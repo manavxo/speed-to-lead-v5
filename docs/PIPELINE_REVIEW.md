@@ -417,18 +417,159 @@ Total: ~18 features, ~3,000 lines of code.
 
 ---
 
-## H. Open Questions for the Owner
+## H. Confirmed Decisions
 
-In priority order. Everything else has been decided above. These are the only ones that need you.
+In priority order. **All 7 originally open questions have been resolved** (per the user session of 2026-06-09). Plus 5 new design directives added below.
 
-1. **VPS or no VPS?** Stay on Render at $14/mo, or spin up a Hetzner/DO box for $5-20/mo. Default: stay on Render. (C5)
-2. **Rep notification channel: WhatsApp or SMS?** Default: WhatsApp via Twilio. Fallback: SMS. (C1)
-3. **Email intake on day 1, or cut from MVP?** Default: cut. Only dealer webform + SMS for v5 launch. Add email intake as a fast-follow. (C6, G.2 step 3)
-4. **Per-dealer quiet-hours override: yes or no?** Default: yes, via `quiet_hours_enabled: bool` in YAML. (C7)
-5. **Inventory upload UX:** CSV upload via the dashboard, or a public URL the dealer sets up? Default: dashboard upload. (G.2 step 8)
-6. **AI persona: ship the 3 templates and let the dealer pick, or expose a text box for full customization?** Default: 3 templates + a text box for tweaks. (E)
-7. **Daily digest SMS: keep or cut?** Default: cut, replace with a dashboard widget. (D-4)
+### H.1 Original 7 open questions — ALL CONFIRMED
+
+1. **VPS or no VPS?** ✅ **Stay on Render.** Free tier for dev, $14/mo Starter tier for production (web $7 + Postgres $7) when the first dealer goes live. The user has confirmed they're okay with the spend. (C5)
+2. **Rep notification channel: WhatsApp or SMS?** ✅ **WhatsApp via Twilio** as the default backend. Fallback to SMS if WhatsApp isn't provisioned. (C1) → See H.2.3 for the implementation decision.
+3. **Email intake on day 1, or cut from MVP?** ✅ **Cut from MVP.** Only dealer webform + SMS for v5 launch. Add email intake (Mailgun Inbound Parse + LLM fallback) as a fast-follow. (C6, G.2 step 3)
+4. **Per-dealer quiet-hours override: yes or no?** ✅ **Yes, per-dealer.** `quiet_hours_enabled: bool` in dealer YAML, defaults to `true`. Staging dealers set it to `false`. The `QUIET_HOURS_DISABLED` env flag stays as a global kill-switch. (C7)
+5. **Inventory upload UX:** ✅ **Dashboard CSV upload.** Drag-and-drop in the dealer settings page. Web-crawling is a Phase 2 opt-in feature for dealers who refuse to upload CSVs. (G.2 step 8)
+6. **AI persona:** ✅ **3 templates + an open text box for tweaks.** The dealer picks from Friendly, Professional, or Casual; can edit the system prompt in a text box. (E)
+7. **Daily digest SMS:** ✅ **Cut.** Replace with a dashboard widget in Phase 2. (D-4)
+
+### H.2 New directives from session 2026-06-09 (5)
+
+These were added in a follow-up session after the original review was written. They're locked in for the v5 build.
+
+#### H.2.1 Render tier strategy: free for dev, paid for production
+
+- **Dev / staging:** Render free tier. The service may sleep after 15 min of inactivity. Fine for development where the user is poking at it.
+- **Production (first dealer goes live):** Switch to Render Starter tier. $14/mo total ($7 web + $7 Postgres). This is the cost of doing business — a 24/7 product needs 24/7 hosting.
+- **Trigger to switch:** The moment any real dealer's leads start flowing. Don't wait for a paying customer to upgrade; the customer's first lead is when the system needs to be awake.
+- **VPS alternative:** Not now. If Render pricing stops making sense at 10+ dealers, revisit. A Hetzner/DO box at $5-20/mo is the only viable alternative and it adds operational work.
+
+#### H.2.2 Dealer-side comms = WhatsApp, NOT SMS
+
+- The system contacts the dealer for: rep claim pings, escalation notifications, appointment confirmations, missed-call handoffs.
+- **All four go via WhatsApp**, not SMS. SMS is for the customer-facing side (the dealer's Twilio number, which customers expect to be reachable as SMS).
+- Implemented as a single chokepoint: `tools/notify_rep.py` with `notify_rep(rep_config, lead, message_type, payload, dealer_config, db_session)`. All engine modules that need to tell the dealer something call this function — never `send_sms()` directly.
+- The function dispatches to a configurable backend per rep. Default = `twilio_whatsapp` (pre-approved Twilio WhatsApp template). Fallback = `sms` (legacy `send_sms()` chokepoint). Phase 2 = `email` and `dashboard` backends.
+- All rep notifications persist a `Message` row with `recipient_role="rep"` so the lead detail page shows them. This was a missing piece in v4 (the rep notification went out but didn't show in the conversation thread).
+
+#### H.2.3 Bypass Twilio for dealer-side if possible (don't force it)
+
+- **The abstraction is the bypass.** `notify_rep()` reads its backend from the rep's config. Swapping backends doesn't require touching any caller.
+- **For Phase 1:** Ship with `twilio_whatsapp` as the only implemented backend. Don't add Meta Cloud API direct integration in Phase 1 — it would be ~1 week of work (Meta business verification, template approval, separate webhook signature verification) for $0 savings at the current scale.
+- **For Phase 2:** When the dealer count is 3+ and Twilio WhatsApp costs become meaningful, evaluate Meta direct. Add a `meta_cloud` backend to `notify_rep()`. Zero changes to engine code.
+- **For Phase 3+:** The abstraction supports `email` and `dashboard` backends for dealers who don't have WhatsApp.
+
+#### H.2.4 Phase 2 provisions MUST exist in Phase 1 architecture
+
+Phase 2 features per the review (and the user wants the architecture to leave room):
+
+- 5 rep-facing dashboard refinements (response timer, lead-claim-rate, etc.)
+- 3 owner-facing features (leads list, attention widget, appointments)
+- 2 system health (logging, monitoring)
+- Email intake with LLM fallback
+- Missed-call handoff decision rule
+- Rep notification on APPT_SET (covered by `notify_rep` already)
+- Per-dealer quiet-hours override
+
+**The Phase 1 architectural decisions that leave room for these (no extra cost in Phase 1, just don't undo them):**
+
+| Provision | Why | Phase 1 verification |
+|---|---|---|
+| `Channel` enum includes SMS, WHATSAPP, WEB_CHAT, EMAIL | Phase 2 can add new channels without schema changes | Verify `app/models/__init__.py` has all four |
+| Dealer config is a free-form `dict`, not strict Pydantic | Phase 2 can add fields without breaking old configs | Verify `Dealer.config` is typed as `dict` |
+| Dashboard `base.html` has a `{% block nav %}` | Phase 2 pages plug in, no template rewrite | Verify the template |
+| State machine events persist to `LeadEvent` | Phase 2 can add Slack/email listeners on event inserts | Verify `app/engine/lifecycle.py` writes `LeadEvent` rows |
+| `notify_rep()` is the notification chokepoint | Phase 2 can add new backends | See H.2.2 |
+| Conversation engine returns `{text, tools_used, mode}` | Phase 2 can add `mode: webhook_response` for chat widget | Verify `app/engine/conversation.py` |
+| `Lead.tags` is a JSONB field | Phase 2 can tag leads without schema changes | Verify `app/models/__init__.py` |
+| `Message.recipient_role` and `Message.sender_role` | Phase 2 can attribute messages to roles (rep, customer, ai, system) | Added in P1-1 task |
+
+#### H.2.5 Testing strategy: manual for the fun stuff, automated for the rest
+
+- **User will test manually:** AI persona tone, conversation flow ("does the AI handle 'I'm just looking' right?"), rep dashboard UX ("can I find my leads quickly?"), customer-facing copy.
+- **Will be automated:** state machine transitions, API contracts, compliance gates (opt-out, quiet hours, OUTBOUND_ENABLED), tool calling (check_inventory, book_appointment), webhook signature validation, every P0 regression test, every Phase 1 feature test.
+
+**Testing infrastructure required in v5 (already partially built):**
+
+| Component | Status in v5 | What it gives you |
+|---|---|---|
+| pytest fixtures: FakeTwilio, FakeLLM, in-memory DB | ✅ Already in `tests/conftest.py` | No real network calls in tests |
+| Structured JSON logs (state transitions, SMS sent, LLM calls) | ✅ Already in v4 | Grep-friendly for debugging |
+| `/debug/lead/{id}` endpoint | ❌ Not yet — add in Phase 0 | See the lead's current state, all messages, all events |
+| `/debug/inbox` endpoint | ❌ Not yet — add in Phase 0 | See all recent leads at a glance |
+| `python -m app.seed_demo` | ❌ Not yet — add in Phase 0 | Creates a "Smoke Test Dealer" with 10 sample leads |
+| `OUTBOUND_ENABLED=false` | ✅ In `.env.example` | All SMS / WhatsApp go to a log file instead of Twilio |
+| Per-dealer `quiet_hours_enabled: false` | ✅ Config schema supports it | Test at 3am without quiet hours blocking |
+| `pytest -v` runs all tests in <30s | TBD — verify | CI-ready, no slow tests |
 
 ---
 
-**Confirmed:** I changed NO code, ran NO migrations, edited NO config. This was a read-only sharpen-the-axe review. The only file written is this one (`PIPELINE_REVIEW.md`).
+## I. Phase 2 Provisions in Phase 1 Architecture — Detail
+
+For each Phase 2 feature, the Phase 1 architectural decision that enables it.
+
+| Phase 2 feature | Phase 1 architectural decision | Code that locks it in |
+|---|---|---|
+| Email intake (AutoTrader / CarGurus / Kijiji) | Dealer config has `lead_email_inbox` field; email adapter has a stub | `app/adapters/intake/email_lead.py` |
+| Rep notification on APPT_SET | `notify_rep()` is the chokepoint; `book_appointment` tool calls it after state transition | `tools/notify_rep.py`, `tools/book_appointment.py` |
+| Missed-call handoff decision rule | `/webhook/twilio/voice` writes a Message row (post-P0-09) so the handoff text shows in the lead thread | `app/main.py:voice webhook` |
+| Per-dealer quiet-hours override | Dealer config has `quiet_hours_enabled: bool`; `tools/send_sms.py` reads it | `tools/send_sms.py` |
+| Email backend for `notify_rep` | `notify_rep()` reads `notify_backend` from rep config; `email` is a valid value (returns NotImplementedError for now) | `tools/notify_rep.py` |
+| Dashboard "attention" widget | `LeadEvent` table tracks all state changes; the widget queries for leads with no rep activity in 30 min | `app/dashboard/templates/leads.html` (Phase 2) |
+| Daily digest (dashboard widget, not SMS) | `LeadEvent` table aggregates; the dashboard widget queries | `app/dashboard/templates/stats.html` (Phase 2) |
+| Multi-channel conversation thread | `Channel` enum + `Message.channel` field | `app/models/__init__.py` |
+| Lead tagging (hot-lead, price-sensitive, etc.) | `Lead.tags` JSONB field | `app/models/__init__.py` |
+| Slack notification on APPT_SET | `LeadEvent` insert can be subscribed to; a Phase 2 listener adds Slack | New file `app/event_listeners/slack.py` (Phase 2) |
+
+---
+
+## J. Testing Strategy — Detail
+
+### J.1 What gets automated
+
+| Category | Test target | Test file |
+|---|---|---|
+| **State machine** | All 11 states, all valid transitions, invalid transitions rejected | `tests/test_lifecycle.py` |
+| **Round-robin** | Even distribution, skip-inactive, escalation to manager | `tests/test_router.py` |
+| **Conversation engine** | Multi-turn history (10 msgs), tool calls, retries, dry-run | `tests/test_conversation.py` |
+| **SMS chokepoint** | Opt-out check, quiet hours, sanitization, OUTBOUND_ENABLED gate | `tests/test_send_sms.py` (or `tests/test_sms_chokepoint.py`) |
+| **Notify rep** | Default = WhatsApp, fallback to SMS, message persistence, dry-run | `tests/test_notify_rep.py` |
+| **Webhook security** | Signed/unsigned/tampered requests (P0-01) | `tests/test_webhook_security.py` |
+| **End-to-end pipeline** | webform → auto-reply → claim → reply → book (the one test that matters) | `tests/test_pipeline_e2e.py` |
+| **P0 regression** | P0-11 conversation history, P0-12 followup not no-op | `tests/test_p0_regressions.py` |
+| **Phase 1 features** | One test file per feature, in the same commit | `tests/test_*.py` |
+
+### J.2 What stays manual
+
+| Category | Why | How the user does it |
+|---|---|---|
+| **AI persona tone** | Subjective; only a human can judge "does this feel like a salesperson?" | Sends the dealer number a few test texts as a fake customer |
+| **Conversation flow** | Multi-turn interactions are hard to assert in unit tests | Replays 5–10 realistic customer scripts (e.g., "I'm just looking", "do you have financing?") |
+| **Rep dashboard UX** | "Can I find my leads quickly?" is a human question | Logs in, navigates, times the click paths |
+| **Customer-facing copy** | "Does this greeting feel right?" | Reads the auto-reply, adjusts the YAML |
+| **Twilio sandbox integration** | Only meaningful with a real phone | Joins the sandbox, runs the opt-in integration test, confirms the WhatsApp arrives |
+| **Email intake** | Depends on real AutoTrader / CarGurus / Kijiji email formats | Forwards a real lead email to the Mailgun address, checks it lands as a Lead |
+
+### J.3 The one test that matters most
+
+`tests/test_pipeline_e2e.py` — the end-to-end test that exercises the full pipeline. It already exists in v5. The user should run it manually after every major change:
+
+```bash
+cd "C:/Users/manav.LAPTOP-TTEINC4O/Desktop/Speed to Lead v5"
+pytest tests/test_pipeline_e2e.py -v
+```
+
+Expected: green in <5 seconds. If this test is red, the engine is broken. If this test is green, the engine works.
+
+---
+
+## K. The Plan
+
+The implementation plan lives at `V5_BUILD_PLAN.md` (in the v5 root). It covers:
+- **Phase 0 Task 0.1:** Twilio signature validation (P0-01) — 2-5 min
+- **Phase 1 Task 1.1:** `notify_rep` abstraction with Twilio WhatsApp default — 30-60 min
+- **Phase 1 Task 1.2:** Real Twilio WhatsApp send (replace the stub) — 15-30 min
+
+Each task is bite-sized, TDD-disciplined, one commit per task. See `V5_BUILD_PLAN.md` for the full task list with code examples and verification steps.
+
+---
+
+**End of pipeline review. The build plan is at `V5_BUILD_PLAN.md`. The migration log is at `V5_MIGRATION_LOG.md`. The next-session prompt is at `NEXT_SESSION_PROMPT.md`.**
