@@ -1,0 +1,28 @@
+# Core runtime
+fastapi>=0.115
+uvicorn[standard]>=0.30
+sqlmodel>=0.0.22
+psycopg[binary]>=3.2
+apscheduler>=3.10
+pydantic>=2.7
+pydantic-settings>=2.3
+pyyaml>=6.0
+twilio>=9.0
+openai>=1.0
+jinja2>=3.1
+httpx>=0.27
+python-multipart>=0.0.6
+itsdangerous>=2.2
+
+# Dev / test
+pytest>=8.0
+pytest-asyncio>=0.23
+ruff>=0.6
+
+# Optional: inventory adapter extras (only if running a Phase 2 inventory discovery adapter)
+# selectolax>=0.3
+# extruct>=0.17
+
+# Dropped from v4:
+# - alembic (no DB migrations in v5; create_all on startup is enough for the lean MVP)
+# - markdown, xhtml2pdf (PDF builder not needed for v5)

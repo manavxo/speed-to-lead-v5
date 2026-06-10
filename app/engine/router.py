@@ -1,0 +1,194 @@
+"""Round-robin lead assignment.
+
+Picks the next active rep using a per-dealer pointer (Dealer.round_robin_pointer), pings them
+via SMS to claim, and schedules an escalation timer. See workflows/escalation.md.
+"""
+from __future__ import annotations
+
+import logging
+from sqlalchemy.orm import Session
+
+from app.engine.lifecycle import transition
+from app.models import Dealer, Lead, LeadState
+
+logger = logging.getLogger("speed-to-lead.router")
+
+
+def next_rep(dealer: Dealer, sales_team: list[dict]) -> dict | None:
+    """Return the next active rep in rotation and advance the dealer's pointer.
+
+    Args:
+        dealer: The dealer model instance (uses round_robin_pointer).
+        sales_team: List of rep dicts with at least 'name', 'phone', 'active' keys.
+
+    Returns:
+        The next active rep dict, or None if no active reps.
+    """
+    active = [r for r in sales_team if r.get("active", True)]
+    if not active:
+        return None
+    idx = dealer.round_robin_pointer % len(active)
+    dealer.round_robin_pointer = (dealer.round_robin_pointer + 1) % len(active)
+    return active[idx]
+
+
+def assign_lead(
+    session: Session,
+    lead: Lead,
+    dealer: Dealer,
+    sales_team: list[dict],
+    *,
+    fake_twilio=None,
+    sms_number: str | None = None,
+) -> Lead | None:
+    """Assign `lead` to the next rep, send the SMS claim ping, transition to ASSIGNED.
+
+    If no active reps, the lead stays in AUTO_REPLIED (AI-only / after-hours path).
+    Sends via tools.send_sms.send_sms, gated by OUTBOUND_ENABLED.
+    """
+    rep = next_rep(dealer, sales_team)
+    if rep is None:
+        # No active reps — lead stays in AUTO_REPLIED (AI handles it)
+        logger.info("No active reps for lead#%s — staying AUTO_REPLIED", lead.id)
+        return None
+
+    # Persist the pointer advancement
+    session.commit()
+
+    # Transition to ASSIGNED (only if not already ASSIGNED)
+    if lead.state != LeadState.ASSIGNED:
+        transition(
+            session, lead, LeadState.ASSIGNED,
+            reason="round_robin_assign",
+            meta={"assigned_rep": rep["name"]},
+        )
+
+    # Update the lead
+    lead.assigned_rep = rep["name"]
+    session.commit()
+    session.refresh(lead)
+
+    # Send SMS claim ping via the send_sms chokepoint
+    claim_msg = (
+        f"New lead assigned to you: {lead.name or 'Customer'} "
+        f"({lead.phone or lead.email or 'unknown'}). "
+        f"Reply 1 to claim, 2 to pass."
+    )
+
+    from tools.send_sms import send_sms
+    send_sms(
+        session=session,
+        to=rep["phone"],
+        body=claim_msg,
+        from_number=sms_number or "",
+        lead=lead,
+        role="REP",
+        recipient_name=rep["name"],
+        fake_twilio=fake_twilio,
+        force_send=True,
+    )
+
+    logger.info("Lead#%s assigned to %s", lead.id, rep["name"])
+    return rep
+
+
+def handle_claim(
+    session: Session,
+    lead: Lead,
+    rep_name: str,
+) -> Lead:
+    """Handle a rep's claim response (reply '1' to claim).
+
+    Transitions ASSIGNED -> CLAIMED.
+    """
+    transition(
+        session, lead, LeadState.CLAIMED,
+        reason="rep_claimed",
+        meta={"claimed_by": rep_name},
+    )
+    return lead
+
+
+def handle_pass(
+    session: Session,
+    lead: Lead,
+    dealer: Dealer,
+    sales_team: list[dict],
+    rep_name: str,
+    *,
+    fake_twilio=None,
+    sms_number: str | None = None,
+    max_pass_count: int = 3,
+) -> Lead | None:
+    """Handle a rep's pass response (reply '2' to pass).
+
+    Tracks how many times the lead has been passed. After max_pass_count
+    consecutive passes, escalates to the manager instead of looping.
+    """
+    lead.pass_count = getattr(lead, "pass_count", 0) + 1
+    session.flush()
+
+    if lead.pass_count >= max_pass_count:
+        # Too many passes — escalate to manager instead of reassigning
+        logger.warning(
+            "Lead#%s passed %d times — escalating to manager", lead.id, lead.pass_count,
+        )
+        _escalate_to_manager(
+            session, lead, dealer,
+            reason=f"passed {lead.pass_count} times by reps",
+            fake_twilio=fake_twilio,
+            sms_number=sms_number,
+        )
+        return None
+
+    return assign_lead(
+        session, lead, dealer, sales_team,
+        fake_twilio=fake_twilio,
+        sms_number=sms_number,
+    )
+
+
+def _escalate_to_manager(
+    session: Session,
+    lead: Lead,
+    dealer: Dealer,
+    *,
+    reason: str = "max_pass_count exceeded",
+    fake_twilio=None,
+    sms_number: str | None = None,
+) -> None:
+    """Escalate a lead to the dealer's manager after too many passes."""
+    from app.engine.lifecycle import transition
+
+    dealer_config = dealer.config or {}
+    manager_phone = dealer_config.get("routing", {}).get("manager_phone")
+
+    transition(
+        session, lead, LeadState.ESCALATED,
+        reason="max_pass_exceeded",
+        meta={"pass_count": lead.pass_count, "reason": reason},
+    )
+    session.flush()
+
+    if manager_phone:
+        manager_msg = (
+            f"Lead {lead.name or 'Customer'} ({lead.phone or lead.email or 'unknown'}) "
+            f"has been passed {lead.pass_count} times. "
+            f"Please review and assign manually."
+        )
+        try:
+            from tools.send_sms import send_sms
+            send_sms(
+                session=session,
+                to=manager_phone,
+                body=manager_msg,
+                from_number=sms_number or "",
+                lead=lead,
+                role="MANAGER",
+                fake_twilio=fake_twilio,
+                force_send=True,
+            )
+        except Exception:
+            logger.exception("Failed to notify manager for lead#%s escalation", lead.id)
+    else:
+        logger.warning("No manager_phone configured for dealer %s — lead#%s escalated silently", dealer.slug, lead.id)

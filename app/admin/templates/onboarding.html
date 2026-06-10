@@ -1,0 +1,533 @@
+{% extends 'base_admin.html' %}
+
+{% block title %}Onboard New Dealer — Admin — Speed to Lead{% endblock %}
+{% block page_title %}Onboard New Dealer{% endblock %}
+
+{% block content %}
+<style>
+    .onboard-form { max-width: 800px; margin: 0 auto; }
+    .form-section { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: 20px; overflow: hidden; }
+    .form-section-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+    .form-section-header h3 { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+    .form-section-header .section-num { width: 24px; height: 24px; background: var(--accent-subtle); color: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; }
+    .form-section-body { padding: 20px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-grid .full-width { grid-column: 1 / -1; }
+    .hours-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+    .hours-grid .day-col { text-align: center; }
+    .hours-grid .day-label { font-size: 11px; font-weight: 500; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 6px; }
+    .hours-grid .day-input { width: 100%; padding: 6px 4px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-family: inherit; font-size: 11px; text-align: center; transition: var(--transition); }
+    .hours-grid .day-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1); }
+    .rep-row { display: grid; grid-template-columns: 1fr 1fr 80px 40px; gap: 10px; align-items: end; margin-bottom: 10px; padding: 10px; background: var(--bg); border-radius: var(--radius-sm); border: 1px solid var(--border); }
+    .rep-row .rep-label { font-size: 11px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px; display: block; }
+    .reps-container { margin-bottom: 10px; }
+    .btn-add-rep { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--bg-elevated); border: 1px dashed var(--border); border-radius: var(--radius-sm); color: var(--text-secondary); font-size: 12px; cursor: pointer; transition: var(--transition); }
+    .btn-add-rep:hover { background: var(--bg); border-color: var(--accent); color: var(--accent); }
+    .btn-remove-rep { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: var(--radius-sm); color: var(--error); cursor: pointer; transition: var(--transition); }
+    .btn-remove-rep:hover { background: rgba(239, 68, 68, 0.2); }
+    .checkbox-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; }
+    .checkbox-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
+    .checkbox-row label { font-size: 13px; color: var(--text-primary); cursor: pointer; }
+    .form-actions { display: flex; gap: 12px; justify-content: flex-end; padding-top: 20px; }
+    .success-panel { background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.2); border-radius: var(--radius-md); padding: 24px; margin-bottom: 20px; }
+    .success-panel h3 { color: var(--success); font-size: 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .yaml-preview { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.6; color: var(--text-primary); overflow-x: auto; max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+    .checklist-item { display: flex; align-items: flex-start; gap: 8px; padding: 8px 0; font-size: 13px; color: var(--text-secondary); }
+    .checklist-item input[type="checkbox"] { margin-top: 2px; accent-color: var(--accent); }
+    .error-banner { background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: var(--radius-md); padding: 16px 20px; margin-bottom: 20px; color: var(--error); font-size: 13px; }
+    .help-text { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+    @media (max-width: 768px) { .form-grid { grid-template-columns: 1fr; } .hours-grid { grid-template-columns: repeat(4, 1fr); } .rep-row { grid-template-columns: 1fr 1fr; } }
+</style>
+
+<div class="onboard-form">
+    {% if error %}
+    <div class="error-banner">
+        <strong>Error:</strong> {{ error }}
+    </div>
+    {% endif %}
+    
+    {% if success %}
+    <!-- SUCCESS STATE -->
+    <div class="success-panel">
+        <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+            Dealer Provisioned Successfully!
+        </h3>
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+            <strong>{{ dealer_name }}</strong> ({{ dealer_slug }}) has been created.
+            Config saved to <code>dealers/{{ dealer_slug }}.yaml</code>
+        </p>
+    </div>
+    
+    <div class="form-section">
+        <div class="form-section-header">
+            <h3>Generated YAML Config</h3>
+        </div>
+        <div class="form-section-body">
+            <pre class="yaml-preview">{{ yaml_content }}</pre>
+        </div>
+    </div>
+    
+    <div class="form-section">
+        <div class="form-section-header">
+            <h3>Twilio Setup Checklist</h3>
+        </div>
+        <div class="form-section-body">
+            <div class="checklist-item">
+                <input type="checkbox"> Buy a Canadian Twilio phone number (BC area code: 604, 778, 236)
+            </div>
+            <div class="checklist-item">
+                <input type="checkbox"> Set SMS webhook to: <code>https://speed-to-lead-8tfi.onrender.com/webhook/sms/inbound</code>
+            </div>
+            <div class="checklist-item">
+                <input type="checkbox"> Join the WhatsApp Sandbox (if using WhatsApp)
+            </div>
+            <div class="checklist-item">
+                <input type="checkbox"> Test SMS inbound — send a message to the dealer's number
+            </div>
+            <div class="checklist-item">
+                <input type="checkbox"> Test auto-reply — verify you receive a response within 10s
+            </div>
+            <div class="checklist-item">
+                <input type="checkbox"> Test rep notification — verify WhatsApp claim ping is received
+            </div>
+            <div class="checklist-item">
+                <input type="checkbox"> Test opt-out — send "STOP" and verify opt-out confirmation
+            </div>
+            <div class="checklist-item">
+                <input type="checkbox"> Check <a href="/dashboard/leads" style="color: var(--accent);">/dashboard/leads</a> for the test lead
+            </div>
+        </div>
+    </div>
+    
+    <div class="form-actions">
+        <a href="/admin/onboarding" class="btn btn-secondary">Onboard Another Dealer</a>
+        <a href="/admin/dealers" class="btn btn-primary">View All Dealers</a>
+    </div>
+    
+    {% else %}
+    <!-- FORM STATE -->
+    <form method="POST" action="/admin/onboarding">
+        
+        <!-- Section 1: Business Info -->
+        <div class="form-section">
+            <div class="form-section-header">
+                <span class="section-num">1</span>
+                <h3>Business Information</h3>
+            </div>
+            <div class="form-section-body">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label" for="business_name">Business Name *</label>
+                        <input class="input" type="text" id="business_name" name="business_name" 
+                               value="{{ form.business_name | default('') }}" required
+                               placeholder="e.g. Sunrise Auto Sales">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="slug">Slug *</label>
+                        <input class="input" type="text" id="slug" name="slug" 
+                               value="{{ form.slug | default('') }}" required
+                               placeholder="e.g. sunrise-auto" pattern="[a-z0-9\-]+">
+                        <div class="help-text">Kebab-case, unique. Used in URLs and file paths.</div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="timezone">Timezone *</label>
+                        <select class="select" id="timezone" name="timezone" required>
+                            <option value="America/Vancouver" {% if form.timezone == 'America/Vancouver' %}selected{% endif %}>America/Vancouver (Pacific)</option>
+                            <option value="America/Edmonton" {% if form.timezone == 'America/Edmonton' %}selected{% endif %}>America/Edmonton (Mountain)</option>
+                            <option value="America/Winnipeg" {% if form.timezone == 'America/Winnipeg' %}selected{% endif %}>America/Winnipeg (Central)</option>
+                            <option value="America/Toronto" {% if form.timezone == 'America/Toronto' %}selected{% endif %}>America/Toronto (Eastern)</option>
+                            <option value="America/Halifax" {% if form.timezone == 'America/Halifax' %}selected{% endif %}>America/Halifax (Atlantic)</option>
+                            <option value="America/St_Johns" {% if form.timezone == 'America/St_Johns' %}selected{% endif %}>America/St_Johns (Newfoundland)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="main_phone">Main Phone</label>
+                        <input class="input" type="tel" id="main_phone" name="main_phone" 
+                               value="{{ form.main_phone | default('') }}"
+                               placeholder="+160****1234">
+                    </div>
+                    <div class="form-group full-width">
+                        <label class="form-label" for="address">Address</label>
+                        <input class="input" type="text" id="address" name="address" 
+                               value="{{ form.address | default('') }}"
+                               placeholder="1234 Kingsway, Vancouver, BC">
+                    </div>
+                    <div class="form-group full-width">
+                        <label class="form-label" for="maps_url">Google Maps URL</label>
+                        <input class="input" type="url" id="maps_url" name="maps_url" 
+                               value="{{ form.maps_url | default('') }}"
+                               placeholder="https://maps.google.com/?q=Sunrise+Auto+Sales">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Section 2: Business Hours -->
+        <div class="form-section">
+            <div class="form-section-header">
+                <span class="section-num">2</span>
+                <h3>Business Hours</h3>
+            </div>
+            <div class="form-section-body">
+                <div class="help-text" style="margin-bottom: 12px;">Enter time range (e.g. 09:00-19:00) or "closed".</div>
+                <div class="hours-grid">
+                    {% for day in ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] %}
+                    <div class="day-col">
+                        <div class="day-label">{{ day }}</div>
+                        <input class="day-input" type="text" name="hours_{{ day }}" 
+                               value="{{ form['hours_' ~ day] | default('09:00-19:00' if day != 'sun' else 'closed') }}"
+                               placeholder="09:00-19:00">
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Section 3: Sales Team -->
+        <div class="form-section">
+            <div class="form-section-header">
+                <span class="section-num">3</span>
+                <h3>Sales Team</h3>
+            </div>
+            <div class="form-section-body">
+                <div class="reps-container" id="reps-container">
+                    <div class="rep-row" data-rep-index="0">
+                        <div>
+                            <span class="rep-label">Rep Name *</span>
+                            <input class="input" type="text" name="rep_name_0" placeholder="Mike" required>
+                        </div>
+                        <div>
+                            <span class="rep-label">WhatsApp Number *</span>
+                            <input class="input" type="tel" name="rep_whatsapp_0" placeholder="+160****1234" required>
+                        </div>
+                        <div>
+                            <span class="rep-label">Active</span>
+                            <div class="checkbox-row">
+                                <input type="checkbox" name="rep_active_0" checked>
+                            </div>
+                        </div>
+                        <div></div>
+                    </div>
+                </div>
+                <button type="button" class="btn-add-rep" onclick="addRep()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Add Sales Rep
+                </button>
+            </div>
+        </div>
+        
+        <!-- Section 4: Channels -->
+        <div class="form-section">
+            <div class="form-section-header">
+                <span class="section-num">4</span>
+                <h3>Channels</h3>
+            </div>
+            <div class="form-section-body">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label" for="sms_number">SMS Number *</label>
+                        <input class="input" type="tel" id="sms_number" name="sms_number" 
+                               value="{{ form.sms_number | default('') }}" required
+                               placeholder="+177****1234">
+                        <div class="help-text">Twilio number for lead-facing SMS.</div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="whatsapp_sender">WhatsApp Sender</label>
+                        <input class="input" type="tel" id="whatsapp_sender" name="whatsapp_sender" 
+                               value="{{ form.whatsapp_sender | default('') }}"
+                               placeholder="+141****1234">
+                        <div class="help-text">Twilio WhatsApp sender for rep notifications.</div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="lead_email_inbox">Lead Email Inbox</label>
+                        <input class="input" type="email" id="lead_email_inbox" name="lead_email_inbox" 
+                               value="{{ form.lead_email_inbox | default('') }}"
+                               placeholder="leads@dealer.com">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="facebook_page_id">Facebook Page ID</label>
+                        <input class="input" type="text" id="facebook_page_id" name="facebook_page_id" 
+                               value="{{ form.facebook_page_id | default('') }}"
+                               placeholder="Optional">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="web_form_token">Web Form Token</label>
+                        <input class="input" type="text" id="web_form_token" name="web_form_token" 
+                               value="{{ form.web_form_token | default('') }}"
+                               placeholder="Auto-generated if empty">
+                        <div class="help-text">Leave blank to auto-generate from slug.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Section 5: Routing -->
+        <div class="form-section">
+            <div class="form-section-header">
+                <span class="section-num">5</span>
+                <h3>Routing</h3>
+            </div>
+            <div class="form-section-body">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label" for="routing_strategy">Strategy</label>
+                        <select class="select" id="routing_strategy" name="routing_strategy">
+                            <option value="round_robin" selected>Round Robin</option>
+                            <option value="by_source">By Source</option>
+                            <option value="single_pool">Single Pool</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="claim_timeout_min">Claim Timeout (minutes)</label>
+                        <input class="input" type="number" id="claim_timeout_min" name="claim_timeout_min" 
+                               value="5" min="1" max="60">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="manager_phone">Manager Phone</label>
+                        <input class="input" type="tel" id="manager_phone" name="manager_phone" 
+                               value="{{ form.manager_phone | default('') }}"
+                               placeholder="+160****1234">
+                        <div class="help-text">Escalation target if no rep claims in time.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Section 6: AI Personality -->
+        <div class="form-section">
+            <div class="form-section-header">
+                <span class="section-num">6</span>
+                <h3>AI Personality</h3>
+            </div>
+            <div class="form-section-body">
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label class="form-label" for="ai_persona">Persona</label>
+                        <input class="input" type="text" id="ai_persona" name="ai_persona" 
+                               value="{{ form.ai_persona | default('friendly, concise, no-pressure local sales rep') }}"
+                               placeholder="e.g. friendly, concise, no-pressure local sales rep">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="ai_goal">Goal</label>
+                        <select class="select" id="ai_goal" name="ai_goal">
+                            <option value="book_appointment" selected>Book Appointment</option>
+                            <option value="collect_info">Collect Info</option>
+                            <option value="answer_questions">Answer Questions</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <div class="checkbox-row" style="padding-top: 24px;">
+                            <input type="checkbox" id="no_price_negotiation" name="no_price_negotiation" checked>
+                            <label for="no_price_negotiation">No price negotiation</label>
+                        </div>
+                        <div class="checkbox-row">
+                            <input type="checkbox" id="no_financing_promises" name="no_financing_promises" checked>
+                            <label for="no_financing_promises">No financing promises</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Section 7: Inventory -->
+        <div class="form-section">
+            <div class="form-section-header">
+                <span class="section-num">7</span>
+                <h3>Inventory</h3>
+            </div>
+            <div class="form-section-body">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label" for="inventory_source">Source</label>
+                        <select class="select" id="inventory_source" name="inventory_source">
+                            <option value="auto" selected>Auto (detect best)</option>
+                            <option value="feed">Feed (CSV/TSV/XML)</option>
+                            <option value="dms">DMS (API)</option>
+                            <option value="structured_data">Structured Data (JSON-LD)</option>
+                            <option value="website_scrape">Website Scrape</option>
+                            <option value="manual">Manual Upload</option>
+                            <option value="none">None</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="inventory_url">Inventory URL</label>
+                        <input class="input" type="url" id="inventory_url" name="inventory_url" 
+                               value="{{ form.inventory_url | default('') }}"
+                               placeholder="https://dealer.example.ca/inventory">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="inventory_platform">Platform Hint</label>
+                        <input class="input" type="text" id="inventory_platform" name="inventory_platform" 
+                               value="{{ form.inventory_platform | default('') }}"
+                               placeholder="e.g. dealerpull, dealercenter">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="inventory_refresh_min">Refresh Interval (min)</label>
+                        <input class="input" type="number" id="inventory_refresh_min" name="inventory_refresh_min" 
+                               value="180" min="10" max="1440">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Section 8: Lead Organization -->
+        <div class="form-section">
+            <div class="form-section-header">
+                <span class="section-num">8</span>
+                <h3>Lead Organization</h3>
+            </div>
+            <div class="form-section-body">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label" for="lead_org_mode">Mode</label>
+                        <select class="select" id="lead_org_mode" name="lead_org_mode">
+                            <option value="native" selected>Native (our dashboard)</option>
+                            <option value="crm_sync">CRM Sync</option>
+                            <option value="sheet">Google Sheet</option>
+                            <option value="webhook">Webhook</option>
+                            <option value="email_digest">Email Digest</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="lead_org_target">Target</label>
+                        <input class="input" type="text" id="lead_org_target" name="lead_org_target" 
+                               value="{{ form.lead_org_target | default('') }}"
+                               placeholder="CRM name, Sheet ID, or webhook URL">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="lead_org_credentials_ref">Credentials Ref</label>
+                        <input class="input" type="text" id="lead_org_credentials_ref" name="lead_org_credentials_ref" 
+                               value="{{ form.lead_org_credentials_ref | default('') }}"
+                               placeholder="Name of secret in .env / vault">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Section 9: Compliance -->
+        <div class="form-section">
+            <div class="form-section-header">
+                <span class="section-num">9</span>
+                <h3>Compliance (Canada / BC)</h3>
+            </div>
+            <div class="form-section-body">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label" for="compliance_region">Region</label>
+                        <select class="select" id="compliance_region" name="compliance_region">
+                            <option value="CA-BC" selected>Canada — British Columbia</option>
+                            <option value="CA-AB">Canada — Alberta</option>
+                            <option value="CA-ON">Canada — Ontario</option>
+                            <option value="CA">Canada (Federal)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="quiet_hours">Quiet Hours</label>
+                        <input class="input" type="text" id="quiet_hours" name="quiet_hours" 
+                               value="21:00-08:00"
+                               placeholder="21:00-08:00">
+                        <div class="help-text">No outbound sends during this window (dealer timezone).</div>
+                    </div>
+                    <div class="form-group full-width">
+                        <label class="form-label" for="consent_text">Consent Text</label>
+                        <textarea class="input" id="consent_text" name="consent_text" rows="2" 
+                                  placeholder="By submitting you agree to receive texts from {dealer_name}. Reply STOP to opt out.">By submitting you agree to receive texts from {dealer_name}. Reply STOP to opt out.</textarea>
+                        <div class="help-text">Use {dealer_name} as a placeholder — it will be replaced automatically.</div>
+                    </div>
+                    <div class="form-group full-width">
+                        <label class="form-label" for="opt_out_keywords">Opt-Out Keywords</label>
+                        <input class="input" type="text" id="opt_out_keywords" name="opt_out_keywords" 
+                               value="STOP, STOPALL, UNSUBSCRIBE, ARRET"
+                               placeholder="STOP, STOPALL, UNSUBSCRIBE, ARRET">
+                        <div class="help-text">Comma-separated. ARRET for bilingual compliance.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Submit -->
+        <div class="form-actions">
+            <a href="/admin/dealers" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary btn-lg">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="8.5" cy="7" r="4"></circle>
+                    <line x1="20" y1="8" x2="20" y2="14"></line>
+                    <line x1="23" y1="11" x2="17" y2="11"></line>
+                </svg>
+                Provision Dealer
+            </button>
+        </div>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let repCount = 1;
+    
+    function addRep() {
+        const container = document.getElementById('reps-container');
+        const idx = repCount++;
+        const row = document.createElement('div');
+        row.className = 'rep-row';
+        row.dataset.repIndex = idx;
+        row.innerHTML = `
+            <div>
+                <span class="rep-label">Rep Name *</span>
+                <input class="input" type="text" name="rep_name_${idx}" placeholder="Name" required>
+            </div>
+            <div>
+                <span class="rep-label">WhatsApp Number *</span>
+                <input class="input" type="tel" name="rep_whatsapp_${idx}" placeholder="+160****1234" required>
+            </div>
+            <div>
+                <span class="rep-label">Active</span>
+                <div class="checkbox-row">
+                    <input type="checkbox" name="rep_active_${idx}" checked>
+                </div>
+            </div>
+            <div>
+                <button type="button" class="btn-remove-rep" onclick="removeRep(this)" title="Remove rep">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+        `;
+        container.appendChild(row);
+    }
+    
+    function removeRep(btn) {
+        const row = btn.closest('.rep-row');
+        if (document.querySelectorAll('.rep-row').length > 1) {
+            row.remove();
+        }
+    }
+    
+    document.getElementById('business_name').addEventListener('input', function() {
+        const slug = this.value
+            .toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-|-$/g, '');
+        document.getElementById('slug').value = slug;
+        
+        const consentField = document.getElementById('consent_text');
+        if (consentField.value.includes('{dealer_name}') || consentField.dataset.auto === 'true') {
+            consentField.value = `By submitting you agree to receive texts from ${this.value}. Reply STOP to opt out.`;
+            consentField.dataset.auto = 'true';
+        }
+    });
+</script>
+{% endblock %}

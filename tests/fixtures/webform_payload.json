@@ -1,0 +1,12 @@
+{
+  "_comment": "Axis-3 webform intake fixture. Posted to /webhook/form/{token}. Expected NormalizedLead: name='Sarah Chen', phone='+16045551234', vehicle_ref='SA1001', consent=true.",
+  "full_name": "Sarah Chen",
+  "phone": "(604) 555-1234",
+  "email": "sarah.chen@example.com",
+  "message": "Is the 2019 Civic still available? Could I see it this week?",
+  "vehicle_stock": "SA1001",
+  "vehicle_title": "2019 Honda Civic EX",
+  "page_url": "https://sunriseauto.example.ca/inventory/SA1001",
+  "consent_sms": true,
+  "submitted_at": "2026-06-04T17:42:11-07:00"
+}

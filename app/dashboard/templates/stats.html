@@ -1,0 +1,720 @@
+{% extends 'base.html' %}
+
+{% block title %}Stats - Speed to Lead{% endblock %}
+{% block page_title %}
+Stats & Analytics
+<form method="get" style="display:inline; float:right; font-size:14px; font-weight:normal;">
+  <label>Show last:
+    <select name="days" onchange="this.form.submit()" style="padding:4px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text);">
+      <option value="7" {% if days == 7 %}selected{% endif %}>7 days</option>
+      <option value="30" {% if days == 30 %}selected{% endif %}>30 days</option>
+      <option value="90" {% if days == 90 %}selected{% endif %}>90 days</option>
+      <option value="180" {% if days == 180 %}selected{% endif %}>180 days</option>
+      <option value="365" {% if days == 365 %}selected{% endif %}>1 year</option>
+    </select>
+  </label>
+</form>
+{% endblock %}
+
+{% block head %}
+<style>
+    /* Stats-specific styles */
+    .stats-container {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    
+    /* Top stat cards */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 32px;
+    }
+    
+    /* Response-time grid (3 cards) */
+    .response-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 32px;
+    }
+    
+    .stat-card .stat-value.green  { color: var(--success, #22c55e); }
+    .stat-card .stat-value.yellow { color: var(--gold, #f59e0b); }
+    .stat-card .stat-value.red    { color: var(--danger, #ef4444); }
+    
+    .stat-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: 20px;
+    }
+    
+    .stat-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+    }
+    
+    .stat-icon {
+        width: 40px;
+        height: 40px;
+        background: var(--accent-subtle);
+        border-radius: var(--radius-sm);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .stat-icon svg {
+        width: 20px;
+        height: 20px;
+        color: var(--accent);
+    }
+    
+    .stat-card .stat-label {
+        font-size: 12px;
+        color: var(--text-muted);
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        margin-bottom: 8px;
+    }
+    
+    .stat-card .stat-value {
+        font-size: 32px;
+        font-weight: 600;
+        color: var(--text-primary);
+        letter-spacing: -0.02em;
+        line-height: 1;
+    }
+    
+    /* Charts section */
+    .charts-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 32px;
+    }
+    
+    .chart-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        overflow: hidden;
+    }
+    
+    .chart-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    .chart-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+    
+    .chart-period {
+        font-size: 12px;
+        color: var(--text-muted);
+        background: var(--bg);
+        padding: 4px 8px;
+        border-radius: var(--radius-sm);
+    }
+    
+    .chart-body {
+        padding: 20px;
+    }
+    
+    /* Funnel */
+    .funnel {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    .funnel-step {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 12px 0;
+    }
+    
+    .funnel-bar-container {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .funnel-bar {
+        height: 32px;
+        background: linear-gradient(90deg, var(--accent) 0%, var(--accent-hover) 100%);
+        border-radius: 4px;
+        transition: all 0.5s ease;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        padding-right: 12px;
+    }
+    
+    .funnel-bar-value {
+        font-size: 12px;
+        font-weight: 600;
+        color: white;
+    }
+    
+    .funnel-label {
+        width: 100px;
+        font-size: 12px;
+        color: var(--text-secondary);
+        text-align: right;
+        flex-shrink: 0;
+    }
+    
+    .funnel-pct {
+        width: 50px;
+        font-size: 11px;
+        color: var(--text-muted);
+        text-align: right;
+        flex-shrink: 0;
+    }
+    
+    /* Leaderboard */
+    .leaderboard-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        overflow: hidden;
+    }
+    
+    .leaderboard-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    .leaderboard-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+    
+    .leaderboard-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .leaderboard-table thead th {
+        padding: 10px 16px;
+        text-align: left;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-elevated);
+    }
+    
+    .leaderboard-table tbody tr {
+        border-bottom: 1px solid var(--border);
+        transition: var(--transition);
+    }
+    
+    .leaderboard-table tbody tr:last-child {
+        border-bottom: none;
+    }
+    
+    .leaderboard-table tbody tr:hover {
+        background: var(--bg-elevated);
+    }
+    
+    .leaderboard-table tbody td {
+        padding: 12px 16px;
+        font-size: 13px;
+        color: var(--text-primary);
+    }
+    
+    .rep-cell {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .rep-rank {
+        width: 24px;
+        height: 24px;
+        background: var(--bg);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-secondary);
+    }
+    
+    .rep-rank.gold {
+        background: rgba(245, 158, 11, 0.12);
+        color: var(--gold);
+    }
+    
+    .rep-rank.silver {
+        background: rgba(156, 163, 175, 0.12);
+        color: #9ca3af;
+    }
+    
+    .rep-rank.bronze {
+        background: rgba(217, 119, 6, 0.12);
+        color: #d97706;
+    }
+    
+    .rep-avatar {
+        width: 32px;
+        height: 32px;
+        background: var(--accent-subtle);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--accent);
+    }
+    
+    .rep-info {
+        flex: 1;
+    }
+    
+    .rep-name {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-primary);
+    }
+    
+    .rep-role {
+        font-size: 11px;
+        color: var(--text-muted);
+    }
+    
+    .metric-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .metric-bar-track {
+        flex: 1;
+        height: 6px;
+        background: var(--bg);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+    
+    .metric-bar-fill {
+        height: 100%;
+        background: var(--accent);
+        border-radius: 3px;
+        transition: width 0.5s ease;
+    }
+    
+    .metric-value {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-primary);
+        min-width: 40px;
+        text-align: right;
+    }
+
+    /* Source Breakdown Table */
+    .source-breakdown-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        overflow: hidden;
+        margin-bottom: 32px;
+    }
+
+    .source-breakdown-card .leaderboard-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .pct-bar-cell {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .pct-bar-track {
+        flex: 1;
+        height: 8px;
+        background: var(--bg);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .pct-bar-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.5s ease;
+    }
+
+    .pct-bar-fill.green { background: var(--success, #22c55e); }
+    .pct-bar-fill.purple { background: var(--purple, #a855f7); }
+
+    .pct-value {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-primary);
+        min-width: 45px;
+        text-align: right;
+    }
+
+    .source-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: var(--radius-sm);
+        font-size: 12px;
+        font-weight: 500;
+        background: var(--accent-subtle);
+        color: var(--accent);
+    }
+    
+    @media (max-width: 768px) {
+        .stats-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+        
+        .response-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .charts-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="stats-container">
+    <!-- Top Stats -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <div class="stat-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                </div>
+            </div>
+            <div class="stat-label">Total Leads</div>
+            <div class="stat-value">{{ total_leads }}</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <div class="stat-icon" style="background: rgba(34, 197, 94, 0.12);">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--success);">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                </div>
+            </div>
+            <div class="stat-label">Active Leads</div>
+            <div class="stat-value">{{ active_leads }}</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <div class="stat-icon" style="background: rgba(168, 85, 247, 0.12);">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--purple);">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                    </svg>
+                </div>
+            </div>
+            <div class="stat-label">Conversion Rate</div>
+            <div class="stat-value">{{ conversion_rate }}</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <div class="stat-icon" style="background: rgba(245, 158, 11, 0.12);">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--gold);">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                </div>
+            </div>
+            <div class="stat-label">Appointments</div>
+            <div class="stat-value">{{ appt_leads }}</div>
+        </div>
+    </div>
+    
+    <!-- Response Time Metrics -->
+    <div class="response-grid">
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <div class="stat-icon" style="background: rgba(34, 197, 94, 0.12);">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--success);">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                </div>
+            </div>
+            <div class="stat-label">Avg Response Time</div>
+            <div class="stat-value {% if response_metrics.avg_response_seconds > 0 and response_metrics.avg_response_seconds < 60 %}green{% elif response_metrics.avg_response_seconds >= 60 and response_metrics.avg_response_seconds < 300 %}yellow{% elif response_metrics.avg_response_seconds >= 300 %}red{% endif %}">
+                {{ response_metrics.avg_response_display }}
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <div class="stat-icon" style="background: rgba(59, 130, 246, 0.12);">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #3b82f6;">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                    </svg>
+                </div>
+            </div>
+            <div class="stat-label">% Within 5 Minutes</div>
+            <div class="stat-value {% if response_metrics.pct_within_5_min >= 80 %}green{% elif response_metrics.pct_within_5_min >= 50 %}yellow{% else %}red{% endif %}">
+                {{ response_metrics.pct_within_5_min }}%
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <div class="stat-icon" style="background: rgba(168, 85, 247, 0.12);">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--purple);">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                </div>
+            </div>
+            <div class="stat-label">Leads with Response</div>
+            <div class="stat-value">{{ response_metrics.total_with_response }}</div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="charts-grid">
+        <!-- Leads by Source -->
+        <div class="chart-card">
+            <div class="chart-header">
+                <div class="chart-title">Leads by Source</div>
+                <div class="chart-period">All time</div>
+            </div>
+            <div class="chart-body">
+                {% if sources %}
+                {% set max_source = sources.values()|max if sources.values()|list else 1 %}
+                <div class="funnel">
+                    {% for source, count in sources.items() %}
+                    <div class="funnel-step">
+                        <div class="funnel-label">{{ source }}</div>
+                        <div class="funnel-bar-container">
+                            <div class="funnel-bar" style="width: {{ (count / max_source * 100)|int }}%;">
+                                <span class="funnel-bar-value">{{ count }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div style="text-align: center; color: var(--text-muted); padding: 40px;">No data yet</div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Conversion Funnel -->
+        <div class="chart-card">
+            <div class="chart-header">
+                <div class="chart-title">Conversion Funnel</div>
+                <div class="chart-period">All time</div>
+            </div>
+            <div class="chart-body">
+                {% if conversion_funnel %}
+                {% set max_count = conversion_funnel|map(attribute='count')|max if conversion_funnel else 1 %}
+                <div class="funnel">
+                    {% for stage in conversion_funnel %}
+                    {% set bar_pct = (stage.count / max_count * 100)|int if max_count > 0 else 0 %}
+                    <div class="funnel-step">
+                        <div class="funnel-label">{{ stage.label }}</div>
+                        <div class="funnel-bar-container">
+                            <div class="funnel-bar" style="width: {{ [bar_pct, 4]|max }}%;">
+                                <span class="funnel-bar-value">{{ stage.count }}</span>
+                            </div>
+                        </div>
+                        <div class="funnel-pct">{{ stage.pct }}%</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div style="text-align: center; color: var(--text-muted); padding: 40px;">No data yet</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Source/Channel Breakdown -->
+    <div class="source-breakdown-card">
+        <div class="leaderboard-header">
+            <div class="leaderboard-title">Source / Channel Breakdown</div>
+            <div class="chart-period">All time</div>
+        </div>
+        <div class="table-container">
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th>Source</th>
+                        <th>Total Leads</th>
+                        <th>Sold</th>
+                        <th>Conversion Rate</th>
+                        <th>Appt+ Rate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if source_breakdown %}
+                    {% for row in source_breakdown %}
+                    <tr>
+                        <td>
+                            <span class="source-badge">{{ row.source }}</span>
+                        </td>
+                        <td>
+                            <div class="metric-bar">
+                                <div class="metric-bar-track">
+                                    {% set max_total_sb = source_breakdown|map(attribute='total')|max if source_breakdown else 1 %}
+                                    <div class="metric-bar-fill" style="width: {{ (row.total / max_total_sb * 100)|int }}%; background: var(--accent);"></div>
+                                </div>
+                                <span class="metric-value">{{ row.total }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="metric-value">{{ row.sold }}</span>
+                        </td>
+                        <td>
+                            <div class="pct-bar-cell">
+                                <div class="pct-bar-track">
+                                    <div class="pct-bar-fill green" style="width: {{ row.conversion_pct|int }}%;"></div>
+                                </div>
+                                <span class="pct-value">{{ row.conversion_pct }}%</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="pct-bar-cell">
+                                <div class="pct-bar-track">
+                                    <div class="pct-bar-fill purple" style="width: {{ row.appt_pct|int }}%;"></div>
+                                </div>
+                                <span class="pct-value">{{ row.appt_pct }}%</span>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 40px;">
+                            No source data yet.
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Leaderboard -->
+    <div class="leaderboard-card">
+        <div class="leaderboard-header">
+            <div class="leaderboard-title">Per-Rep Performance</div>
+            <div class="chart-period">All time</div>
+        </div>
+        <div class="table-container">
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Rep</th>
+                        <th>Leads Handled</th>
+                        <th>Appts Set</th>
+                        <th>Sold</th>
+                        <th>Conversion</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if reps %}
+                    {% set sorted_reps = reps.items()|sort(attribute='1.total', reverse=true) %}
+                    {% for rep_name, rep_data in sorted_reps %}
+                    <tr>
+                        <td>
+                            <div class="rep-rank {% if loop.index == 1 %}gold{% elif loop.index == 2 %}silver{% elif loop.index == 3 %}bronze{% endif %}">{{ loop.index }}</div>
+                        </td>
+                        <td>
+                            <div class="rep-cell">
+                                <div class="rep-avatar">{{ rep_name[:2]|upper }}</div>
+                                <div class="rep-info">
+                                    <div class="rep-name">{{ rep_name }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="metric-bar">
+                                <div class="metric-bar-track">
+                                    {% set max_total = sorted_reps|map(attribute='1.total')|max if sorted_reps else 1 %}
+                                    <div class="metric-bar-fill" style="width: {{ (rep_data.total / max_total * 100)|int }}%; background: var(--success);"></div>
+                                </div>
+                                <span class="metric-value">{{ rep_data.total }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="metric-bar">
+                                <div class="metric-bar-track">
+                                    {% set max_appt = sorted_reps|map(attribute='1.appt')|max if sorted_reps else 1 %}
+                                    <div class="metric-bar-fill" style="width: {{ (rep_data.appt / max_appt * 100)|int if max_appt > 0 else 0 }}%; background: var(--purple);"></div>
+                                </div>
+                                <span class="metric-value">{{ rep_data.appt }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="metric-value">{{ rep_data.sold }}</span>
+                        </td>
+                        <td>
+                            <span style="color: var(--accent-hover); font-weight: 600;">
+                                {{ (rep_data.sold / rep_data.total * 100)|round(1) if rep_data.total > 0 else 0 }}%
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 40px;">
+                            No rep data yet.
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

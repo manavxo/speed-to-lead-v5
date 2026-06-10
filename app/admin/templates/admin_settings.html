@@ -1,0 +1,111 @@
+{% extends 'base_admin.html' %}
+
+{% block title %}Platform Settings — Admin — Speed to Lead{% endblock %}
+{% block page_title %}Platform Settings{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px;">
+
+    <!-- Platform Overview -->
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;" class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">Total Dealers</div>
+            <div class="stat-value">{{ total_dealers }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Total Leads</div>
+            <div class="stat-value">{{ total_leads }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Active Leads</div>
+            <div class="stat-value" style="color: var(--success);">{{ active_leads }}</div>
+        </div>
+    </div>
+
+    <!-- Environment Info -->
+    <div class="card" style="margin-bottom: 24px;">
+        <div class="card-header">
+            <span class="card-title">Environment</span>
+        </div>
+        <div class="card-body">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div>
+                    <div class="form-label">Environment</div>
+                    <div style="margin-bottom: 12px;">
+                        <span class="badge {% if environment == 'production' %}badge-new{% else %}badge-assigned{% endif %}" style="{% if environment != 'production' %}background: rgba(234, 179, 8, 0.12); color: var(--warning);{% endif %}">
+                            {{ environment }}
+                        </span>
+                    </div>
+
+                    <div class="form-label">Public Base URL</div>
+                    <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">
+                        <code style="padding: 2px 6px; background: var(--bg-elevated); border-radius: 4px;">{{ public_base_url }}</code>
+                    </div>
+                </div>
+                <div>
+                    <div class="form-label">Outbound Sending</div>
+                    <div style="margin-bottom: 12px;">
+                        {% if outbound_enabled %}
+                        <span class="badge badge-new">Enabled</span>
+                        {% else %}
+                        <span class="badge badge-lost">Disabled</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-label">AI Model</div>
+                    <div style="font-size: 13px; color: var(--text-secondary);">
+                        <code style="padding: 2px 6px; background: var(--bg-elevated); border-radius: 4px;">{{ openrouter_model }}</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Links -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Quick Links</span>
+        </div>
+        <div class="card-body">
+            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                <a href="/admin/dealers" class="btn btn-secondary">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                        <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"></path>
+                        <line x1="2" y1="13" x2="22" y2="13"></line>
+                    </svg>
+                    Manage Dealers
+                </a>
+                <a href="/admin/onboarding" class="btn btn-secondary">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Onboard New Dealer
+                </a>
+                <a href="/admin/dealers/export-all" class="btn btn-secondary">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Export All Configs
+                </a>
+                <a href="/dashboard/leads" class="btn btn-secondary">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                    </svg>
+                    Open Dashboard
+                </a>
+                <a href="/healthz" class="btn btn-secondary" target="_blank">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                    </svg>
+                    Health Check
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

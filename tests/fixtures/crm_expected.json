@@ -1,0 +1,16 @@
+{
+  "_comment": "Axis-2 expected outbound payload when a LeadEvent (state_change -> APPT_SET) is mirrored to a generic CRM sink. Adapter-specific shape; used to golden-test crm_sync mapping.",
+  "external_contact": {
+    "name": "Sarah Chen",
+    "phone": "+16045551234",
+    "email": "sarah.chen@example.com",
+    "source": "webform"
+  },
+  "opportunity": {
+    "vehicle_stock": "SA1001",
+    "vehicle": "2019 Honda Civic EX",
+    "stage": "appointment_set",
+    "appointment_for": "2026-06-06T18:00:00-07:00",
+    "assigned_rep": "Mike"
+  }
+}

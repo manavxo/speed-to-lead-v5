@@ -1,0 +1,45 @@
+<!doctype html>
+<!-- Fixture for Axis-1 rung 3 (structured_data): a dealer inventory page embedding schema.org Vehicle JSON-LD. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Inventory — Sunrise Auto Sales</title>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Vehicle",
+    "name": "2019 Honda Civic EX",
+    "vehicleIdentificationNumber": "2HGFC2F50KH500001",
+    "sku": "SA1001",
+    "modelDate": "2019",
+    "manufacturer": "Honda",
+    "model": "Civic",
+    "vehicleConfiguration": "EX",
+    "bodyType": "Sedan",
+    "mileageFromOdometer": { "@type": "QuantitativeValue", "value": 48000, "unitCode": "KMT" },
+    "offers": { "@type": "Offer", "price": 18900, "priceCurrency": "CAD", "availability": "https://schema.org/InStock" },
+    "url": "https://sunriseauto.example.ca/inventory/SA1001",
+    "image": "https://sunriseauto.example.ca/img/SA1001-1.jpg"
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Vehicle",
+    "name": "2020 Toyota RAV4 XLE",
+    "vehicleIdentificationNumber": "5TDZA23C13S500003",
+    "sku": "SA1003",
+    "modelDate": "2020",
+    "manufacturer": "Toyota",
+    "model": "RAV4",
+    "vehicleConfiguration": "XLE",
+    "bodyType": "SUV",
+    "mileageFromOdometer": { "@type": "QuantitativeValue", "value": 31000, "unitCode": "KMT" },
+    "offers": { "@type": "Offer", "price": 28995, "priceCurrency": "CAD", "availability": "https://schema.org/InStock" },
+    "url": "https://sunriseauto.example.ca/inventory/SA1003",
+    "image": "https://sunriseauto.example.ca/img/SA1003-1.jpg"
+  }
+  </script>
+</head>
+<body><h1>Our Inventory</h1></body>
+</html>

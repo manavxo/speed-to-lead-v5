@@ -1,0 +1,351 @@
+{% extends 'base_admin.html' %}
+
+{% block title %}{{ dealer_name }} — Dealer Detail{% endblock %}
+{% block page_title %}{{ dealer_name }}{% endblock %}
+
+{% block top_actions %}
+<a href="/admin/dealers" class="btn btn-ghost" style="margin-right: 8px;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"></polyline>
+    </svg>
+    Back to Dealers
+</a>
+<a href="/admin/dealers/{{ dealer_slug }}/export-yaml" class="btn btn-secondary">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
+    </svg>
+    Export YAML
+</a>
+<a href="/admin/onboarding?edit={{ dealer_slug }}" class="btn btn-secondary">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+    </svg>
+    Edit Config
+</a>
+<button class="btn btn-secondary" onclick="toggleEditForm()" id="edit-toggle-btn">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+    </svg>
+    Edit
+</button>
+<form method="POST" action="/admin/dealers/{{ dealer_slug }}/delete" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this dealer? This cannot be undone.');">
+    <button type="submit" class="btn btn-danger">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        </svg>
+        Delete
+    </button>
+</form>
+{% endblock %}
+
+{% block content %}
+<!-- Edit Form (hidden by default) -->
+<div id="edit-form-container" style="display: none; margin-bottom: 24px;">
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Edit Dealer Configuration</span>
+            <button class="btn btn-ghost btn-sm" onclick="toggleEditForm()">Cancel</button>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="/admin/dealers/{{ dealer_slug }}/edit">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="form-group">
+                        <label class="form-label">Business Name</label>
+                        <input type="text" name="business_name" class="input" value="{{ dealer_name }}">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">SMS Number</label>
+                        <input type="text" name="sms_number" class="input" value="{{ sms_number or '' }}" placeholder="+1...">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">WhatsApp Number</label>
+                        <input type="text" name="whatsapp_number" class="input" value="{{ whatsapp_sender or '' }}" placeholder="+1...">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">AI Persona</label>
+                        <input type="text" name="ai_persona" class="input" value="{{ ai_persona or '' }}" placeholder="e.g. friendly, concise sales rep">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Team Members (JSON)</label>
+                    <textarea name="team_members" class="input" rows="3" placeholder='[{"name":"John","whatsapp":"+1...","active":true}]'>{% if sales_team %}{{ sales_team | tojson }}{% endif %}</textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Business Hours (JSON)</label>
+                    <textarea name="business_hours" class="input" rows="3" placeholder='{"mon":"9am-5pm","tue":"9am-5pm",...}'>{% if hours %}{{ hours | tojson }}{% endif %}</textarea>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
+                    <button type="button" class="btn btn-secondary" onclick="toggleEditForm()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 360px; gap: 24px;" class="client-detail-grid">
+
+    <!-- Left Column -->
+    <div>
+        <!-- Stats Row -->
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
+            <div class="stat-card">
+                <div class="stat-label">Total Leads</div>
+                <div class="stat-value">{{ total_leads }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Active Leads</div>
+                <div class="stat-value" style="color: var(--success);">{{ active_leads }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Sold</div>
+                <div class="stat-value" style="color: var(--gold);">{{ sold_leads }}</div>
+            </div>
+        </div>
+
+        <!-- Dealer Info Card -->
+        <div class="card" style="margin-bottom: 24px;">
+            <div class="card-header">
+                <span class="card-title">Dealer Configuration</span>
+            </div>
+            <div class="card-body">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <div class="form-label">Business Name</div>
+                        <div style="font-size: 14px; margin-bottom: 12px;">{{ dealer_name }}</div>
+
+                        <div class="form-label">Slug</div>
+                        <div style="margin-bottom: 12px;">
+                            <code style="font-size: 12px; padding: 2px 6px; background: var(--bg-elevated); border-radius: 4px;">{{ dealer_slug }}</code>
+                        </div>
+
+                        <div class="form-label">Timezone</div>
+                        <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">{{ timezone }}</div>
+
+                        <div class="form-label">Main Phone</div>
+                        <div style="font-size: 13px; color: var(--text-secondary);">{{ main_phone or '—' }}</div>
+                    </div>
+                    <div>
+                        <div class="form-label">SMS Number</div>
+                        <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">{{ sms_number or '—' }}</div>
+
+                        <div class="form-label">WhatsApp Sender</div>
+                        <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">{{ whatsapp_sender or '—' }}</div>
+
+                        <div class="form-label">Web Form Token</div>
+                        <div style="margin-bottom: 12px;">
+                            {% if web_form_token %}
+                            <code style="font-size: 12px; padding: 2px 6px; background: var(--bg-elevated); border-radius: 4px;">{{ web_form_token }}</code>
+                            {% else %}
+                            <span style="font-size: 13px; color: var(--text-muted);">—</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="form-label">Location</div>
+                        <div style="font-size: 13px; color: var(--text-secondary);">{{ location_address or '—' }}</div>
+                    </div>
+                </div>
+
+                {% if sales_team %}
+                <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);">
+                    <div class="form-label" style="margin-bottom: 10px;">Sales Team</div>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        {% for rep in sales_team %}
+                        <div style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                            <div style="width: 6px; height: 6px; border-radius: 50%; background: {{ 'var(--success)' if rep.active else 'var(--text-muted)' }};"></div>
+                            <span style="font-size: 13px;">{{ rep.name }}</span>
+                            <span style="font-size: 11px; color: var(--text-muted);">{{ rep.whatsapp }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if hours %}
+                <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);">
+                    <div class="form-label" style="margin-bottom: 10px;">Business Hours</div>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+                        {% for day, time in hours.items() %}
+                        <div style="font-size: 12px;">
+                            <span style="color: var(--text-muted); text-transform: uppercase;">{{ day }}:</span>
+                            <span style="color: var(--text-secondary);">{{ time }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if ai_persona %}
+                <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);">
+                    <div class="form-label" style="margin-bottom: 10px;">AI Persona</div>
+                    <div style="font-size: 13px; color: var(--text-secondary); font-style: italic;">"{{ ai_persona }}"</div>
+                </div>
+                {% endif %}
+
+                <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);">
+                    <div class="form-label" style="margin-bottom: 10px;">Quick Actions</div>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button class="btn btn-secondary btn-sm" onclick="copyWebhook()" id="copy-webhook-btn">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            Copy Webhook URL
+                        </button>
+                        <button class="btn btn-secondary btn-sm" onclick="copyEmbedCode()" id="copy-embed-btn">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="16 18 22 12 16 6"></polyline>
+                                <polyline points="8 6 2 12 8 18"></polyline>
+                            </svg>
+                            Copy Embed Code
+                        </button>
+                        <a href="/admin/dealers/{{ dealer_slug }}/export-yaml" class="btn btn-secondary btn-sm">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            Export YAML
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if compliance %}
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Compliance</span>
+            </div>
+            <div class="card-body">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div>
+                        <div class="form-label">Region</div>
+                        <div style="font-size: 13px; color: var(--text-secondary);">{{ compliance.get('region', '—') }}</div>
+                    </div>
+                    <div>
+                        <div class="form-label">Quiet Hours</div>
+                        <div style="font-size: 13px; color: var(--text-secondary);">{{ compliance.get('quiet_hours', '—') }}</div>
+                    </div>
+                </div>
+                <div style="margin-top: 12px;">
+                    <div class="form-label">Consent Text</div>
+                    <div style="font-size: 13px; color: var(--text-secondary); font-style: italic;">{{ compliance.get('consent_text', '—') }}</div>
+                </div>
+                <div style="margin-top: 12px;">
+                    <div class="form-label">Opt-Out Keywords</div>
+                    <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                        {% for kw in compliance.get('opt_out_keywords', []) %}
+                        <span style="font-size: 11px; padding: 2px 8px; background: var(--bg-elevated); border-radius: 4px; color: var(--text-secondary);">{{ kw }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Right Column: Provisioning Checklist -->
+    <div>
+        <div class="card" style="position: sticky; top: 0;">
+            <div class="card-header">
+                <span class="card-title">Provisioning Checklist</span>
+                <span style="font-size: 12px; color: var(--text-muted);">{{ completed_steps }}/{{ total_steps }}</span>
+            </div>
+            <div class="card-body" style="padding: 12px 20px;">
+                {% set checklist_items = [
+                    ("yaml_created", "YAML config created", "Configuration file written to dealers/ directory"),
+                    ("twilio_number", "Twilio number purchased", "SMS-capable number provisioned in Twilio console"),
+                    ("sms_webhook", "SMS webhook configured", "Twilio webhook points to /webhook/sms endpoint"),
+                    ("whatsapp_sandbox", "WhatsApp sandbox joined", "Meta Business WhatsApp setup completed"),
+                    ("test_sms", "Test SMS sent/received", "Round-trip SMS test with the lead-facing number"),
+                    ("auto_reply", "Auto-reply verified", "First inbound message triggers AI auto-response"),
+                    ("rep_notify", "Rep notification verified", "Sales team receives WhatsApp claim notification"),
+                    ("opt_out", "Opt-out tested", "Reply STOP correctly unsubscribes and logs consent"),
+                    ("dashboard", "Dashboard verified", "Lead appears in dashboard with correct data"),
+                    ("go_live", "Go live", "All checks passed, dealer is live and accepting leads"),
+                ] %}
+
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                    {% for key, label, description in checklist_items %}
+                    <div style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 8px; border-radius: var(--radius-sm); transition: background 0.15s;"
+                         onmouseover="this.style.background='var(--bg-elevated)'"
+                         onmouseout="this.style.background='transparent'">
+                        <div style="flex-shrink: 0; margin-top: 1px;">
+                            {% if checklist.get(key) %}
+                            <div style="width: 20px; height: 20px; border-radius: 50%; background: rgba(34, 197, 94, 0.15); display: flex; align-items: center; justify-content: center;">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                            </div>
+                            {% else %}
+                            <div style="width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border);"></div>
+                            {% endif %}
+                        </div>
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="font-size: 13px; font-weight: 500; color: {{ 'var(--text-primary)' if checklist.get(key) else 'var(--text-secondary)' }};">
+                                {{ label }}
+                            </div>
+                            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">{{ description }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                {% set pct = (completed_steps / total_steps * 100) if total_steps > 0 else 0 %}
+                <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 12px; font-weight: 500; color: var(--text-secondary);">Setup Progress</span>
+                        <span style="font-size: 12px; font-weight: 600; color: {{ 'var(--success)' if pct == 100 else 'var(--accent)' }};">{{ pct|int }}%</span>
+                    </div>
+                    <div style="height: 6px; background: var(--bg-elevated); border-radius: 3px; overflow: hidden;">
+                        <div style="height: 100%; width: {{ pct }}%; background: {{ 'var(--success)' if pct == 100 else 'var(--accent)' }}; border-radius: 3px; transition: width 0.5s ease;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden data for JS -->
+<script>
+    var webhookUrl = "{{ webhook_url }}";
+    var embedCode = "{{ embed_code }}";
+</script>
+{% endblock %}
+
+{% block scripts %}
+function toggleEditForm() {
+    var container = document.getElementById('edit-form-container');
+    if (container.style.display === 'none' || container.style.display === '') {
+        container.style.display = 'block';
+    } else {
+        container.style.display = 'none';
+    }
+}
+
+function copyWebhook() {
+    navigator.clipboard.writeText(webhookUrl).then(function() {
+        var btn = document.getElementById('copy-webhook-btn');
+        btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Copied!';
+        setTimeout(function() {
+            btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy Webhook URL';
+        }, 2000);
+    });
+}
+
+function copyEmbedCode() {
+    navigator.clipboard.writeText(embedCode).then(function() {
+        var btn = document.getElementById('copy-embed-btn');
+        btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Copied!';
+        setTimeout(function() {
+            btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg> Copy Embed Code';
+        }, 2000);
+    });
+}
+{% endblock %}

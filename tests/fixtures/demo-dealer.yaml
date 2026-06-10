@@ -1,0 +1,57 @@
+# Demo dealer used by the test suite + tests/seed_demo.py.
+dealer:
+  slug: demo-auto
+  name: "Demo Auto Sales"
+  timezone: America/Vancouver
+  hours:
+    mon: "09:00-18:00"
+    tue: "09:00-18:00"
+    wed: "09:00-18:00"
+    thu: "09:00-18:00"
+    fri: "09:00-18:00"
+    sat: "10:00-16:00"
+    sun: "closed"
+  location_address: "500 Demo Rd, Burnaby, BC"
+  main_phone: "+16045550000"
+
+channels:
+  sms_number: "+17785550111"
+  whatsapp_sender: "+17785550112"
+  lead_email_inbox: "leads+demo@yourdomain.com"
+  web_form_token: "demo-token-abc123"
+
+sales_team:
+  - { name: "Mike", phone: "+16045550121", active: true }
+  - { name: "Dana", phone: "+16045550122", active: true }
+  - { name: "Priya", phone: "+16045550123", active: false }   # inactive: discovery should skip
+
+routing:
+  strategy: round_robin
+  claim_timeout_min: 5
+  escalation: [reassign, notify_manager]
+  manager_phone: "+16045550130"
+
+ai:
+  persona: "friendly, concise, no-pressure local sales rep"
+  goal: book_appointment
+  guardrails: { no_price_negotiation: true, no_financing_promises: true }
+
+followups:
+  cadence_min: [60, 1440, 4320, 10080]
+
+inventory:
+  source: feed
+  url: "tests/fixtures/inventory_feed.csv"
+  refresh_min: 180
+  field_map: auto
+
+lead_org:
+  mode: native
+  target: ""
+  credentials_ref: ""
+
+compliance:
+  region: CA-BC
+  consent_text: "By submitting you agree to receive texts from Demo Auto Sales. Reply STOP to opt out."
+  opt_out_keywords: [STOP, STOPALL, UNSUBSCRIBE, ARRET]
+  quiet_hours: "21:00-08:00"

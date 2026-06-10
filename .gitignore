@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Virtual envs
+.venv/
+venv/
+env/
+ENV/
+
+# Secrets and local config
+.env
+.env.local
+.env.*.local
+credentials.json
+token.json
+*.key
+*.pem
+secrets.yaml
+
+# Local data
+*.db
+*.sqlite
+*.sqlite3
+.tmp/
+localStorage/
+data/
+*.log
+logs/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node (for the admin dashboard if it ever exists)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build artifacts
+dist/
+build/
+*.whl
+
+# Old / archive content
+_archive*/
+v3/
+v4/
