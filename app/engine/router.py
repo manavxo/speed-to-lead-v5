@@ -41,10 +41,12 @@ def assign_lead(
     fake_twilio=None,
     sms_number: str | None = None,
 ) -> Lead | None:
-    """Assign `lead` to the next rep, send the SMS claim ping, transition to ASSIGNED.
+    """Assign `lead` to the next rep, ping them via notify_rep, transition to ASSIGNED.
 
     If no active reps, the lead stays in AUTO_REPLIED (AI-only / after-hours path).
-    Sends via tools.send_sms.send_sms, gated by OUTBOUND_ENABLED.
+    Sends via tools.notify_rep (the dealer-side chokepoint, per directive H.2.2),
+    not send_sms() directly. Default backend is WhatsApp; falls back to SMS if
+    the rep's config says so.
     """
     rep = next_rep(dealer, sales_team)
     if rep is None:
@@ -68,24 +70,20 @@ def assign_lead(
     session.commit()
     session.refresh(lead)
 
-    # Send SMS claim ping via the send_sms chokepoint
-    claim_msg = (
-        f"New lead assigned to you: {lead.name or 'Customer'} "
-        f"({lead.phone or lead.email or 'unknown'}). "
-        f"Reply 1 to claim, 2 to pass."
-    )
-
-    from tools.send_sms import send_sms
-    send_sms(
+    # Ping the rep via the notify_rep chokepoint (default = Twilio WhatsApp).
+    # This is the only place dealer-side notifications get sent from the router.
+    from tools.notify_rep import notify_rep
+    dealer_config = dealer.config or {}
+    notify_rep(
         session=session,
-        to=rep["phone"],
-        body=claim_msg,
-        from_number=sms_number or "",
+        rep_config=rep,
         lead=lead,
-        role="REP",
-        recipient_name=rep["name"],
-        fake_twilio=fake_twilio,
-        force_send=True,
+        message_type="claim",
+        payload={
+            "customer_name": lead.name or "Customer",
+            "vehicle": lead.vehicle_ref or "",
+        },
+        dealer_config=dealer_config,
     )
 
     logger.info("Lead#%s assigned to %s", lead.id, rep["name"])
@@ -177,16 +175,27 @@ def _escalate_to_manager(
             f"Please review and assign manually."
         )
         try:
-            from tools.send_sms import send_sms
-            send_sms(
+            # Per directive H.2.2: dealer-side notifications go through the
+            # notify_rep chokepoint, not send_sms() directly. The manager is
+            # modeled as a special "rep" with a phone and a default WhatsApp
+            # backend; the abstraction is the bypass.
+            from tools.notify_rep import notify_rep
+            dealer_config = dealer.config or {}
+            notify_rep(
                 session=session,
-                to=manager_phone,
-                body=manager_msg,
-                from_number=sms_number or "",
+                rep_config={
+                    "name": "Manager",
+                    "phone": manager_phone,
+                    "active": True,
+                    "notify_backend": "twilio_whatsapp",
+                },
                 lead=lead,
-                role="MANAGER",
-                fake_twilio=fake_twilio,
-                force_send=True,
+                message_type="escalation",
+                payload={
+                    "customer_name": lead.name or "Customer",
+                    "reason": reason,
+                },
+                dealer_config=dealer_config,
             )
         except Exception:
             logger.exception("Failed to notify manager for lead#%s escalation", lead.id)

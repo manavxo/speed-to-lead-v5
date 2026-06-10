@@ -27,8 +27,11 @@ channels:                            # AXIS 3 — channels they use to generate 
   web_form_token: "sunrise-9f3a2b"   # embeddable form posts to /webhook/form/{token}
 
 sales_team:                          # round-robin pool; whatsapp must be WhatsApp-enabled
-  - { name: "Mike",  phone: "+16045550121", active: true }
-  - { name: "Dana",  phone: "+16045550122", active: true }
+  # notify_backend: twilio_whatsapp (default) | sms (fallback) | email (Phase 2) | dashboard (Phase 2)
+  # notify_template_sid: pre-approved Twilio WhatsApp template SID (e.g. "HXxxxxxx").
+  #                       Required for WhatsApp business-initiated pings; see docs/PIPELINE_REVIEW.md H.2.2.
+  - { name: "Mike",  phone: "+160****0121", active: true, notify_backend: twilio_whatsapp, notify_template_sid: "HX_replace_with_real_sid" }
+  - { name: "Dana",  phone: "+160****0122", active: true, notify_backend: twilio_whatsapp, notify_template_sid: "HX_replace_with_real_sid" }
 
 routing:
   strategy: round_robin

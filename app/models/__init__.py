@@ -128,6 +128,12 @@ class Message(SQLModel, table=True):
     error_code: Optional[str] = None                       # Twilio error code (e.g. 21610, 30007)
     ai_generated: bool = False
     approved_by: Optional[str] = None                       # rep who approved (business-hours mode)
+    # Role attribution (Phase 2 provisioning — locked in during v5 build per directive H.2.4).
+    # recipient_role: "customer" | "rep" | "manager" | "system"
+    # sender_role:   "customer" | "ai"      | "rep"    | "system"
+    # Lets the lead detail page show who said what, and lets Phase 2 filter/sort by role.
+    sender_role: Optional[str] = Field(default=None, index=True)
+    recipient_role: Optional[str] = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=_utcnow)
 
 
