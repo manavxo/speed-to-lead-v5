@@ -24,6 +24,7 @@ Per v5 hard rule: OUTBOUND_ENABLED=false default. Real sends only on explicit
 
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from dataclasses import dataclass, field
@@ -58,7 +59,22 @@ class NotificationResult:
     error: str | None = None
 
 
-# --- Transport stubs (Task 1.2 will replace twilio_whatsapp with real call) ---
+# --- Twilio client factory (mockable in tests) -------------------------------
+
+def _get_twilio_client():
+    """Return a Twilio client. Mockable via monkeypatch in tests.
+
+    Returns None when TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN aren't set, so
+    the transport functions can fail clearly with a configuration error
+    rather than crashing deep in the Twilio SDK.
+    """
+    if not settings.twilio_account_sid or not settings.twilio_auth_token:
+        return None
+    from twilio.rest import Client
+    return Client(settings.twilio_account_sid, settings.twilio_auth_token)
+
+
+# --- Transport implementations ----------------------------------------------
 
 def send_via_twilio_whatsapp(
     *,
@@ -68,35 +84,67 @@ def send_via_twilio_whatsapp(
     template_sid: str | None = None,
     variables: dict | None = None,
 ) -> str:
-    """Send a message via Twilio WhatsApp. STUB for Task 1.1.
+    """Send a message via Twilio WhatsApp. Real implementation (Task 1.2).
 
-    Task 1.2 replaces this with the real `twilio.rest.Client.messages.create`
-    call using `content_sid=template_sid` and `content_variables=str(variables)`.
-    For now: raises NotImplementedError when OUTBOUND_ENABLED is true (so the
-    dry-run path stays safe by default; real sends only land via Task 1.2).
+    Per Twilio's WhatsApp Business API rules: business-initiated messages MUST
+    use a pre-approved template (the 24h session-window exception only applies
+    after a customer-initiated message). So when notify_rep() pings a rep about
+    a new lead, we send a template via content_sid + content_variables.
+
+    When the rep's config has no notify_template_sid, we fall back to a
+    free-form body — only valid in a 24h session, but it lets us still send
+    during development before templates are provisioned.
     """
     if not settings.outbound_enabled:
-        # Defensive: should be caught by the dry-run gate in notify_rep first.
         return f"DRYRUN_{uuid.uuid4().hex[:12]}"
-    raise NotImplementedError(
-        "Real Twilio WhatsApp send lands in Task 1.2. "
-        "Until then, keep OUTBOUND_ENABLED=false."
-    )
+
+    client = _get_twilio_client()
+    if client is None:
+        raise RuntimeError(
+            "Twilio not configured: set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN"
+        )
+
+    kwargs: dict = {
+        "to": f"whatsapp:{to_phone}",
+        "from_": f"whatsapp:{from_phone}",
+    }
+    if template_sid:
+        # Business-initiated: use a pre-approved template.
+        kwargs["content_sid"] = template_sid
+        if variables:
+            # Twilio expects content_variables as a JSON-encoded string.
+            kwargs["content_variables"] = json.dumps(variables)
+    else:
+        # No template configured: free-form body. Use only when in a 24h
+        # session or when the dealer has explicitly opted out of templates
+        # for this rep.
+        kwargs["body"] = body
+
+    message = client.messages.create(**kwargs)
+    return message.sid
 
 
 def send_via_sms(*, to_phone: str, from_phone: str, body: str) -> str:
-    """Send a message via SMS. STUB for Task 1.1.
+    """Send a message via SMS (fallback backend). Real implementation (Task 1.2).
 
-    Task 1.2 can route this through the existing tools.send_sms.send_sms()
-    chokepoint if we ever need the SMS fallback path. For now, behave the
-    same as WhatsApp: dry-run in dev, raise in prod.
+    SMS doesn't use templates — straight body. Used when a rep's
+    notify_backend is configured as 'sms' instead of 'twilio_whatsapp'.
     """
     if not settings.outbound_enabled:
         return f"DRYRUN_{uuid.uuid4().hex[:12]}"
-    raise NotImplementedError(
-        "Real SMS fallback send lands in Task 1.2. "
-        "Until then, keep OUTBOUND_ENABLED=false."
+
+    client = _get_twilio_client()
+    if client is None:
+        raise RuntimeError(
+            "Twilio not configured: set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN"
+        )
+
+    message = client.messages.create(
+        to=to_phone,
+        from_=from_phone,
+        body=body,
     )
+    return message.sid
 
 
 # --- Message body builder ----------------------------------------------------
