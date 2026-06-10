@@ -236,43 +236,65 @@ def _empty_twiml() -> PlainTextResponse:
     )
 
 
-def _validate_twilio_signature(request: Request) -> bool:
-    """Validate X-Twilio-Signature when REQUIRE_TWILIO_SIGNATURE is enabled.
+def _twilio_validator_url(request: Request) -> str:
+    """Build the URL Twilio used to sign the request.
 
-    Uses the external https URL (Render terminates TLS), not the internal http URL.
+    Twilio signs with the external https URL (the one the dealer set as the
+    webhook URL). Behind a TLS terminator (Render, Fly, etc.), the request.url
+    is the internal http URL. Use public_base_url when it's https, otherwise
+    the request URL as-is (dev / test).
     """
-    if not settings.require_twilio_signature:
-        return True
+    url = str(request.url)
+    if settings.public_base_url and settings.public_base_url.startswith("https"):
+        from urllib.parse import urlparse, urlunparse
+        parsed = urlparse(url)
+        ext = urlparse(settings.public_base_url)
+        return urlunparse((
+            ext.scheme,
+            ext.netloc,
+            parsed.path,
+            parsed.params,
+            parsed.query,
+            "",
+        ))
+    return url
+
+
+def _validate_twilio_signature(request: Request, form_data: dict | None = None) -> bool:
+    """Validate the X-Twilio-Signature header against the request body.
+
+    P0-01: This is the only line of defense against an attacker who knows
+    a webhook URL. Fails closed in every failure mode:
+
+    - No auth token configured         => False (never accept unsigned)
+    - No signature header              => False
+    - Twilio library missing           => False
+    - HMAC doesn't match               => False
+    - Any exception                    => False
+
+    The signature binds (url, sorted-form-params) to the request, so a
+    tampered body fails validation. Tests inject a FakeValidator via
+    `monkeypatch.setattr(twilio.request_validator, "RequestValidator", ...)`
+    so they can exercise this without HTTPS or a real auth token.
+    """
+    token = settings.twilio_auth_token
+    if not token:
+        # Fail closed: cannot validate without a token.
+        return False
+
+    signature = request.headers.get("X-Twilio-Signature", "")
+    if not signature:
+        return False
+
     try:
         from twilio.request_validator import RequestValidator
-        validator = RequestValidator(settings.twilio_auth_token)
-
-        # Build the full URL using the external base URL
-        url = str(request.url)
-        if settings.public_base_url and settings.public_base_url.startswith("https"):
-            # Replace the internal URL with the external one for signature validation
-            from urllib.parse import urlparse, urlunparse
-            parsed = urlparse(url)
-            ext_parsed = urlparse(settings.public_base_url)
-            url = urlunparse((
-                ext_parsed.scheme,
-                ext_parsed.netloc,
-                parsed.path,
-                parsed.params,
-                parsed.query,
-                "",
-            ))
-
-        signature = request.headers.get('X-Twilio-Signature', '')
-        # Get form data synchronously (already parsed in the route handler)
-        # We validate with empty params — the real validation happens after form parsing
-        # This is a structural check; full validation requires form data
-        if not signature:
-            return False
-        return True  # Full validation with form data done in route handler
-    except Exception:
-        logger.exception('Twilio signature validation error')
+        validator = RequestValidator(token)
+    except ImportError:
+        logger.exception("twilio library not installed — failing closed")
         return False
+
+    url = _twilio_validator_url(request)
+    return validator.validate(url, form_data or {}, signature)
 
 
 def _idempotency_check(session: Session, provider_sid: str | None) -> bool:
@@ -357,15 +379,16 @@ async def webhook_twilio_sms(request: Request) -> Response:
     Otherwise routes to customer conversation engine.
     Returns TwiML response.
     """
-    # Validate Twilio signature
-    if not _validate_twilio_signature(request):
+    # P0-01: parse the form FIRST, then validate. The HMAC binds to the
+    # parsed form params, so we need them before we can check the signature.
+    form = await request.form()
+    payload = dict(form)
+
+    if not _validate_twilio_signature(request, payload):
         return PlainTextResponse("Forbidden", status_code=403)
 
     session = _get_session()
     try:
-        form = await request.form()
-        payload = dict(form)
-
         from_number = mask_phone(payload.get("From", ""))
         to_number = payload.get("To", "")
         body = (payload.get("Body", "") or "").strip()
@@ -664,14 +687,15 @@ async def webhook_twilio_whatsapp(request: Request) -> Response:
     Tenant resolved by the WhatsApp sender number.
     Returns TwiML response.
     """
-    if not _validate_twilio_signature(request):
+    # P0-01: parse form first, then validate signature.
+    form = await request.form()
+    payload = dict(form)
+
+    if not _validate_twilio_signature(request, payload):
         return PlainTextResponse("Forbidden", status_code=403)
 
     session = _get_session()
     try:
-        form = await request.form()
-        payload = dict(form)
-
         message_sid = payload.get("MessageSid", "")
 
         # Idempotency
@@ -765,14 +789,15 @@ async def webhook_twilio_voice(request: Request) -> Response:
 
     If the call is unanswered/no-answer, sends an SMS text-back to the caller.
     """
-    if not _validate_twilio_signature(request):
+    # P0-01: parse form first, then validate signature.
+    form = await request.form()
+    payload = dict(form)
+
+    if not _validate_twilio_signature(request, payload):
         return PlainTextResponse("Forbidden", status_code=403)
 
     session = _get_session()
     try:
-        form = await request.form()
-        payload = dict(form)
-
         from_number = mask_phone(payload.get("From", ""))
         to_number = payload.get("To", "")
         call_status = payload.get("CallStatus", "")

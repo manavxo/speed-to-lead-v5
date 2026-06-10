@@ -5,8 +5,21 @@ No test may hit a real external service. Use these fakes; assert on recorded cal
 
 from __future__ import annotations
 
+# IMPORTANT: env vars must be set BEFORE app.* is imported (Settings reads them
+# at module-import time). conftest.py is loaded before test_*.py by pytest, so
+# these run before any test module imports `from app.main import ...`.
+import os
+os.environ.setdefault("TWILIO_AUTH_TOKEN", "test-twilio-secret")
+os.environ.setdefault("OUTBOUND_ENABLED", "false")
+os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+os.environ.setdefault("QUIET_HOURS_DISABLED", "true")
+os.environ.setdefault("REQUIRE_TWILIO_SIGNATURE", "true")
+
+import hashlib
+import hmac
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlencode
 
 import pytest
 from sqlalchemy import create_engine
@@ -16,6 +29,36 @@ from sqlmodel import SQLModel
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests" / "fixtures"
+
+# Test-only Twilio auth token (must match the os.environ value above).
+TWILIO_AUTH_TOKEN = os.environ["TWILIO_AUTH_TOKEN"]
+
+
+def make_signed_twilio_request(
+    uri: str,
+    body: dict | None = None,
+    secret: str = TWILIO_AUTH_TOKEN,
+    signature: str | None = None,
+) -> dict:
+    """Build a properly-signed Twilio webhook request for testing.
+
+    Twilio signs: HMAC-SHA1(secret, uri + sorted-form-params)
+    Reference: https://www.twilio.com/docs/usage/webhooks/webhooks-security
+
+    Pass `signature="garbage"` (or any non-matching value) to simulate a
+    tampered/unsigned request. Pass `signature=""` to simulate a missing header.
+    """
+    body = body or {}
+    if signature is None:
+        # Real signature: HMAC-SHA1 of (uri + sorted form-params)
+        body_str = urlencode(sorted(body.items()))
+        data = (uri + body_str).encode("utf-8")
+        signature = hmac.new(secret.encode("utf-8"), data, hashlib.sha1).hexdigest()
+    return {
+        "uri": uri,
+        "body": body,
+        "headers": {"X-Twilio-Signature": signature},
+    }
 
 
 def make_auth_cookies(dealer_slug: str = "smoke-test") -> dict:
