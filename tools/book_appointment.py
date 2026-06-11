@@ -2,6 +2,9 @@
 
 Creates an Appointment, transitions the lead to APPT_SET, schedules reminder texts, and notifies
 the assigned rep. The conversation's primary goal.
+
+State machine notifications (APPT_SET, SOLD) route through tools.notify_rep —
+NEVER call twilio.rest.Client directly from this file. Per directive H.2.2.
 """
 
 from __future__ import annotations
@@ -17,89 +20,106 @@ from app.models import Appointment, Lead, LeadEvent, LeadState
 logger = logging.getLogger("speed-to-lead.book_appointment")
 
 
+def _notify_rep_via_chokepoint(
+    session: Session,
+    lead: Lead,
+    *,
+    message_type: str,
+    payload: dict,
+    dealer_config: dict | None,
+) -> None:
+    """Find the assigned rep's config and dispatch via notify_rep().
+
+    Single chokepoint for every rep-targeted notification in this module
+    (APPT_SET, SOLD). Per directive H.2.2: never call Twilio directly from
+    engine/tool code — always go through notify_rep so backends stay
+    swappable and DRYRUN/logging/persistence is consistent.
+
+    Fire-and-forget: any failure inside notify_rep is logged but not
+    raised. The appointment / sale is still recorded.
+    """
+    if not dealer_config:
+        logger.info("No dealer config — skipping %s notification for lead#%s",
+                    message_type, lead.id)
+        return
+
+    sales_team = dealer_config.get("sales_team", [])
+    rep_config: dict | None = None
+    rep_name = lead.assigned_rep
+    if rep_name and sales_team:
+        for rep in sales_team:
+            if rep.get("name", "").lower() == rep_name.lower():
+                # Copy so we don't mutate the dealer's config in place
+                rep_config = dict(rep)
+                break
+
+    if not rep_config:
+        # Fall back to the dealership main phone. SMS backend — main numbers
+        # usually can't do WhatsApp unless explicitly provisioned.
+        main_phone = (
+            dealer_config.get("dealer", {}).get("main_phone", "")
+            or dealer_config.get("channels", {}).get("sms_number", "")
+        )
+        if not main_phone:
+            logger.warning(
+                "No rep or main phone for %s notification on lead#%s",
+                message_type, lead.id,
+            )
+            return
+        rep_config = {
+            "name": "Dealership",
+            "phone": main_phone,
+            "active": True,
+            "notify_backend": "sms",
+        }
+
+    from tools.notify_rep import notify_rep
+    try:
+        notify_rep(
+            session=session,
+            rep_config=rep_config,
+            lead=lead,
+            message_type=message_type,
+            payload=payload,
+            dealer_config=dealer_config,
+        )
+    except Exception:
+        # Defence-in-depth — notify_rep already catches transport errors and
+        # returns NotificationResult(success=False). If something escapes
+        # (e.g. programmer error in the chokepoint itself), we still don't
+        # want the booking to fail.
+        logger.exception(
+            "notify_rep escaped for %s on lead#%s (fire-and-forget swallowed)",
+            message_type, lead.id,
+        )
+
+
 def _notify_rep_of_appointment(
+    session: Session,
     lead: Lead,
     scheduled_for: datetime,
     *,
     notes: str | None = None,
     dealer_config: dict | None = None,
 ) -> None:
-    """Send an SMS notification to the assigned rep (or dealership main phone) about a new appointment.
+    """Send an APPT_SET notification to the assigned rep (or dealership main
+    phone) about a new appointment. Fire-and-forget — appointment is still
+    booked even if notification fails.
 
-    This is a fire-and-forget notification — if it fails, the appointment is still booked.
+    This is now a thin wrapper around _notify_rep_via_chokepoint so the
+    chokepoint stays the only caller of Twilio in this module.
     """
-    if not dealer_config:
-        logger.info("No dealer config — skipping appointment notification")
-        return
-
-    # Find the notification target: assigned rep's phone, or dealership main phone
-    sales_team = dealer_config.get("sales_team", [])
-    main_phone = dealer_config.get("dealer", {}).get("main_phone", "")
-    sms_number = dealer_config.get("channels", {}).get("sms_number", "")
-    dealer_name = dealer_config.get("dealer", {}).get("name", "Dealership")
-
-    # Try to find the assigned rep's phone from the sales team
-    rep_phone = None
-    rep_name = lead.assigned_rep
-    if rep_name and sales_team:
-        for rep in sales_team:
-            if rep.get("name", "").lower() == rep_name.lower():
-                rep_phone = rep.get("phone") or rep.get("whatsapp") or ""
-                break
-
-    # Fall back to dealership main phone
-    notify_to = rep_phone or main_phone or sms_number
-    if not notify_to:
-        logger.warning("No notification phone available for appointment on lead#%s", lead.id)
-        return
-
-    # Build the notification message
-    appt_time = scheduled_for.strftime("%A, %B %d at %I:%M %p")
-    customer_name = lead.name or "A customer"
-    customer_phone = lead.phone or "no phone on file"
-
-    msg_parts = [
-        f"📅 NEW APPOINTMENT — {dealer_name}",
-        "",
-        f"Customer: {customer_name}",
-        f"Phone: {customer_phone}",
-        f"When: {appt_time}",
-    ]
-    if lead.assigned_rep:
-        msg_parts.append(f"Rep: {lead.assigned_rep}")
-    if notes:
-        msg_parts.append(f"Notes: {notes}")
-    if lead.vehicle_ref:
-        msg_parts.append(f"Vehicle: {lead.vehicle_ref}")
-
-    msg_parts.extend([
-        "",
-        "This appointment was booked by the AI assistant.",
-        "Please confirm with the customer if needed.",
-    ])
-
-    body = "\n".join(msg_parts)
-
-    # Send via Twilio directly — this is an internal notification to the dealership,
-    # not a customer-facing message, so we bypass opt-out/consent/quiet-hours checks.
-    try:
-        from app.config import settings
-
-        if not settings.outbound_enabled:
-            logger.info("DRY-RUN appointment notification to %s: %s", notify_to, body[:80])
-            return
-
-        from_number = sms_number or main_phone
-        if not from_number:
-            logger.warning("No from_number for appointment notification")
-            return
-
-        from twilio.rest import Client as TwilioClient
-        client = TwilioClient(settings.twilio_account_sid, settings.twilio_auth_token)
-        msg = client.messages.create(to=notify_to, from_=from_number, body=body)
-        logger.info("Appointment notification sent to %s (SID=%s) for lead#%s", notify_to, msg.sid, lead.id)
-    except Exception:
-        logger.exception("Failed to send appointment notification for lead#%s", lead.id)
+    _notify_rep_via_chokepoint(
+        session, lead,
+        message_type="appointment_set",
+        payload={
+            "customer_name": lead.name or "A customer",
+            "vehicle": lead.vehicle_ref or "",
+            "scheduled_for": scheduled_for.isoformat(),
+            "notes": notes or "",
+        },
+        dealer_config=dealer_config,
+    )
 
 
 def book_appointment(
@@ -168,7 +188,7 @@ def book_appointment(
 
     # Notify the assigned rep (or dealership) about the new appointment
     _notify_rep_of_appointment(
-        lead, scheduled_for,
+        session, lead, scheduled_for,
         notes=notes,
         dealer_config=dealer_config,
     )
@@ -204,3 +224,46 @@ def cancel_appointment(session: Session, appt: Appointment) -> Appointment:
     session.commit()
     session.refresh(appt)
     return appt
+
+
+def mark_sold(
+    session: Session,
+    lead: Lead,
+    sold_at: datetime,
+    *,
+    dealer_config: dict | None = None,
+) -> Lead:
+    """Mark a lead as SOLD. Transitions SHOWED -> SOLD and notifies the
+    assigned rep through the notify_rep() chokepoint.
+
+    The state transition is guarded by the lifecycle TRANSITIONS table
+    (only legal from SHOWED). On illegal state, raises ValueError.
+
+    Args:
+        session: SQLAlchemy session.
+        lead: The lead to mark as sold (must be in SHOWED).
+        sold_at: When the sale closed.
+        dealer_config: Optional dealer config for rep notification.
+
+    Returns:
+        The Lead (now in SOLD state).
+    """
+    # Lifecycle guard — raises ValueError on illegal transition
+    transition(
+        session, lead, LeadState.SOLD,
+        reason="sale_closed",
+        meta={"sold_at": sold_at.isoformat()},
+    )
+
+    # Notify the rep via the chokepoint (fire-and-forget)
+    _notify_rep_via_chokepoint(
+        session, lead,
+        message_type="sale",
+        payload={
+            "customer_name": lead.name or "A customer",
+            "vehicle": lead.vehicle_ref or "",
+        },
+        dealer_config=dealer_config,
+    )
+
+    return lead

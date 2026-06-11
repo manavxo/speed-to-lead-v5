@@ -181,6 +181,10 @@ def _build_body(message_type: str, payload: dict, rep_name: str) -> str:
             f"{rep_name} — missed call from {customer}. "
             f"AI already texted them a follow-up."
         )
+    if message_type == "sale":
+        # State machine SOLD notification. Rep needs to know fast — they're
+        # tracking the commission. Keep it punchy: just the close + customer.
+        return f"{rep_name} — sold: {customer}{vehicle_str}. Congrats 🎉"
     # Fallback: generic
     return f"{rep_name} — update on {customer}{vehicle_str}."
 
@@ -242,7 +246,7 @@ def notify_rep(
         lead: The lead this notification is about. Used for the Message log
             and for the body text.
         message_type: One of 'claim', 'appointment_set', 'escalation',
-            'missed_call'. Determines the body template.
+            'missed_call', 'sale'. Determines the body template.
         payload: Free-form data the body template uses (customer_name, vehicle,
             scheduled_for, reason, etc.).
         dealer_config: The dealer's full config (for whatsapp_sender fallback).
