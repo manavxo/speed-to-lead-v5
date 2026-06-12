@@ -66,12 +66,15 @@ def test_p0_12_followup_sender_actually_sends_a_message(db_session, monkeypatch)
         lambda *a, **kw: {"text": "Just checking in!", "tools_used": []},
     )
 
-    # Patch the SMS chokepoint to capture the call
+    # Patch the SMS chokepoint to capture the call.
+    # The real call is keyword-only: send_sms(session=..., to=..., body=..., lead=lead, ...).
+    # The fake below must read from kwargs, not positional args.
     sent = {}
     def fake_send_sms(*args, **kwargs):
-        sent["to"] = kwargs.get("to_phone") or args[1] if len(args) > 1 else None
-        sent["body"] = kwargs.get("body") or args[2] if len(args) > 2 else None
-        sent["lead_id"] = kwargs.get("lead_id")
+        sent["to"] = kwargs.get("to")
+        sent["body"] = kwargs.get("body")
+        lead = kwargs.get("lead")
+        sent["lead_id"] = lead.id if lead is not None else None
         return "FAKE_SID"
     monkeypatch.setattr(
         "tools.send_sms.send_sms", fake_send_sms, raising=False,
@@ -83,8 +86,12 @@ def test_p0_12_followup_sender_actually_sends_a_message(db_session, monkeypatch)
     # Capture Message rows that get added
     initial_count = len(db_session.query(Message).all())
 
-    # Fire the followup
-    _handle_followup(lead.id, dealer.slug, minutes=30)
+    # Fire the followup using the SESSION-TAKING variant — the production cron
+    # entry point (_handle_followup) creates its own session via the global factory,
+    # which in tests points at a different in-memory SQLite DB. _handle_followup_session
+    # takes a session directly so we can test the business logic in isolation.
+    from app.scheduler import _handle_followup_session
+    _handle_followup_session(db_session, lead.id, dealer.slug, minutes=30)
 
     # Assert: send_sms was called
     assert sent.get("to") is not None, (
@@ -137,8 +144,9 @@ def test_p0_12_followup_skips_terminal_leads(db_session, monkeypatch):
     import app.scheduler as sched
     monkeypatch.setattr(sched, "send_sms", fake_send_sms, raising=False)
 
-    # Fire the followup
-    _handle_followup(sold.id, dealer.slug, minutes=30)
+    # Fire the followup using the session-taking variant (see note above).
+    from app.scheduler import _handle_followup_session
+    _handle_followup_session(db_session, sold.id, dealer.slug, minutes=30)
 
     assert called["count"] == 0, (
         "P0-12: followup was sent to a SOLD lead. Terminal leads must be skipped."

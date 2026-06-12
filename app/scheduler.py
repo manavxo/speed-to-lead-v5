@@ -112,87 +112,96 @@ def schedule_followup(scheduler, lead_id: int, dealer_slug: str, minutes: int):
     )
 
 
-def _handle_followup(lead_id: int, dealer_slug: str, minutes: int):
-    """Handle follow-up for a cold lead.
+def _handle_followup_session(session, lead_id: int, dealer_slug: str, minutes: int):
+    """Business logic for the follow-up job. Takes a session for testability.
 
     Loads the lead, checks it's still active, then sends a follow-up message
     via the conversation engine (which uses the AI to generate context-aware text).
     """
-    from app.db import get_session_factory
     from app.models import Lead, LeadState, Dealer, Message, Direction, Channel
     from sqlalchemy import select
 
     logger.info("Follow-up for lead %s (%d min)", lead_id, minutes)
+    lead = session.execute(select(Lead).where(Lead.id == lead_id)).scalar()
+    if lead is None:
+        logger.warning("Follow-up: lead %s not found", lead_id)
+        return
+
+    if lead.state in (LeadState.SOLD, LeadState.LOST, LeadState.OPTED_OUT):
+        logger.info("Follow-up: lead %s in terminal state %s — skipping", lead_id, lead.state)
+        return
+
+    # Load dealer config
+    dealer = session.execute(select(Dealer).where(Dealer.slug == dealer_slug)).scalar()
+    if dealer is None:
+        logger.warning("Follow-up: dealer %s not found", dealer_slug)
+        return
+
+    dealer_config = dealer.config or {}
+
+    # Generate a follow-up message via the conversation engine
+    followup_prompt = f"Following up after {minutes} minutes of no response. Be friendly and brief."
+    try:
+        from app.engine.conversation import handle_turn
+        result = handle_turn(
+            session, lead, followup_prompt,
+            dealer_config=dealer_config,
+        )
+        text = result.get("text", "Just checking in — let us know if you have any questions!")
+    except Exception:
+        logger.exception("Follow-up AI generation failed for lead %s", lead_id)
+        text = "Just checking in — let us know if you have any questions!"
+
+    # Append CASL compliance footer
+    dealer_name = dealer_config.get('dealer', {}).get('name', '')
+    footer = dealer_config.get('compliance', {}).get('consent_text', 'Reply STOP to opt out.')
+    if dealer_name and dealer_name not in text:
+        text = f"{text}\n\n— {dealer_name}. {footer}"
+    elif footer not in text:
+        text = f"{text}\n\n{footer}"
+
+    # Store the follow-up message in the Message table
+    outbound_msg = Message(
+        lead_id=lead.id,
+        direction=Direction.OUTBOUND,
+        channel=lead.source or Channel.SMS,
+        body=text,
+        ai_generated=True,
+    )
+    session.add(outbound_msg)
+
+    # Send via Twilio
+    try:
+        from tools.send_sms import send_sms
+        sms_number = dealer_config.get("channels", {}).get("sms_number")
+        if lead.phone:
+            send_sms(
+                session=session,
+                to=lead.phone,
+                body=text,
+                from_number=sms_number or "",
+                lead=lead,
+                role="AI",
+                fake_twilio=None,
+                force_send=True,
+            )
+            logger.info("Follow-up sent to lead %s", lead_id)
+    except Exception:
+        logger.exception("Follow-up send failed for lead %s", lead_id)
+
+    session.commit()
+
+
+def _handle_followup(lead_id: int, dealer_slug: str, minutes: int):
+    """Cron entry point: creates a session, delegates to _handle_followup_session.
+
+    Production code calls this — it manages session lifecycle. Tests should
+    call _handle_followup_session directly with their own session.
+    """
+    from app.db import get_session_factory
     session = get_session_factory()()
     try:
-        lead = session.execute(select(Lead).where(Lead.id == lead_id)).scalar()
-        if lead is None:
-            logger.warning("Follow-up: lead %s not found", lead_id)
-            return
-
-        if lead.state in (LeadState.SOLD, LeadState.LOST, LeadState.OPTED_OUT):
-            logger.info("Follow-up: lead %s in terminal state %s — skipping", lead_id, lead.state)
-            return
-
-        # Load dealer config
-        dealer = session.execute(select(Dealer).where(Dealer.slug == dealer_slug)).scalar()
-        if dealer is None:
-            logger.warning("Follow-up: dealer %s not found", dealer_slug)
-            return
-
-        dealer_config = dealer.config or {}
-
-        # Generate a follow-up message via the conversation engine
-        followup_prompt = f"Following up after {minutes} minutes of no response. Be friendly and brief."
-        try:
-            from app.engine.conversation import handle_turn
-            result = handle_turn(
-                session, lead, followup_prompt,
-                dealer_config=dealer_config,
-            )
-            text = result.get("text", "Just checking in — let us know if you have any questions!")
-        except Exception:
-            logger.exception("Follow-up AI generation failed for lead %s", lead_id)
-            text = "Just checking in — let us know if you have any questions!"
-
-        # Append CASL compliance footer
-        dealer_name = dealer_config.get('dealer', {}).get('name', '')
-        footer = dealer_config.get('compliance', {}).get('consent_text', 'Reply STOP to opt out.')
-        if dealer_name and dealer_name not in text:
-            text = f"{text}\n\n— {dealer_name}. {footer}"
-        elif footer not in text:
-            text = f"{text}\n\n{footer}"
-
-        # Store the follow-up message in the Message table
-        outbound_msg = Message(
-            lead_id=lead.id,
-            direction=Direction.OUTBOUND,
-            channel=lead.source or Channel.SMS,
-            body=text,
-            ai_generated=True,
-        )
-        session.add(outbound_msg)
-
-        # Send via Twilio
-        try:
-            from tools.send_sms import send_sms
-            sms_number = dealer_config.get("channels", {}).get("sms_number")
-            if lead.phone:
-                send_sms(
-                    session=session,
-                    to=lead.phone,
-                    body=text,
-                    from_number=sms_number or "",
-                    lead=lead,
-                    role="AI",
-                    fake_twilio=None,
-                    force_send=True,
-                )
-                logger.info("Follow-up sent to lead %s", lead_id)
-        except Exception:
-            logger.exception("Follow-up send failed for lead %s", lead_id)
-
-        session.commit()
+        _handle_followup_session(session, lead_id, dealer_slug, minutes)
     except Exception:
         logger.exception("Follow-up failed for lead %s", lead_id)
     finally:
