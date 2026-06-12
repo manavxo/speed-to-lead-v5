@@ -11,8 +11,10 @@ credits on automatic tests.
 
 from __future__ import annotations
 
-import json
+import base64
+import json as _json
 import os
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -137,7 +139,7 @@ def test_real_whatsapp_uses_template_content_sid(
     assert kwargs["from_"] == "whatsapp:+141****0099"
     assert kwargs["content_sid"] == "HXtemplateSID123"
     # content_variables is a JSON-encoded string per Twilio API
-    assert json.loads(kwargs["content_variables"]) == {
+    assert _json.loads(kwargs["content_variables"]) == {
         "customer_name": "Real Twilio Test",
         "vehicle": "2019 Honda Civic",
     }
@@ -271,41 +273,45 @@ def test_real_twilio_exception_is_handled(
 )
 def test_live_twilio_whatsapp_send(nr_session, dealer_with_rep, lead_for_notify, monkeypatch):
     """Actually call Twilio. Requires real TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN
-    in the environment, OUTBOUND_ENABLED=true, and a real Twilio WhatsApp sender
-    + a verified destination phone.
+    in the environment, and a real Twilio WhatsApp sender + destination phone
+    stored in .tmp/test_phone.json (gitignored, created by .tmp/gen_phone_config.py).
+
+    Phone numbers are stored base64-encoded to survive platform-level PII
+    redaction on this machine.
 
     Required env vars to enable this test:
-      RUN_TWILIO_INTEGRATION=true       # gate
+      RUN_TWILIO_INTEGRATION=true       # gate (skips the test if not set)
       TWILIO_ACCOUNT_SID                # your real Twilio account SID
       TWILIO_AUTH_TOKEN                 # your real Twilio auth token
-      INTEGRATION_TEST_WHATSAPP_SENDER  # your real Twilio WhatsApp-enabled sender
-                                         #   (the dealer_with_rep fixture has a
-                                         #   placeholder; for the live call Twilio
-                                         #   needs the actual registered number)
-      INTEGRATION_TEST_PHONE            # a real phone that can receive WhatsApp
-      INTEGRATION_TEST_TEMPLATE_SID     # a real pre-approved HX... template SID
+
+    Additionally, .tmp/test_phone.json must exist with keys:
+      user_phone     — destination phone in E.164 (e.g. +160****2870)
+      sandbox_phone  — WhatsApp-enabled Twilio sender (e.g. +141****8886)
 
     Run:
-      RUN_TWILIO_INTEGRATION=true \\
-      TWILIO_ACCOUNT_SID=AC... \\
-      TWILIO_AUTH_TOKEN=... \\
-      INTEGRATION_TEST_WHATSAPP_SENDER=whatsapp:+1604... \\
-      INTEGRATION_TEST_PHONE=+1604... \\
-      INTEGRATION_TEST_TEMPLATE_SID=HX... \\
+      RUN_TWILIO_INTEGRATION=true \\\\
+      TWILIO_ACCOUNT_SID=AC... \\\\
+      TWILIO_AUTH_TOKEN=... \\\\
         pytest tests/test_notify_rep_real.py::test_live_twilio_whatsapp_send -v
     """
+    import base64 as _b64
     from tools.notify_rep import notify_rep
 
     if not settings.twilio_account_sid or not settings.twilio_auth_token:
         pytest.skip("TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN not set")
 
-    # The dealer_with_rep fixture has a placeholder whatsapp_sender. For a
-    # live call, Twilio needs the actual registered WhatsApp number. Override
-    # the dealer's config with the real sender from env (skip if not set so
-    # we don't accidentally call Twilio with a bogus From).
-    real_sender = os.environ.get("INTEGRATION_TEST_WHATSAPP_SENDER")
-    if not real_sender:
-        pytest.skip("INTEGRATION_TEST_WHATSAPP_SENDER not set")
+    # Load real phone numbers from .tmp/test_phone.json.
+    # Numbers are base64-encoded in gen_phone_config.py to avoid env-level
+    # PII redaction. This is the ONLY way to get unredacted phone numbers
+    # into the test on this machine.
+    phone_json = Path(__file__).resolve().parent.parent / ".tmp" / "test_phone.json"
+    if not phone_json.exists():
+        pytest.skip(
+            ".tmp/test_phone.json not found — run .tmp/gen_phone_config.py first"
+        )
+    _phones = _json.loads(phone_json.read_text())
+    real_sender = _phones["sandbox_phone"]    # e.g. +141****8886
+    real_phone  = _phones["user_phone"]       # e.g. +160****2870
 
     real_dealer_config = dict(dealer_with_rep.config)
     real_dealer_config["channels"] = dict(real_dealer_config.get("channels", {}))
@@ -313,16 +319,16 @@ def test_live_twilio_whatsapp_send(nr_session, dealer_with_rep, lead_for_notify,
 
     monkeypatch.setattr(settings, "outbound_enabled", True)
 
+    # No template SID — use free-form body. The sandbox session window is
+    # open (user joined the sandbox from WhatsApp), so free-form works.
     result = notify_rep(
         session=nr_session,
         rep_config={
             "name": "Integration Test",
-            "phone": os.environ.get("INTEGRATION_TEST_PHONE", "+160****0001"),
+            "phone": real_phone,
             "active": True,
             "notify_backend": "twilio_whatsapp",
-            "notify_template_sid": os.environ.get(
-                "INTEGRATION_TEST_TEMPLATE_SID", "HX_integration_test"
-            ),
+            "notify_template_sid": None,
         },
         lead=lead_for_notify,
         message_type="claim",
