@@ -33,65 +33,73 @@ def _on_job_event(event):
 # derives the assignment time from the LeadEvent stream.
 # ---------------------------------------------------------------------------
 
-def _run_escalation_sweep():
-    """Sweep all dealers for ASSIGNED leads past claim_timeout_min."""
-    from app.db import get_session_factory
+def _run_escalation_sweep_session(session) -> None:
+    """Business logic for the escalation sweep. Takes a session for testability.
+
+    Sweep all dealers for ASSIGNED leads past claim_timeout_min and escalate them.
+    """
     from app.models import Dealer, Lead, LeadEvent, LeadState
     from sqlalchemy import select, func
 
+    dealers = session.execute(select(Dealer)).scalars().all()
+    now = datetime.now(timezone.utc)
+
+    for dealer in dealers:
+        dealer_config = dealer.config or {}
+        timeout_min = dealer_config.get("routing", {}).get("claim_timeout_min", 5)
+        cutoff = now - timedelta(minutes=timeout_min)
+
+        # Find leads that are ASSIGNED and whose most recent ASSIGNED event is older than cutoff
+        assigned_leads = session.execute(
+            select(Lead).where(
+                Lead.dealer_id == dealer.id,
+                Lead.state == LeadState.ASSIGNED,
+            )
+        ).scalars().all()
+
+        for lead in assigned_leads:
+            # Find the most recent "to=ASSIGNED" LeadEvent for this lead
+            latest_assigned_event = session.execute(
+                select(LeadEvent).where(
+                    LeadEvent.lead_id == lead.id,
+                    LeadEvent.type == "state_change",
+                ).order_by(LeadEvent.created_at.desc())
+            ).scalars().first()
+
+            if latest_assigned_event is None:
+                continue
+
+            event_time = latest_assigned_event.created_at
+            # Ensure timezone-aware comparison
+            if event_time.tzinfo is None:
+                event_time = event_time.replace(tzinfo=timezone.utc)
+
+            if event_time < cutoff:
+                payload = latest_assigned_event.payload or {}
+                if payload.get("to") == "ASSIGNED":
+                    sales_team = dealer_config.get("sales_team", [])
+                    sms_number = dealer_config.get("channels", {}).get("sms_number")
+                    try:
+                        from app.engine.escalation import on_claim_timeout
+                        on_claim_timeout(
+                            session, lead.id, dealer, sales_team,
+                            sms_number=sms_number,
+                        )
+                        logger.info(
+                            "Escalation sweep: lead#%s escalated (assigned %d min ago)",
+                            lead.id, (now - event_time).total_seconds() / 60,
+                        )
+                    except Exception:
+                        logger.exception("Escalation failed for lead#%s", lead.id)
+
+
+def _run_escalation_sweep():
+    """Cron entry point: creates a session, delegates to _run_escalation_sweep_session."""
+    from app.db import get_session_factory
     logger.info("Running escalation sweep")
     session = get_session_factory()()
     try:
-        dealers = session.execute(select(Dealer)).scalars().all()
-        now = datetime.now(timezone.utc)
-
-        for dealer in dealers:
-            dealer_config = dealer.config or {}
-            timeout_min = dealer_config.get("routing", {}).get("claim_timeout_min", 5)
-            cutoff = now - timedelta(minutes=timeout_min)
-
-            # Find leads that are ASSIGNED and whose most recent ASSIGNED event is older than cutoff
-            assigned_leads = session.execute(
-                select(Lead).where(
-                    Lead.dealer_id == dealer.id,
-                    Lead.state == LeadState.ASSIGNED,
-                )
-            ).scalars().all()
-
-            for lead in assigned_leads:
-                # Find the most recent "to=ASSIGNED" LeadEvent for this lead
-                latest_assigned_event = session.execute(
-                    select(LeadEvent).where(
-                        LeadEvent.lead_id == lead.id,
-                        LeadEvent.type == "state_change",
-                    ).order_by(LeadEvent.created_at.desc())
-                ).scalars().first()
-
-                if latest_assigned_event is None:
-                    continue
-
-                event_time = latest_assigned_event.created_at
-                # Ensure timezone-aware comparison
-                if event_time.tzinfo is None:
-                    event_time = event_time.replace(tzinfo=timezone.utc)
-
-                if event_time < cutoff:
-                    payload = latest_assigned_event.payload or {}
-                    if payload.get("to") == "ASSIGNED":
-                        sales_team = dealer_config.get("sales_team", [])
-                        sms_number = dealer_config.get("channels", {}).get("sms_number")
-                        try:
-                            from app.engine.escalation import on_claim_timeout
-                            on_claim_timeout(
-                                session, lead.id, dealer, sales_team,
-                                sms_number=sms_number,
-                            )
-                            logger.info(
-                                "Escalation sweep: lead#%s escalated (assigned %d min ago)",
-                                lead.id, (now - event_time).total_seconds() / 60,
-                            )
-                        except Exception:
-                            logger.exception("Escalation failed for lead#%s", lead.id)
+        _run_escalation_sweep_session(session)
     except Exception:
         logger.exception("Escalation sweep failed")
     finally:
@@ -208,94 +216,109 @@ def _handle_followup(lead_id: int, dealer_slug: str, minutes: int):
         session.close()
 
 
-def _run_inventory_sync():
-    """Run inventory sync for all dealers (honors per-dealer refresh_min)."""
-    from app.db import get_session_factory
+def _run_inventory_sync_session(session) -> None:
+    """Business logic for the inventory sync job. Takes a session for testability."""
     from app.models import Dealer
     from sqlalchemy import select
 
+    dealers = session.execute(select(Dealer)).scalars().all()
+    for dealer in dealers:
+        config = dealer.config or {}
+        refresh_min = config.get("inventory", {}).get("refresh_min", 180)
+        try:
+            from tools.sync_inventory import sync_inventory
+            sync_inventory(session, dealer)
+            logger.info("Inventory synced for %s (refresh_min=%d)", dealer.slug, refresh_min)
+        except Exception:
+            logger.exception("Inventory sync failed for %s", dealer.slug)
+
+
+def _run_inventory_sync():
+    """Cron entry point: creates a session, delegates to _run_inventory_sync_session."""
+    from app.db import get_session_factory
     logger.info("Running scheduled inventory sync")
     session = get_session_factory()()
     try:
-        dealers = session.execute(select(Dealer)).scalars().all()
-        for dealer in dealers:
-            config = dealer.config or {}
-            refresh_min = config.get("inventory", {}).get("refresh_min", 180)
-            try:
-                from tools.sync_inventory import sync_inventory
-                sync_inventory(session, dealer)
-                logger.info("Inventory synced for %s (refresh_min=%d)", dealer.slug, refresh_min)
-            except Exception:
-                logger.exception("Inventory sync failed for %s", dealer.slug)
+        _run_inventory_sync_session(session)
     finally:
         session.close()
 
 
-def _run_org_sink_flush():
-    """Flush pending LeadEvents to org sinks."""
-    from app.db import get_session_factory
+def _run_org_sink_flush_session(session) -> None:
+    """Business logic for the org sink flush job. Takes a session for testability."""
     from app.models import Dealer
     from sqlalchemy import select
 
+    dealers = session.execute(select(Dealer)).scalars().all()
+    for dealer in dealers:
+        config = dealer.config or {}
+        mode = config.get("lead_org", {}).get("mode", "native")
+        if mode == "native":
+            continue
+        try:
+            from tools.sync_crm import flush_events
+            flush_events(session, dealer)
+            logger.info("Org sink flushed for %s", dealer.slug)
+        except Exception:
+            logger.exception("Org sink flush failed for %s", dealer.slug)
+
+
+def _run_org_sink_flush():
+    """Cron entry point: creates a session, delegates to _run_org_sink_flush_session."""
+    from app.db import get_session_factory
     logger.info("Running org sink flush")
     session = get_session_factory()()
     try:
-        dealers = session.execute(select(Dealer)).scalars().all()
-        for dealer in dealers:
-            config = dealer.config or {}
-            mode = config.get("lead_org", {}).get("mode", "native")
-            if mode == "native":
-                continue
-            try:
-                from tools.sync_crm import flush_events
-                flush_events(session, dealer)
-                logger.info("Org sink flushed for %s", dealer.slug)
-            except Exception:
-                logger.exception("Org sink flush failed for %s", dealer.slug)
+        _run_org_sink_flush_session(session)
     finally:
         session.close()
 
 
-def _run_stuck_lead_sweep():
-    """Log leads stuck in NEW or ASSIGNED beyond thresholds (observability)."""
-    from app.db import get_session_factory
+def _run_stuck_lead_sweep_session(session) -> None:
+    """Business logic for the stuck-lead sweep. Takes a session for testability."""
     from app.models import Dealer, Lead, LeadState
     from sqlalchemy import select
 
+    now = datetime.now(timezone.utc)
+    dealers = session.execute(select(Dealer)).scalars().all()
+    for dealer in dealers:
+        config = dealer.config or {}
+        timeout_min = config.get("routing", {}).get("claim_timeout_min", 5)
+        new_threshold = now - timedelta(minutes=5)
+        assigned_threshold = now - timedelta(minutes=timeout_min * 2)
+
+        # Leads stuck in NEW for >5 min
+        stuck_new = session.execute(
+            select(Lead).where(
+                Lead.dealer_id == dealer.id,
+                Lead.state == LeadState.NEW,
+                Lead.created_at < new_threshold,
+            )
+        ).scalars().all()
+        for lead in stuck_new:
+            logger.warning("STUCK lead#%s in NEW for %d min (dealer=%s)",
+                           lead.id, (now - lead.created_at).total_seconds() / 60, dealer.slug)
+
+        # Leads stuck in ASSIGNED for >2x timeout
+        stuck_assigned = session.execute(
+            select(Lead).where(
+                Lead.dealer_id == dealer.id,
+                Lead.state == LeadState.ASSIGNED,
+                Lead.updated_at < assigned_threshold,
+            )
+        ).scalars().all()
+        for lead in stuck_assigned:
+            logger.warning("STUCK lead#%s in ASSIGNED for %d min (dealer=%s)",
+                           lead.id, (now - lead.updated_at).total_seconds() / 60, dealer.slug)
+
+
+def _run_stuck_lead_sweep():
+    """Cron entry point: creates a session, delegates to _run_stuck_lead_sweep_session."""
+    from app.db import get_session_factory
     logger.info("Running stuck-lead sweep")
     session = get_session_factory()()
     try:
-        now = datetime.now(timezone.utc)
-        dealers = session.execute(select(Dealer)).scalars().all()
-        for dealer in dealers:
-            config = dealer.config or {}
-            timeout_min = config.get("routing", {}).get("claim_timeout_min", 5)
-            new_threshold = now - timedelta(minutes=5)
-            assigned_threshold = now - timedelta(minutes=timeout_min * 2)
-
-            # Leads stuck in NEW for >5 min
-            stuck_new = session.execute(
-                select(Lead).where(
-                    Lead.dealer_id == dealer.id,
-                    Lead.state == LeadState.NEW,
-                    Lead.created_at < new_threshold,
-                )
-            ).scalars().all()
-            for lead in stuck_new:
-                logger.warning("STUCK lead#%s in NEW for %d min (dealer=%s)",
-                               lead.id, (now - lead.created_at).total_seconds() / 60, dealer.slug)
-
-            # Leads stuck in ASSIGNED for >2x timeout
-            stuck_assigned = session.execute(
-                select(Lead).where(
-                    Lead.dealer_id == dealer.id,
-                    Lead.state == LeadState.ASSIGNED,
-                    Lead.updated_at < assigned_threshold,
-                )
-            ).scalars().all()
-            for lead in stuck_assigned:
-                logger.warning("STUCK lead#%s in ASSIGNED for %d min (dealer=%s)",
-                               lead.id, (now - lead.updated_at).total_seconds() / 60, dealer.slug)
+        _run_stuck_lead_sweep_session(session)
     except Exception:
         logger.exception("Stuck-lead sweep failed")
     finally:
@@ -308,43 +331,48 @@ def _normalize_db_url(url: str) -> str:
     return url.replace("postgresql://", "postgresql+psycopg://", 1)
 
 
-def _run_daily_digest_for_all_dealers():
-    """Run daily digest for all dealers that have it enabled."""
-    from app.db import get_session_factory
+def _run_daily_digest_for_all_dealers_session(session) -> None:
+    """Business logic for the daily digest job. Takes a session for testability."""
     from app.models import Dealer
     from sqlalchemy import select
 
-    logger.info("Checking daily digests for all dealers")
     now_utc = datetime.now(timezone.utc)
+    dealers = session.execute(select(Dealer)).scalars().all()
+    for dealer in dealers:
+        config = dealer.config or {}
+        routing = config.get("routing", {})
+        if not routing.get("digest_enabled", False):
+            continue
+
+        # Check if current dealer-local time matches digest_time
+        digest_time = routing.get("digest_time", "08:00")
+        tz_name = config.get("dealer", {}).get("timezone", "America/Vancouver")
+        try:
+            from zoneinfo import ZoneInfo
+            now_local = now_utc.astimezone(ZoneInfo(tz_name))
+        except Exception:
+            now_local = now_utc
+
+        try:
+            digest_h, digest_m = map(int, digest_time.split(":"))
+        except (ValueError, AttributeError):
+            digest_h, digest_m = 8, 0
+
+        # Only fire if we're within the target hour
+        if now_local.hour == digest_h:
+            try:
+                send_daily_digest(session, dealer.slug, config)
+            except Exception:
+                logger.exception("Daily digest failed for %s", dealer.slug)
+
+
+def _run_daily_digest_for_all_dealers():
+    """Cron entry point: creates a session, delegates to _run_daily_digest_for_all_dealers_session."""
+    from app.db import get_session_factory
+    logger.info("Checking daily digests for all dealers")
     session = get_session_factory()()
     try:
-        dealers = session.execute(select(Dealer)).scalars().all()
-        for dealer in dealers:
-            config = dealer.config or {}
-            routing = config.get("routing", {})
-            if not routing.get("digest_enabled", False):
-                continue
-
-            # Check if current dealer-local time matches digest_time
-            digest_time = routing.get("digest_time", "08:00")
-            tz_name = config.get("dealer", {}).get("timezone", "America/Vancouver")
-            try:
-                from zoneinfo import ZoneInfo
-                now_local = now_utc.astimezone(ZoneInfo(tz_name))
-            except Exception:
-                now_local = now_utc
-
-            try:
-                digest_h, digest_m = map(int, digest_time.split(":"))
-            except (ValueError, AttributeError):
-                digest_h, digest_m = 8, 0
-
-            # Only fire if we're within the target hour
-            if now_local.hour == digest_h:
-                try:
-                    send_daily_digest(session, dealer.slug, config)
-                except Exception:
-                    logger.exception("Daily digest failed for %s", dealer.slug)
+        _run_daily_digest_for_all_dealers_session(session)
     finally:
         session.close()
 
