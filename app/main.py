@@ -810,6 +810,7 @@ async def webhook_twilio_voice(request: Request) -> Response:
     """Inbound/missed call -> missed-call text-back.
 
     If the call is unanswered/no-answer, sends an SMS text-back to the caller.
+    Creates a Lead, logs the Message, and transitions to AUTO_REPLIED.
     """
     # P0-01: parse form first, then validate signature.
     form = await request.form()
@@ -820,28 +821,10 @@ async def webhook_twilio_voice(request: Request) -> Response:
 
     session = _get_session()
     try:
-        from_number = mask_phone(payload.get("From", ""))
-        to_number = payload.get("To", "")
-        call_status = payload.get("CallStatus", "")
+        from tools.detect_missed_call import handle_missed_call_from_webhook
 
-        # Only text back on no-answer/busy/failed
-        if call_status not in ("no-answer", "busy", "failed", "completed"):
-            return _empty_twiml()
-
-        dealer = _find_dealer_by_sms(session, to_number)
-        if dealer is None:
-            return _empty_twiml()
-
-        dealer_config = dealer.config or {}
-        dealer_name = dealer_config.get("dealer", {}).get("name", "us")
-        main_phone = dealer_config.get("dealer", {}).get("main_phone", "")
-
-        reply_text = (
-            f"Hi! We missed your call to {dealer_name}. "
-            f"Text us here or call back at {main_phone}. We'll get back to you ASAP!"
-        )
-
-        # Check if caller has opted out
+        # Check if caller has opted out first
+        from_number = payload.get("From", "")
         opt_out = _exec(session,
             select(ConsentLog).where(
                 ConsentLog.phone == from_number,
@@ -852,7 +835,24 @@ async def webhook_twilio_voice(request: Request) -> Response:
         if opt_out:
             return _empty_twiml()
 
-        return _twiml(reply_text)
+        # Handle the missed call
+        def _sms_sender(to, from_, body):
+            """Send SMS via Twilio."""
+            from tools.send_sms import send_sms
+            return send_sms(to=to, from_=from_, body=body)
+
+        result = handle_missed_call_from_webhook(
+            session=session,
+            payload=payload,
+            sms_sender=_sms_sender,
+        )
+
+        if result.success:
+            logger.info("Missed call handled: lead=%d, sid=%s", result.lead_id, result.message_sid)
+            return _twiml(payload.get("Body", ""))  # Empty TwiML — SMS is sent via API
+        else:
+            logger.info("Missed call skipped: %s", result.error)
+            return _empty_twiml()
 
     except Exception:
         logger.exception("webhook_twilio_voice error")
