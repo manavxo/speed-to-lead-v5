@@ -274,12 +274,42 @@ def test_live_twilio_whatsapp_send(nr_session, dealer_with_rep, lead_for_notify,
     in the environment, OUTBOUND_ENABLED=true, and a real Twilio WhatsApp sender
     + a verified destination phone.
 
-    Run: RUN_TWILIO_INTEGRATION=true pytest tests/test_notify_rep_real.py -v
+    Required env vars to enable this test:
+      RUN_TWILIO_INTEGRATION=true       # gate
+      TWILIO_ACCOUNT_SID                # your real Twilio account SID
+      TWILIO_AUTH_TOKEN                 # your real Twilio auth token
+      INTEGRATION_TEST_WHATSAPP_SENDER  # your real Twilio WhatsApp-enabled sender
+                                         #   (the dealer_with_rep fixture has a
+                                         #   placeholder; for the live call Twilio
+                                         #   needs the actual registered number)
+      INTEGRATION_TEST_PHONE            # a real phone that can receive WhatsApp
+      INTEGRATION_TEST_TEMPLATE_SID     # a real pre-approved HX... template SID
+
+    Run:
+      RUN_TWILIO_INTEGRATION=true \\
+      TWILIO_ACCOUNT_SID=AC... \\
+      TWILIO_AUTH_TOKEN=... \\
+      INTEGRATION_TEST_WHATSAPP_SENDER=whatsapp:+1604... \\
+      INTEGRATION_TEST_PHONE=+1604... \\
+      INTEGRATION_TEST_TEMPLATE_SID=HX... \\
+        pytest tests/test_notify_rep_real.py::test_live_twilio_whatsapp_send -v
     """
     from tools.notify_rep import notify_rep
 
     if not settings.twilio_account_sid or not settings.twilio_auth_token:
         pytest.skip("TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN not set")
+
+    # The dealer_with_rep fixture has a placeholder whatsapp_sender. For a
+    # live call, Twilio needs the actual registered WhatsApp number. Override
+    # the dealer's config with the real sender from env (skip if not set so
+    # we don't accidentally call Twilio with a bogus From).
+    real_sender = os.environ.get("INTEGRATION_TEST_WHATSAPP_SENDER")
+    if not real_sender:
+        pytest.skip("INTEGRATION_TEST_WHATSAPP_SENDER not set")
+
+    real_dealer_config = dict(dealer_with_rep.config)
+    real_dealer_config["channels"] = dict(real_dealer_config.get("channels", {}))
+    real_dealer_config["channels"]["whatsapp_sender"] = real_sender
 
     monkeypatch.setattr(settings, "outbound_enabled", True)
 
@@ -297,7 +327,7 @@ def test_live_twilio_whatsapp_send(nr_session, dealer_with_rep, lead_for_notify,
         lead=lead_for_notify,
         message_type="claim",
         payload={"customer_name": "Live Integration Test"},
-        dealer_config=dealer_with_rep.config,
+        dealer_config=real_dealer_config,
     )
 
     assert result.success is True
