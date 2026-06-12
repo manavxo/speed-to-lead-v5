@@ -454,16 +454,20 @@ def test_p0_11_conversation_history_loads_last_10_messages(db_session, monkeypat
         dealer_config=DEMO_CONFIG,
     )
 
-    # The AI should have received exactly 10 messages (the most recent 10)
+    # The AI should have received exactly 10 history messages (the most recent 10 from DB),
+    # PLUS the current user message appended at the end. So total user/assistant = 11.
+    # Filter out the current user message to verify just the history loaded from DB.
     sent_messages = captured["messages"]
-    # The first 1-2 are system+user prompt structure; the rest are history
     history = [m for m in sent_messages if m.get("role") in ("user", "assistant")]
-    assert len(history) == 10, (
-        f"P0-11 REGRESSION: expected exactly 10 history messages, got {len(history)}. "
+    # The current user message ("Final question?") is the LAST item. Drop it to inspect
+    # just the 10 history messages loaded from the DB.
+    db_history = history[:-1]
+    assert len(db_history) == 10, (
+        f"P0-11 REGRESSION: expected exactly 10 history messages from DB, got {len(db_history)}. "
         f"The AI is single-turn again — this is the v4 bug we fixed."
     )
     # And the most recent message (Message number 11) must be in the history
-    bodies = [m.get("content", "") for m in history]
+    bodies = [m.get("content", "") for m in db_history]
     assert any("Message number 11" in b for b in bodies), (
         f"P0-11 REGRESSION: the most recent message must be in history. "
         f"Got bodies: {bodies}"
