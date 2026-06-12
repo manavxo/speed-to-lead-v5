@@ -184,6 +184,8 @@
             </div>
             
             <form method="POST" action="/dashboard/login">
+                <!-- P0-08: CSRF token (double-submit cookie pattern) -->
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <div class="form-group">
                     <label class="form-label" for="dealer_slug">Dealer ID</label>
                     <input type="text" id="dealer_slug" name="dealer_slug" class="input" placeholder="your-dealer-slug" required autocomplete="off">

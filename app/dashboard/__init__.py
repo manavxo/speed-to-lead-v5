@@ -6,13 +6,14 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 import hashlib
+import hmac
 import secrets
 import time
 
 import bcrypt
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from fastapi import APIRouter, Cookie, Depends, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy import func as sa_func, case as sa_case
@@ -128,6 +129,37 @@ def _verify_password(password: str) -> bool:
 
 def _get_session() -> Session:
     return get_session_factory()()
+
+
+# ---------------------------------------------------------------------------
+# P0-08: CSRF protection (double-submit cookie pattern)
+# ---------------------------------------------------------------------------
+
+def _generate_csrf_token() -> str:
+    """Generate a random CSRF token for the double-submit cookie pattern.
+
+    The token is opaque (32 bytes from secrets.token_urlsafe → 43-char
+    base64url string) and unpredictable. The same value lands in the
+    csrf_token cookie AND in a hidden form field. POST compares them.
+    """
+    return secrets.token_urlsafe(32)
+
+
+def _validate_csrf_token(request: Request, submitted_token: str) -> bool:
+    """Validate the submitted CSRF token against the csrf_token cookie.
+
+    Returns True only if both are non-empty and exactly match.
+    Uses hmac.compare_digest for constant-time comparison (prevents
+    timing attacks that could leak the cookie value character by
+    character).
+    """
+    if not submitted_token:
+        return False
+    cookie_token = request.cookies.get("csrf_token")
+    if not cookie_token:
+        return False
+    return hmac.compare_digest(cookie_token, submitted_token)
+
 
 def get_dealer_from_auth(session: Session, cookie_value: str) -> Dealer | None:
     """Extract dealer_slug from the signed auth cookie and look up the Dealer.
@@ -607,7 +639,22 @@ def require_auth(session: str = Cookie(None)):
 
 @router.get("/login")
 async def login_page(request: Request):
-    return templates.TemplateResponse(request=request, name="login.html", context={"request": request, "active_page": "login"})
+    # P0-08: generate CSRF token, set double-submit cookie, mirror in form
+    token = _generate_csrf_token()
+    response = templates.TemplateResponse(
+        request=request,
+        name="login.html",
+        context={"request": request, "csrf_token": token, "active_page": "login"},
+    )
+    response.set_cookie(
+        "csrf_token",
+        token,
+        httponly=True,
+        secure=(settings.environment == "production"),
+        samesite="lax",
+        max_age=3600,
+    )
+    return response
 
 
 @router.post("/login")
@@ -616,7 +663,14 @@ async def login_submit(
     dealer_slug: str = Form(...),
     username: str = Form(...),
     password: str = Form(...),
+    csrf_token: str = Form(""),  # P0-08: default empty so missing field → 403, not 422
 ):
+    # P0-08: CSRF check FIRST, before rate limit. Putting CSRF before the
+    # rate-limit means an attacker cannot DoS a dealer by flooding POSTs
+    # and consuming the legitimate dealer's rate-limit window.
+    if not _validate_csrf_token(request, csrf_token):
+        return PlainTextResponse("Forbidden — CSRF token missing or invalid", status_code=403)
+
     ip = (request.headers.get('X-Forwarded-For', '').split(',')[0].strip() or (request.client.host if request.client else 'unknown'))
 
     if _check_rate_limit(ip):
