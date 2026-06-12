@@ -14,6 +14,9 @@ os.environ.setdefault("OUTBOUND_ENABLED", "false")
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("QUIET_HOURS_DISABLED", "true")
 os.environ.setdefault("REQUIRE_TWILIO_SIGNATURE", "true")
+# P0-11 test needs the conversation engine to actually call the LLM
+# (not bail out with the "api key not set" early return).
+os.environ.setdefault("OPENROUTER_API_KEY", "test-openrouter-key-not-real")
 
 import hashlib
 import hmac

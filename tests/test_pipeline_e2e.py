@@ -177,19 +177,26 @@ def test_full_pipeline_e2e(e2e_session, dealer, vehicle):
     assert lead.vehicle_id == vehicle.id
     assert lead.assigned_rep in ("Manav", "Friend")
 
-    # Assert: Messages were sent (auto-reply + WhatsApp claim ping)
+    # Assert: Auto-reply was sent via the customer-facing SMS chokepoint (send_sms).
+    # The claim ping goes through notify_rep, which has its own fake — it's verified
+    # via the Message table check below.
     all_messages = fake_twilio.sent
-    assert len(all_messages) >= 2, f"Expected at least 2 messages (SMS + WhatsApp), got {len(all_messages)}"
-    # At least one message should contain the dealer name
+    assert len(all_messages) >= 1, f"Expected at least 1 customer-facing SMS, got {len(all_messages)}"
+    # The auto-reply should contain the dealer name
     assert any("Test Motors" in m.get("body", "") for m in all_messages), \
         f"Expected dealer name in messages: {[m.get('body', '') for m in all_messages]}"
-    # At least one message should be a claim ping
-    assert any("Reply 1 to claim" in m.get("body", "") for m in all_messages), \
-        f"Expected claim ping in messages: {[m.get('body', '') for m in all_messages]}"
 
-    # Assert: Messages persisted
+    # Assert: Messages persisted (auto-reply + claim ping via notify_rep)
     messages = e2e_session.query(Message).filter(Message.lead_id == lead.id).all()
     assert len(messages) >= 2  # At least auto-reply + claim ping
+    # Verify the claim ping has the right shape: it should be a rep-targeted message.
+    # notify_rep() persists with recipient_role="rep" per directive H.2.4.
+    rep_messages = [m for m in messages if getattr(m, "recipient_role", None) == "rep"]
+    assert len(rep_messages) >= 1, (
+        f"Expected at least 1 rep-targeted claim ping via notify_rep, "
+        f"got {len(rep_messages)} messages with recipient_role='rep'. "
+        f"All messages: {[(m.direction, m.recipient_role, m.body[:50]) for m in messages]}"
+    )
 
     # Assert: LeadEvents recorded
     events = e2e_session.query(LeadEvent).filter(LeadEvent.lead_id == lead.id).all()

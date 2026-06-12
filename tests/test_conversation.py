@@ -445,9 +445,12 @@ def test_p0_11_conversation_history_loads_last_10_messages(db_session, monkeypat
     monkeypatch.setattr(conv, "_call_openrouter_with_retry", spy)
     monkeypatch.setattr(conv, "_get_openai_client", lambda: object())
 
-    # Call _call_openrouter directly
+    # Call _call_openrouter directly (current signature: system_prompt, user_message, *, session, lead, ...)
     conv._call_openrouter(
-        db_session, lead, "Final question?",
+        system_prompt="You are a sales rep.",
+        user_message="Final question?",
+        session=db_session,
+        lead=lead,
         dealer_config=DEMO_CONFIG,
     )
 
@@ -487,8 +490,8 @@ def _make_lead(session, dealer: Dealer, name: str) -> Lead:
     from app.models import Lead
     return Lead(
         dealer_id=dealer.id,
-        customer_name=name,
-        customer_phone="+16045551234",
-        channel=Channel.SMS,
+        name=name,
+        phone="+160****1234",
+        source=Channel.SMS,
         state=LeadState.ENGAGED,
     )

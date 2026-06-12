@@ -18,8 +18,6 @@ from app.engine.lifecycle import transition
 from app.models import Channel, ConsentLog, Direction, Lead, LeadState, Message
 from tools.check_inventory import resolve_vehicle
 
-from app.db import get_session_factory
-
 logger = logging.getLogger("speed-to-lead.route_lead")
 
 
@@ -157,10 +155,13 @@ def ingest_lead(
             logger.info("Auto-reply suppressed for lead#%s (opt-out or quiet hours)", lead.id)
 
     # ALWAYS record the auto-reply message to the conversation thread.
-    # Use a fresh session query to avoid stale state after transition + send_sms.
-    fresh_session = get_session_factory()()
+    # Use the caller's session — no global factory. The previous "fresh_session"
+    # hack broke tests because each `sqlite:///:memory:` is a different in-memory
+    # DB, so the factory pointed at a DB with no tables. expire_all() handles
+    # any stale entity state from the transition + send_sms above.
     try:
-        existing_msg = fresh_session.execute(
+        session.expire_all()
+        existing_msg = session.execute(
             select(Message).where(Message.lead_id == lead.id, Message.direction == Direction.OUTBOUND)
         ).scalars().first()
         if not existing_msg:
@@ -171,16 +172,14 @@ def ingest_lead(
                 body=auto_text,
                 ai_generated=True,
             )
-            fresh_session.add(msg)
-            fresh_session.commit()
+            session.add(msg)
+            session.commit()
             logger.info("Auto-reply message recorded for lead#%s", lead.id)
         else:
             logger.info("Auto-reply message already exists for lead#%s (sid=%s)", lead.id, existing_msg.provider_sid)
     except Exception:
         logger.exception("Failed to record auto-reply message for lead#%s", lead.id)
-        fresh_session.rollback()
-    finally:
-        fresh_session.close()
+        session.rollback()
 
     # 6. Assign round-robin + SMS claim ping
     sales_team = dealer_config.get("sales_team", [])

@@ -31,31 +31,44 @@ def _normalize_db_url(url: str) -> str:
     return url
 
 
+def _is_sqlite(url: str) -> bool:
+    """SQLite uses StaticPool/SingletonThreadPool — it doesn't accept pool_size,
+    max_overflow, pool_recycle, or pool_pre_ping. The app must skip those kwargs
+    when running against an in-memory or file SQLite (i.e. tests)."""
+    return url.startswith("sqlite")
+
+
+def _pool_kwargs(url: str) -> dict:
+    """Postgres pool tuning for Render free tier. SQLite opts out — see _is_sqlite."""
+    if _is_sqlite(url):
+        return {}
+    return {
+        "pool_size": 2,
+        "max_overflow": 2,
+        "pool_recycle": 300,
+        "pool_pre_ping": True,
+    }
+
+
 def get_engine(url: str | None = None):
     """Get or create the SQLAlchemy engine. Pass a custom URL for testing."""
     global _engine
+    target_url = url if url is not None else settings.database_url
     if url is not None:
-        # Connection pool settings for Render free tier (single Postgres connection).
-        # Increase pool_size and max_overflow when upgrading to a paid Render plan.
+        # Caller-provided URL (tests): always rebuild the engine so we don't
+        # reuse a stale engine bound to a different DB.
         _engine = create_engine(
             _normalize_db_url(url),
             echo=False,
-            pool_size=2,
-            max_overflow=2,
-            pool_recycle=300,
-            pool_pre_ping=True,
+            **_pool_kwargs(url),
         )
         return _engine
     if _engine is None:
-        # Connection pool settings for Render free tier (single Postgres connection).
-        # Increase pool_size and max_overflow when upgrading to a paid Render plan.
+        # App-level engine: built once from settings, reused for the process lifetime.
         _engine = create_engine(
-            _normalize_db_url(settings.database_url),
+            _normalize_db_url(target_url),
             echo=False,
-            pool_size=2,
-            max_overflow=2,
-            pool_recycle=300,
-            pool_pre_ping=True,
+            **_pool_kwargs(target_url),
         )
     return _engine
 

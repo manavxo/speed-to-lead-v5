@@ -50,9 +50,9 @@ def test_p0_12_followup_sender_actually_sends_a_message(db_session, monkeypatch)
 
     lead = Lead(
         dealer_id=dealer.id,
-        customer_name="P0-12 Customer",
-        customer_phone="+160****5678",
-        channel=Channel.SMS,
+        name="P0-12 Customer",
+        phone="+160****5678",
+        source=Channel.SMS,
         state=LeadState.ENGAGED,
     )
     db_session.add(lead)
@@ -120,9 +120,9 @@ def test_p0_12_followup_skips_terminal_leads(db_session, monkeypatch):
     # SOLD lead
     sold = Lead(
         dealer_id=dealer.id,
-        customer_name="Sold Customer",
-        customer_phone="+160****9999",
-        channel=Channel.SMS,
+        name="Sold Customer",
+        phone="+160****9999",
+        source=Channel.SMS,
         state=LeadState.SOLD,
     )
     db_session.add(sold)
