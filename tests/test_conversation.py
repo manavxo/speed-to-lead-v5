@@ -422,14 +422,17 @@ def test_p0_11_conversation_history_loads_last_10_messages(db_session, monkeypat
     db_session.commit()
     db_session.refresh(lead)
 
-    # Add 12 messages (alternating in/out, with the last being inbound)
-    # This is more than 10 — the function should pick the MOST RECENT 10.
+    # Add 12 messages (alternating in/out, with the last being outbound) with
+    # DISTINCT created_at timestamps. Without explicit timestamps, the default
+    # factory gives all 12 messages the same created_at (microsecond precision,
+    # loop is sub-microsecond), making ORDER BY DESC LIMIT 10 non-deterministic.
     for i in range(12):
         msg = Message(
             lead_id=lead.id,
             direction=Direction.INBOUND if i % 2 == 0 else Direction.OUTBOUND,
             channel=Channel.SMS,
             body=f"Message number {i}",
+            created_at=datetime(2026, 6, 1, 12, 0, i, tzinfo=timezone.utc),
         )
         db_session.add(msg)
     db_session.commit()

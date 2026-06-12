@@ -91,6 +91,70 @@ def _exec(session: Session, stmt):
     return session.execute(stmt).scalars()
 
 
+def _process_and_send_sync(
+    session: Session,
+    lead_id: int,
+    dealer_id: int,
+    dealer_slug: str,
+    body: str,
+    raw_from: str,
+    sms_from_number: str,
+) -> None:
+    """Sync helper for the SMS webhook background task.
+
+    Runs the AI turn, appends the CASL footer, sends the reply via send_sms,
+    and logs the result. Takes a session so it can be tested directly (the
+    async wrapper _process_and_send handles session lifecycle).
+
+    Returns silently on missing lead/dealer; logs errors.
+    """
+    bg_lead = session.get(Lead, lead_id)
+    if not bg_lead:
+        logger.error("Background task: lead#%s not found", lead_id)
+        return
+
+    bg_dealer = session.get(Dealer, dealer_id)
+    bg_dealer_config = bg_dealer.config if bg_dealer else {}
+
+    # Get vehicle context
+    vehicle = None
+    if bg_lead.vehicle_id:
+        from app.models import Vehicle
+        vehicle = session.get(Vehicle, bg_lead.vehicle_id)
+
+    result = handle_turn(
+        session, bg_lead, body,
+        dealer_config=bg_dealer_config,
+        vehicle=vehicle,
+    )
+
+    reply_text = result.get("text", "Thanks for your message!")
+
+    # Append CASL compliance footer
+    bg_dealer_name = bg_dealer_config.get("dealer", {}).get("name", "")
+    footer = bg_dealer_config.get("compliance", {}).get(
+        "consent_text", "Reply STOP to opt out."
+    )
+    if bg_dealer_name and bg_dealer_name not in reply_text:
+        reply_text = f"{reply_text}\n\n— {bg_dealer_name}. {footer}"
+    elif footer not in reply_text:
+        reply_text = f"{reply_text}\n\n{footer}"
+
+    # Send via send_sms chokepoint (enforces compliance, logs message)
+    from tools.send_sms import send_sms
+    send_sms(
+        session,
+        to=raw_from,
+        body=reply_text,
+        from_number=sms_from_number,
+        dealer_slug=dealer_slug,
+        dealer_config=bg_dealer_config,
+        lead=bg_lead,
+        force_send=True,
+    )
+    logger.info("Background reply sent for lead#%s", lead_id)
+
+
 def _get_session() -> Session:
     """Get a new DB session."""
     factory = get_session_factory()
@@ -599,56 +663,14 @@ async def webhook_twilio_sms(request: Request) -> Response:
             import asyncio
 
             async def _process_and_send():
-                """Background: run AI, then send reply via Twilio REST API."""
+                """Background entry point: creates a session, delegates to sync helper."""
+                from app.db import get_session_factory
                 bg_session = get_session_factory()()
                 try:
-                    bg_lead = bg_session.get(Lead, lead_id)
-                    if not bg_lead:
-                        logger.error("Background task: lead#%s not found", lead_id)
-                        return
-
-                    bg_dealer = bg_session.get(Dealer, dealer_id)
-                    bg_dealer_config = bg_dealer.config if bg_dealer else {}
-
-                    # Get vehicle context
-                    vehicle = None
-                    if bg_lead.vehicle_id:
-                        from app.models import Vehicle
-                        vehicle = bg_session.get(Vehicle, bg_lead.vehicle_id)
-
-                    result = handle_turn(
-                        bg_session, bg_lead, body,
-                        dealer_config=bg_dealer_config,
-                        vehicle=vehicle,
+                    _process_and_send_sync(
+                        bg_session, lead_id, dealer_id, dealer_slug,
+                        body, raw_from, sms_from_number,
                     )
-
-                    reply_text = result.get("text", "Thanks for your message!")
-
-                    # Append CASL compliance footer
-                    bg_dealer_name = bg_dealer_config.get("dealer", {}).get("name", "")
-                    footer = bg_dealer_config.get("compliance", {}).get(
-                        "consent_text", "Reply STOP to opt out."
-                    )
-                    if bg_dealer_name and bg_dealer_name not in reply_text:
-                        reply_text = f"{reply_text}\n\n— {bg_dealer_name}. {footer}"
-                    elif footer not in reply_text:
-                        reply_text = f"{reply_text}\n\n{footer}"
-
-                    # Send via send_sms chokepoint (enforces compliance, logs message)
-                    from tools.send_sms import send_sms
-                    send_sms(
-                        bg_session,
-                        to=raw_from,
-                        body=reply_text,
-                        from_number=sms_from_number,
-                        dealer_slug=dealer_slug,
-                        dealer_config=bg_dealer_config,
-                        lead=bg_lead,
-                        force_send=True,
-                    )
-                    logger.info("Background reply sent for lead#%s", lead_id)
-                except Exception:
-                    logger.exception("Background reply failed for lead#%s", lead_id)
                 finally:
                     bg_session.close()
 
