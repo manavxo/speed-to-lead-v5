@@ -17,6 +17,9 @@ COPY . .
 # Create data dir for SQLite fallback
 RUN mkdir -p /app/data
 
-EXPOSE 10000
+# Render injects PORT; default to 10000 for local Docker runs
+ENV PORT=10000
+EXPOSE ${PORT}
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "10000"]
+# Use shell form so $PORT is interpolated
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT}
