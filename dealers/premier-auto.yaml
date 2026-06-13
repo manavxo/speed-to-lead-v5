@@ -1,0 +1,64 @@
+# Test dealer for Phase 1 live testing
+# Business: Premier Auto Group, Burnaby BC
+# Webhook token: premier-auto-group-token
+# WhatsApp sandbox: Twilio sandbox number
+
+dealer:
+  slug: premier-auto
+  name: "Premier Auto Group"
+  timezone: America/Vancouver
+  hours:
+    mon: "09:00-19:00"
+    tue: "09:00-19:00"
+    wed: "09:00-19:00"
+    thu: "09:00-19:00"
+    fri: "09:00-19:00"
+    sat: "10:00-17:00"
+    sun: "closed"
+  location_address: "4567 Kingsway, Burnaby, BC V5H 2B1"
+  maps_url: "https://maps.google.com/?q=Premier+Auto+Group+Burnaby"
+  main_phone: "+17787623122"
+
+channels:
+  sms_number: "+17785550111"
+  whatsapp_sender: "+14155238886"
+  lead_email_inbox: "leads+premier@yourdomain.com"
+  web_form_token: "premier-auto-group-token"
+
+sales_team:
+  - { name: "Mike",  phone: "+16045550121", active: true, notify_backend: twilio_whatsapp, notify_template_sid: null }
+  - { name: "Dana",  phone: "+16045550122", active: true, notify_backend: twilio_whatsapp, notify_template_sid: null }
+  - { name: "Sarah", phone: "+16045550123", active: true, notify_backend: twilio_whatsapp, notify_template_sid: null }
+
+routing:
+  strategy: round_robin
+  claim_timeout_min: 5
+  escalation: [reassign, notify_manager]
+  manager_phone: "+16045550130"
+
+ai:
+  persona: "friendly, knowledgeable, no-pressure sales rep at Premier Auto Group in Burnaby. You know the inventory well. Keep responses concise (2-3 sentences max). Be helpful but never pushy."
+  goal: book_appointment
+  guardrails:
+    no_price_negotiation: true
+    no_financing_promises: true
+
+followups:
+  cadence_min: [60, 1440, 4320, 10080]
+
+inventory:
+  source: manual
+  url: ""
+  refresh_min: 180
+  field_map: auto
+
+lead_org:
+  mode: native
+  target: ""
+  credentials_ref: ""
+
+compliance:
+  region: CA-BC
+  consent_text: "By submitting you agree to receive texts from Premier Auto Group. Reply STOP to opt out. Msg&data rates may apply."
+  opt_out_keywords: [STOP, STOPALL, UNSUBSCRIBE, ARRET]
+  quiet_hours: "21:00-08:00"
