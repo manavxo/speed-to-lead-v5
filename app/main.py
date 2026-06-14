@@ -340,7 +340,13 @@ def _validate_twilio_signature(request: Request, form_data: dict | None = None) 
     tampered body fails validation. Tests inject a FakeValidator via
     `monkeypatch.setattr(twilio.request_validator, "RequestValidator", ...)`
     so they can exercise this without HTTPS or a real auth token.
+
+    When REQUIRE_TWILIO_SIGNATURE=false (the default), validation is skipped
+    entirely — safe for dev/sandbox testing where signing is impractical.
     """
+    if not settings.require_twilio_signature:
+        return True
+
     token = settings.twilio_auth_token
     if not token:
         # Fail closed: cannot validate without a token.
@@ -803,6 +809,8 @@ async def _handle_customer_whatsapp_test(
                     body=ai_response,
                     dealer_id=dealer.id,
                     lead_id=lead_id,
+                    session=session,
+                    lead=existing_lead,
                 )
                 logger.info("[TEST MODE] WhatsApp reply sent to %s", from_number)
             except Exception:
@@ -855,6 +863,8 @@ async def _handle_customer_whatsapp_test(
                         body=ai_response,
                         dealer_id=dealer.id,
                         lead_id=lead_id,
+                        session=session,
+                        lead=lead,
                     )
                     logger.info("[TEST MODE] WhatsApp auto-reply sent to new customer %s", from_number)
                 except Exception:

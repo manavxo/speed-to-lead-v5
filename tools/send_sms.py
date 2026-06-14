@@ -324,7 +324,6 @@ def send_sms(
         if fake_twilio:
             sid = fake_twilio.send(to=to, body=tagged_body, from_=from_number)
         else:
-            logger.info("SEND_WHATSAPP: to=%s from=%s template=%s vars=%s", to, from_number, template, variables)
             from twilio.rest import Client
             client = Client(settings.twilio_account_sid, settings.twilio_auth_token)
             message = client.messages.create(to=to, body=tagged_body, from_=from_number)

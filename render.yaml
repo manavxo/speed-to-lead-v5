@@ -15,7 +15,11 @@ services:
       - key: TWILIO_PHONE_NUMBER
         sync: false
       - key: OUTBOUND_ENABLED
-        value: "false"
+        value: "true"
+      - key: PUBLIC_BASE_URL
+        value: "https://speed-to-lead-v5.onrender.com"
+      - key: OPENROUTER_API_KEY
+        sync: false
       - key: SECRET_KEY
         generateValue: true
       - key: CSRF_SECRET
