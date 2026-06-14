@@ -11,6 +11,7 @@ exercised end-to-end without Twilio creds.  This is what makes deploying safe be
 from __future__ import annotations
 
 import logging
+import json
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
@@ -323,6 +324,7 @@ def send_sms(
         if fake_twilio:
             sid = fake_twilio.send(to=to, body=tagged_body, from_=from_number)
         else:
+            logger.info("SEND_WHATSAPP: to=%s from=%s template=%s vars=%s", to, from_number, template, variables)
             from twilio.rest import Client
             client = Client(settings.twilio_account_sid, settings.twilio_auth_token)
             message = client.messages.create(to=to, body=tagged_body, from_=from_number)
@@ -381,6 +383,7 @@ def send_whatsapp(
                 to=to, body=tagged_body, from_=from_number, channel="whatsapp",
             )
         else:
+            logger.info("SEND_WHATSAPP: to=%s from=%s template=%s vars=%s", to, from_number, template, variables)
             from twilio.rest import Client
             client = Client(settings.twilio_account_sid, settings.twilio_auth_token)
             kwargs: dict = {
@@ -390,7 +393,7 @@ def send_whatsapp(
             if template:
                 kwargs["content_sid"] = template
                 if variables:
-                    kwargs["content_variables"] = str(variables)
+                    kwargs["content_variables"] = json.dumps(variables)
             else:
                 kwargs["body"] = tagged_body
             message = client.messages.create(**kwargs)
