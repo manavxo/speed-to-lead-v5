@@ -773,11 +773,20 @@ async def _handle_customer_whatsapp_test(
             except ValueError:
                 pass
 
-        session.close()
+        # Get vehicle context
+        vehicle = None
+        if existing_lead.vehicle_id:
+            from app.models import Vehicle
+            vehicle = session.get(Vehicle, existing_lead.vehicle_id)
 
         # Generate AI response
         try:
-            ai_response = handle_turn(lead_id, dealer_slug, from_number, body)
+            result = handle_turn(
+                session, existing_lead, body,
+                dealer_config=dealer_config,
+                vehicle=vehicle,
+            )
+            ai_response = result.get("text", "Thanks for your message!")
             logger.info("[TEST MODE] AI response to WhatsApp customer %s: %s", from_number, ai_response[:100])
         except Exception:
             logger.exception("[TEST MODE] AI response failed for WhatsApp customer %s", from_number)
@@ -805,21 +814,34 @@ async def _handle_customer_whatsapp_test(
     else:
         # New lead — create it and send auto-reply
         from app.engine.router import ingest_lead
+        from app.adapters.intake import NormalizedLead
+        from app.models import Channel
         try:
-            lead = ingest_lead(
-                session=session,
-                dealer=dealer,
+            # Build NormalizedLead
+            lead_data = NormalizedLead(
+                source=Channel.WHATSAPP,
                 name="",
                 phone=from_number,
-                source="whatsapp_test",
                 message=body,
+                consent=True,  # WhatsApp implies consent for testing
             )
+            lead = ingest_lead(session, dealer, lead_data)
             lead_id = lead.id
             dealer_slug = dealer.slug
-            session.close()
+
+            # Get vehicle context
+            vehicle = None
+            if lead.vehicle_id:
+                from app.models import Vehicle
+                vehicle = session.get(Vehicle, lead.vehicle_id)
 
             # Generate AI response for new lead
-            ai_response = handle_turn(lead_id, dealer_slug, from_number, body)
+            result = handle_turn(
+                session, lead, body,
+                dealer_config=dealer_config,
+                vehicle=vehicle,
+            )
+            ai_response = result.get("text", "Thanks for reaching out!")
             logger.info("[TEST MODE] AI response to new WhatsApp customer %s: %s", from_number, ai_response[:100])
 
             # Send WhatsApp reply
