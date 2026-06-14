@@ -134,25 +134,46 @@ def ingest_lead(
     transition(session, lead, LeadState.AUTO_REPLIED, reason="auto_reply",
                meta={"reply_text": auto_text})
 
-    # 5. Send the auto-reply SMS (gated by OUTBOUND_ENABLED inside send_sms)
-    sms_number = dealer_config.get("channels", {}).get("sms_number", "")
-    if lead_data.phone and sms_number:
-        from tools.send_sms import send_sms
-        sid = send_sms(
-            session,
-            to=lead_data.phone,
-            body=auto_text,
-            from_number=sms_number,
-            dealer_slug=dealer.slug,
-            dealer_config=dealer_config,
-            lead=lead,
-            fake_twilio=fake_twilio,
-            now=now,
-        )
-        if sid:
-            logger.info("Auto-reply sent for lead#%s sid=%s", lead.id, sid)
+    # 5. Send the auto-reply (gated by OUTBOUND_ENABLED inside send_sms/send_whatsapp)
+    # Prefer WhatsApp if whatsapp_sender is configured, otherwise fall back to SMS
+    channels = dealer_config.get("channels", {})
+    whatsapp_sender = channels.get("whatsapp_sender", "")
+    sms_number = channels.get("sms_number", "")
+
+    if lead_data.phone and (whatsapp_sender or sms_number):
+        if whatsapp_sender:
+            # Send via WhatsApp
+            from tools.send_sms import send_whatsapp
+            sid = send_whatsapp(
+                to=lead_data.phone,
+                body=auto_text,
+                from_number=whatsapp_sender,
+                lead=lead,
+                session=session,
+                role="CUSTOMER",
+                fake_twilio=fake_twilio,
+            )
+            channel = "whatsapp"
         else:
-            logger.info("Auto-reply suppressed for lead#%s (opt-out or quiet hours)", lead.id)
+            # Fall back to SMS
+            from tools.send_sms import send_sms
+            sid = send_sms(
+                session,
+                to=lead_data.phone,
+                body=auto_text,
+                from_number=sms_number,
+                dealer_slug=dealer.slug,
+                dealer_config=dealer_config,
+                lead=lead,
+                fake_twilio=fake_twilio,
+                now=now,
+            )
+            channel = "sms"
+
+        if sid:
+            logger.info("Auto-reply %s sent for lead#%s sid=%s", channel, lead.id, sid)
+        else:
+            logger.info("Auto-reply %s suppressed for lead#%s (opt-out or quiet hours)", channel, lead.id)
 
     # ALWAYS record the auto-reply message to the conversation thread.
     # Use the caller's session — no global factory. The previous "fresh_session"
