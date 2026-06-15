@@ -980,8 +980,8 @@ async def webhook_twilio_whatsapp(request: Request) -> Response:
         else:
             return _twiml("Reply 1 to claim, 2 to pass.")
 
-    except Exception:
-        logger.exception("webhook_twilio_whatsapp error")
+    except Exception as exc:
+        logger.error("webhook_twilio_whatsapp error: %s: %s", type(exc).__name__, exc, exc_info=True)
         return _empty_twiml()
     finally:
         session.close()
