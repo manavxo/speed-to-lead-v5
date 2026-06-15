@@ -821,7 +821,7 @@ async def _handle_customer_whatsapp_test(
         return _empty_twiml()
     else:
         # New lead — create it and send auto-reply
-        from app.engine.router import ingest_lead
+        from tools.route_lead import ingest_lead
         from app.adapters.intake import NormalizedLead
         from app.models import Channel
         try:
