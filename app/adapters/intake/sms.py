@@ -9,16 +9,9 @@ from app.models import Channel
 
 
 def _normalize_phone(raw: str | None) -> str | None:
-    if not raw:
-        return None
-    digits = re.sub(r"\D", "", raw)
-    if len(digits) == 10:
-        return f"+1{digits}"
-    if len(digits) == 11 and digits.startswith("1"):
-        return f"+{digits}"
-    if raw.startswith("+"):
-        return raw
-    return f"+{digits}"
+    """Deprecated — use app.adapters.intake.normalize_phone instead."""
+    from app.adapters.intake import normalize_phone
+    return normalize_phone(raw)
 
 
 class TwilioSmsAdapter(IntakeAdapter):

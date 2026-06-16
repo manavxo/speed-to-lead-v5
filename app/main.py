@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.db import get_session_factory, init_db
 from app.models import ConsentLog, Dealer, Lead, LeadState, Message, Direction, Channel
-from app.adapters.intake import mask_phone
+from app.adapters.intake import mask_phone, normalize_phone
 from app.admin import router as admin_router
 from app.dashboard import router as dashboard_router
 from app.scheduler import register_jobs
@@ -183,8 +183,8 @@ def _auto_provision_dealers() -> None:
                     select(Dealer).where(Dealer.slug == cfg.dealer.slug)
                 ).scalars().first()
 
-                sms_number = (cfg.channels.sms_number or "").replace(" ", "").replace("-", "")
-                whatsapp_sender = (cfg.channels.whatsapp_sender or "").replace(" ", "").replace("-", "")
+                sms_number = normalize_phone(cfg.channels.sms_number or "")
+                whatsapp_sender = normalize_phone(cfg.channels.whatsapp_sender or "")
                 web_form_token = cfg.channels.web_form_token or None
 
                 if existing:
@@ -242,7 +242,7 @@ def _find_dealer_by_sms(session: Session, number: str) -> Dealer | None:
     """
     if not number:
         return None
-    norm = number.replace(" ", "").replace("-", "")
+    norm = normalize_phone(number)
     dealer = _exec(session,
         select(Dealer).where(Dealer.sms_number == norm)
     ).first()
@@ -253,7 +253,7 @@ def _find_dealer_by_sms(session: Session, number: str) -> Dealer | None:
     for d in dealers:
         config = d.config or {}
         channels = config.get("channels", {})
-        sms = (channels.get("sms_number") or "").replace(" ", "").replace("-", "")
+        sms = normalize_phone(channels.get("sms_number") or "")
         if sms == norm:
             return d
     return None
@@ -266,7 +266,7 @@ def _find_dealer_by_whatsapp(session: Session, number: str) -> Dealer | None:
     """
     if not number:
         return None
-    norm = number.replace(" ", "").replace("-", "")
+    norm = normalize_phone(number)
     dealer = _exec(session,
         select(Dealer).where(Dealer.whatsapp_sender == norm)
     ).first()
@@ -277,7 +277,7 @@ def _find_dealer_by_whatsapp(session: Session, number: str) -> Dealer | None:
     for d in dealers:
         config = d.config or {}
         channels = config.get("channels", {})
-        wa = (channels.get("whatsapp_sender") or "").replace(" ", "").replace("-", "")
+        wa = normalize_phone(channels.get("whatsapp_sender") or "")
         if wa == norm:
             return d
     return None
@@ -459,8 +459,8 @@ async def webhook_twilio_sms(request: Request) -> Response:
 
     session = _get_session()
     try:
-        from_number = mask_phone(payload.get("From", ""))
-        to_number = payload.get("To", "")
+        from_number = normalize_phone(payload.get("From", ""))
+        to_number = normalize_phone(payload.get("To", ""))
         body = (payload.get("Body", "") or "").strip()
         message_sid = payload.get("MessageSid", "")
 
@@ -478,10 +478,10 @@ async def webhook_twilio_sms(request: Request) -> Response:
         sales_team = dealer_config.get("sales_team", [])
 
         # Check if sender is a sales rep replying to a claim ping
-        raw_from = payload.get("From", "").replace(" ", "").replace("-", "")
+        raw_from = normalize_phone(payload.get("From", ""))
         rep = None
         for r in sales_team:
-            rep_phone = (r.get("phone", "") or "").replace(" ", "").replace("-", "")
+            rep_phone = normalize_phone(r.get("phone", "") or "")
             if rep_phone == raw_from:
                 rep = r
                 break
@@ -904,13 +904,24 @@ async def webhook_twilio_whatsapp(request: Request) -> Response:
             logger.info("Duplicate WhatsApp webhook sid=%s — skipping", message_sid)
             return _empty_twiml()
 
-        from_number = payload.get("From", "").replace("whatsapp:", "")
-        to_number = payload.get("To", "").replace("whatsapp:", "")
+        from_number = normalize_phone(payload.get("From", "").replace("whatsapp:", ""))
+        to_number = normalize_phone(payload.get("To", "").replace("whatsapp:", ""))
         body = (payload.get("Body", "") or "").strip()
+
+        logger.info(
+            "WhatsApp webhook: from=%s to=%s body=%r sid=%s",
+            from_number, to_number, body, message_sid,
+        )
 
         dealer = _find_dealer_by_whatsapp(session, to_number)
         if dealer is None:
-            logger.warning("No dealer found for WhatsApp to=%s", to_number)
+            # Log ALL dealer whatsapp_sender values so we can see the mismatch
+            all_dealers = _exec(session, select(Dealer)).all()
+            dealer_wa = {d.slug: d.whatsapp_sender for d in all_dealers}
+            logger.warning(
+                "No dealer found for WhatsApp to=%s. Known dealers: %s",
+                to_number, dealer_wa,
+            )
             return _empty_twiml()
 
         dealer_config = dealer.config or {}
@@ -919,9 +930,8 @@ async def webhook_twilio_whatsapp(request: Request) -> Response:
         # Find the rep by their phone number (SMS-based claim/pass)
         rep = None
         for r in sales_team:
-            rep_phone = (r.get("phone", "") or "").replace(" ", "").replace("-", "")
-            from_norm = from_number.replace(" ", "").replace("-", "")
-            if rep_phone == from_norm:
+            rep_phone = normalize_phone(r.get("phone", "") or "")
+            if rep_phone == from_number:
                 rep = r
                 break
 

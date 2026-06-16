@@ -8,11 +8,43 @@ speed-to-lead flow. Adding a channel = one adapter here + one webhook route in `
 from __future__ import annotations
 
 import abc
+import re
 from typing import Optional
 
 from pydantic import BaseModel
 
 from app.models import Channel
+
+# ---------------------------------------------------------------------------
+# Canonical phone normalization — THE single source of truth.
+# Every phone number comparison, storage, or lookup MUST go through this.
+# ---------------------------------------------------------------------------
+
+_PHONE_DIGITS = re.compile(r"\d+")
+
+
+def normalize_phone(raw: str | None) -> str | None:
+    """Normalize any phone string to E.164 format (+1XXXXXXXXXX).
+
+    Handles every format Twilio, web forms, or humans can throw at it:
+        "+1 (604) 839-2870"  → "+16048392870"
+        "6048392870"         → "+16048392870"
+        "14155238886"        → "+14155238886"
+        "+14155238886"       → "+14155238886"
+        "whatsapp:+14155238886" → "+14155238886"
+        "" / None            → None
+    """
+    if not raw:
+        return None
+    digits = "".join(_PHONE_DIGITS.findall(raw))
+    if not digits:
+        return None
+    # 10-digit North American → prepend country code
+    if len(digits) == 10:
+        digits = "1" + digits
+    # 11-digit starting with 1 → already has country code
+    # Anything else → leave as-is (international)
+    return f"+{digits}"
 
 
 class NormalizedLead(BaseModel):
@@ -56,4 +88,4 @@ def mask_phone(raw: str | None) -> str | None:
     return raw
 
 
-__all__ = ["NormalizedLead", "IntakeAdapter", "mask_phone"]
+__all__ = ["NormalizedLead", "IntakeAdapter", "mask_phone", "normalize_phone"]
