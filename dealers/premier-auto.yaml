@@ -26,9 +26,13 @@ channels:
   web_form_token: "premier-auto-group-token"
 
 sales_team:
-  - { name: "Mike",  phone: "+16045550121", active: true, notify_backend: twilio_whatsapp, notify_template_sid: null }
-  - { name: "Dana",  phone: "+16045550122", active: true, notify_backend: twilio_whatsapp, notify_template_sid: null }
-  - { name: "Sarah", phone: "+16045550123", active: true, notify_backend: twilio_whatsapp, notify_template_sid: null }
+  # LIVE TEST (2026-06-17): Vishva is the only active rep, so every test lead
+  # pings him. He must join the Twilio WhatsApp sandbox first. Restore the real
+  # team / set others active:true after testing.
+  - { name: "Vishva", phone: "+16049168418", active: true,  notify_backend: twilio_whatsapp, notify_template_sid: null }
+  - { name: "Mike",   phone: "+16045550121", active: false, notify_backend: twilio_whatsapp, notify_template_sid: null }
+  - { name: "Dana",   phone: "+16045550122", active: false, notify_backend: twilio_whatsapp, notify_template_sid: null }
+  - { name: "Sarah",  phone: "+16045550123", active: false, notify_backend: twilio_whatsapp, notify_template_sid: null }
 
 routing:
   strategy: round_robin

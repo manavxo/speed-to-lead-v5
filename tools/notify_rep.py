@@ -41,6 +41,23 @@ if TYPE_CHECKING:
 logger = logging.getLogger("speed-to-lead.notify_rep")
 
 
+def _log_rep_send_failure(rep_name: str, rep_phone: str, channel: str, exc: Exception) -> None:
+    """Log a failed rep ping as a clean one-line warning, not a crash dump.
+
+    A rep being unreachable (wrong/fake number, not joined to the WhatsApp
+    sandbox, etc.) must NOT look like a pipeline crash: the lead flow already
+    swallows this and carries on. We log a readable warning and keep the full
+    traceback only at debug level for when someone is actually digging in.
+    """
+    logger.warning(
+        "Could not notify rep %s at %s via %s: %s "
+        "(lead pipeline continues; check the number is valid and, for WhatsApp, "
+        "that the rep joined the Twilio sandbox)",
+        rep_name, rep_phone, channel, exc,
+    )
+    logger.debug("Full rep-notify error for %s", rep_name, exc_info=True)
+
+
 # --- Public types ------------------------------------------------------------
 
 @dataclass
@@ -348,7 +365,7 @@ def notify_rep(
         except NotImplementedError as exc:
             return NotificationResult(False, backend, None, error=str(exc))
         except Exception as exc:
-            logger.exception("notify_rep WhatsApp send failed for rep=%s", rep_name)
+            _log_rep_send_failure(rep_name, rep_phone, "WhatsApp", exc)
             return NotificationResult(False, backend, None, error=str(exc))
 
     # backend == "sms" (validated above)
@@ -362,5 +379,5 @@ def notify_rep(
     except NotImplementedError as exc:
         return NotificationResult(False, backend, None, error=str(exc))
     except Exception as exc:
-        logger.exception("notify_rep SMS send failed for rep=%s", rep_name)
+        _log_rep_send_failure(rep_name, rep_phone, "SMS", exc)
         return NotificationResult(False, backend, None, error=str(exc))

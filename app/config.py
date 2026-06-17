@@ -111,8 +111,15 @@ class Channels(BaseModel):
 
 class SalesRep(BaseModel):
     name: str
-    phone: str = Field(..., description="Phone number for round-robin claim pings (SMS)")
+    phone: str = Field(..., description="Phone number for round-robin claim pings")
     active: bool = True
+    notify_backend: str = Field(
+        "twilio_whatsapp",
+        description="How to ping this rep: twilio_whatsapp (default) | sms | email | dashboard",
+    )
+    notify_template_sid: Optional[str] = Field(
+        None, description="Twilio approved-template SID for business-initiated rep pings"
+    )
 
 
 class Routing(BaseModel):
