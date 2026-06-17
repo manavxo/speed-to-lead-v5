@@ -145,15 +145,12 @@ def ingest_lead(
 
     if lead_data.phone and (whatsapp_sender or sms_number):
         if whatsapp_sender:
-            # Send via WhatsApp using template (required for business-initiated messages)
+            # Send via WhatsApp as free-form message (sandbox allows this;
+            # production will need an approved template for business-initiated)
             from tools.send_sms import send_whatsapp
-            customer_name = lead_data.name.split()[0] if lead_data.name else "there"
-            dealer_name = dealer_config.get("dealer", {}).get("name", "us")
             sid = send_whatsapp(
                 to=lead_data.phone,
                 body=auto_text,
-                template=WHATSAPP_AUTO_REPLY_TEMPLATE,
-                variables={"1": customer_name, "2": dealer_name},
                 from_number=whatsapp_sender,
                 lead=lead,
                 session=session,
