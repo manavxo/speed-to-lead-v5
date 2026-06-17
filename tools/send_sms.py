@@ -359,6 +359,14 @@ def send_whatsapp(
     When OUTBOUND_ENABLED is false, returns a DRYRUN SID and logs instead of sending.
     """
     lead_id = lead.id if lead else None
+    # Diagnostic: surface the exact From + gate state before any processing.
+    logger.info(
+        "send_whatsapp ENTRY: to=%s from_number=%r role=%s outbound_enabled=%s lead=%s",
+        to, from_number, role, settings.outbound_enabled, lead_id,
+    )
+    if not from_number:
+        logger.error("send_whatsapp: empty from_number for to=%s — refusing to send", to)
+        return None
     # Sanitize message for deliverability
     body = _sanitize_message(body)
     tagged_body = _apply_message_tag(

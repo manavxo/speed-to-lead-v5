@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -145,6 +146,19 @@ def send_via_sms(*, to_phone: str, from_phone: str, body: str) -> str:
         body=body,
     )
     return message.sid
+
+
+def _is_placeholder_phone(phone: str) -> bool:
+    """True for NANP 555-line placeholder numbers (e.g. +16045550121).
+
+    The 555-01xx exchange is reserved for fiction/demos; Twilio cannot deliver
+    to it. Demo dealer YAMLs use these for reps, so a real send would always
+    400. Matched on the 3-digit exchange == '555' of the 10-digit national part.
+    """
+    digits = re.sub(r"\D", "", phone or "")
+    if len(digits) == 11 and digits.startswith("1"):
+        digits = digits[1:]
+    return len(digits) == 10 and digits[3:6] == "555"
 
 
 # --- Message body builder ----------------------------------------------------
@@ -302,7 +316,23 @@ def notify_rep(
             success=True, backend=backend, message_sid=sid, dry_run=True,
         )
 
-    # Real send paths (gated on OUTBOUND_ENABLED above)
+    # Real send paths (gated on OUTBOUND_ENABLED above).
+    # Demo dealers carry placeholder 555-01xx rep numbers that Twilio cannot
+    # deliver to. Skip them best-effort (still log the Message row for the lead
+    # timeline) instead of letting a Twilio 400/63015 bubble up as noise — and,
+    # importantly, never crash the ingest pipeline over a fake rep number.
+    if _is_placeholder_phone(rep_phone):
+        sid = f"SKIPPED_FAKE_{uuid.uuid4().hex[:12]}"
+        logger.info(
+            "notify_rep: skipping placeholder rep phone %s for lead#%s (sid=%s)",
+            rep_phone, lead.id, sid,
+        )
+        log_channel = Channel.WHATSAPP if backend == "twilio_whatsapp" else Channel.SMS
+        _log_rep_message(session, lead, log_channel, body, sid)
+        return NotificationResult(
+            success=True, backend=backend, message_sid=sid, dry_run=True,
+        )
+
     if backend == "twilio_whatsapp":
         from_phone = dealer_config.get("channels", {}).get("whatsapp_sender", "")
         try:

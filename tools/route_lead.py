@@ -137,8 +137,18 @@ def ingest_lead(
     # 5. Send the auto-reply (gated by OUTBOUND_ENABLED inside send_sms/send_whatsapp)
     # Prefer WhatsApp if whatsapp_sender is configured, otherwise fall back to SMS
     channels = dealer_config.get("channels", {})
-    whatsapp_sender = channels.get("whatsapp_sender", "")
-    sms_number = channels.get("sms_number", "")
+    # Source senders from config, falling back to the dealer record columns.
+    # The DB-stored `dealer.config` JSON can lag the dedicated sms_number/
+    # whatsapp_sender columns (e.g. a config seeded before whatsapp_sender
+    # existed). Without this fallback an empty config whatsapp_sender silently
+    # routes the customer auto-reply down the SMS branch with the fake
+    # sms_number as From — the exact "+1778555… is not a Twilio number" 400.
+    whatsapp_sender = channels.get("whatsapp_sender") or getattr(dealer, "whatsapp_sender", "") or ""
+    sms_number = channels.get("sms_number") or getattr(dealer, "sms_number", "") or ""
+    logger.info(
+        "Auto-reply routing for lead#%s: whatsapp_sender=%r sms_number=%r channels_keys=%s",
+        lead.id, whatsapp_sender, sms_number, list(channels.keys()),
+    )
 
     # WhatsApp template SID for customer auto-replies
     WHATSAPP_AUTO_REPLY_TEMPLATE = "HX4ec87aebc636f28e34c42d57e3112320"
