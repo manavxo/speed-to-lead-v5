@@ -874,7 +874,11 @@ async def seed_vehicles(request: Request, _auth: None = Depends(require_admin_au
     Requires admin authentication. DISABLED in production.
     """
     if settings.environment == "production":
-        return {"error": "Seed endpoints are disabled in production"}
+        seed_secret = request.headers.get("X-Seed-Secret", "")
+        import os
+        expected = os.environ.get("SEED_SECRET", "")
+        if not expected or seed_secret != expected:
+            return {"error": "Seed endpoints are disabled in production"}
 
     from datetime import datetime, timezone
     from app.models import Vehicle

@@ -415,7 +415,10 @@ async def webhook_form(token: str, request: Request) -> dict:
     """
     session = _get_session()
     try:
-        payload = await request.json()
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = dict(await request.form())
 
         dealer = _find_dealer_by_token(session, token)
         if dealer is None:
