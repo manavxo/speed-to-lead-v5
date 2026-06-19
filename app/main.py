@@ -54,7 +54,7 @@ async def lifespan(application: FastAPI):
 app = FastAPI(title="Speed-to-Lead", version="0.2.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[settings.public_base_url, "http://localhost:8000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -385,28 +385,6 @@ def healthz() -> dict:
     return {"ok": True}
 
 
-@app.get("/debug/dealer/{slug}")
-def debug_dealer(slug: str):
-    """Temporary diagnostic: returns dealer config for debugging rep notification issues."""
-    session = _get_session()
-    try:
-        dealer = _exec(session, select(Dealer).where(Dealer.slug == slug)).first()
-        if not dealer:
-            return {"error": f"Dealer '{slug}' not found"}
-        config = dealer.config or {}
-        return {
-            "slug": dealer.slug,
-            "whatsapp_sender_column": dealer.whatsapp_sender,
-            "sms_number_column": dealer.sms_number,
-            "config_whatsapp_sender": config.get("channels", {}).get("whatsapp_sender"),
-            "config_sms_number": config.get("channels", {}).get("sms_number"),
-            "sales_team": config.get("sales_team", []),
-            "sales_team_active": [r for r in config.get("sales_team", []) if r.get("active", True)],
-        }
-    finally:
-        session.close()
-
-
 @app.get("/readyz")
 def readyz():
     """Readiness probe — checks DB connectivity (SELECT 1). Returns 503 on failure."""
@@ -444,7 +422,7 @@ async def webhook_form(token: str, request: Request) -> dict:
 
         dealer = _find_dealer_by_token(session, token)
         if dealer is None:
-            return {"error": "Unknown dealer token", "token": token}
+            return {"error": "Not found"}
 
         from app.adapters.intake.webform import WebFormAdapter
         lead_data = WebFormAdapter().parse(payload)
@@ -460,7 +438,8 @@ async def webhook_form(token: str, request: Request) -> dict:
         }
     except Exception as exc:
         logger.exception("webhook_form error")
-        return {"error": "Internal server error"}
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "Internal server error"}, status_code=500)
     finally:
         session.close()
 
@@ -486,8 +465,7 @@ async def webhook_twilio_sms(request: Request) -> Response:
     try:
         from_number = normalize_phone(payload.get("From", ""))
         to_number = normalize_phone(payload.get("To", ""))
-        body = (payload.get("Body", "") or "").strip()
-        message_sid = payload.get("MessageSid", "")
+        body = (payload.get("Body", "") or "").strip()[:4000]
 
         # Idempotency: short-circuit on duplicate webhook
         if _idempotency_check(session, message_sid):
@@ -931,7 +909,7 @@ async def webhook_twilio_whatsapp(request: Request) -> Response:
 
         from_number = normalize_phone(payload.get("From", "").replace("whatsapp:", ""))
         to_number = normalize_phone(payload.get("To", "").replace("whatsapp:", ""))
-        body = (payload.get("Body", "") or "").strip()
+        body = (payload.get("Body", "") or "").strip()[:4000]
 
         logger.info(
             "WhatsApp webhook: from=%s to=%s body=%r sid=%s",
@@ -1104,7 +1082,8 @@ async def webhook_twilio_status(request: Request) -> dict:
         return {"ok": True}
     except Exception as exc:
         logger.exception("webhook_twilio_status error")
-        return {"error": "Internal server error"}
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "Internal server error"}, status_code=500)
     finally:
         session.close()
 
@@ -1118,7 +1097,8 @@ async def webhook_messenger(request: Request) -> dict:
         return {"status": "not_implemented", "payload_keys": list(payload.keys())}
     except Exception as exc:
         logger.exception("webhook_messenger error")
-        return {"error": "Internal server error"}
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "Internal server error"}, status_code=500)
 
 
 @app.get("/webhook/messenger")

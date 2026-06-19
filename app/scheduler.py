@@ -419,7 +419,7 @@ def send_daily_digest(session, dealer_slug: str, dealer_config: dict = None):
         select(Lead).where(
             Lead.created_at >= yesterday_start_utc,
             Lead.created_at < yesterday_end_utc,
-            Lead.dealer_slug == dealer_slug,
+            Lead.dealer_id == dealer.id,
         )
     ).scalars().all()
 

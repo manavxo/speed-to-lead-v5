@@ -123,9 +123,13 @@ def _is_quiet_hours(dealer_config: dict, now: datetime | None = None) -> bool:
     except Exception:
         local_now = now
 
-    start_str, end_str = quiet_str.split("-")
-    start_h, start_m = map(int, start_str.split(":"))
-    end_h, end_m = map(int, end_str.split(":"))
+    try:
+        start_str, end_str = quiet_str.split("-")
+        start_h, start_m = map(int, start_str.split(":"))
+        end_h, end_m = map(int, end_str.split(":"))
+    except (ValueError, AttributeError):
+        logger.warning("Malformed quiet_hours %r — defaulting to no quiet hours", quiet_str)
+        return False
 
     current_minutes = local_now.hour * 60 + local_now.minute
     start_minutes = start_h * 60 + start_m

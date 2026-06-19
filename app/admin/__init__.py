@@ -238,11 +238,15 @@ def _build_dealer_config(form_data: dict) -> tuple[dict, str]:
 
 @router.get("/login")
 async def admin_login_page(request: Request):
-    return templates.TemplateResponse(
+    from app.dashboard import _generate_csrf_token
+    csrf_token = _generate_csrf_token()
+    response = templates.TemplateResponse(
         request=request,
         name="admin_login.html",
-        context={"request": request, "active_page": "login", "error": None},
+        context={"request": request, "active_page": "login", "error": None, "csrf_token": csrf_token},
     )
+    response.set_cookie("csrf_token", csrf_token, httponly=False, max_age=3600, samesite="lax")
+    return response
 
 
 @router.post("/login")
@@ -250,14 +254,19 @@ async def admin_login_submit(
     request: Request,
     username: str = Form(...),
     password: str = Form(...),
+    csrf_token: str = Form(""),
 ):
+    from app.dashboard import _validate_csrf_token
+    if not _validate_csrf_token(request, csrf_token):
+        return PlainTextResponse("Forbidden — CSRF token missing or invalid", status_code=403)
+
     ip = request.client.host if request.client else "unknown"
 
     if _check_rate_limit(ip):
         return templates.TemplateResponse(
             request=request,
             name="admin_login.html",
-            context={"request": request, "error": "Too many attempts. Try again later."},
+            context={"request": request, "error": "Too many attempts. Try again later.", "csrf_token": ""},
             status_code=429,
         )
 
@@ -266,14 +275,14 @@ async def admin_login_submit(
         serializer = _get_serializer()
         token = serializer.dumps({"user": username, "ts": time.time()})
         response = RedirectResponse("/admin/dealers", status_code=303)
-        response.set_cookie("session", token, httponly=True, max_age=86400, samesite="lax")
+        response.set_cookie("session", token, httponly=True, secure=(settings.environment == "production"), max_age=86400, samesite="lax")
         return response
 
     _record_failure(ip)
     return templates.TemplateResponse(
         request=request,
         name="admin_login.html",
-        context={"request": request, "error": "Invalid credentials"},
+        context={"request": request, "error": "Invalid credentials", "csrf_token": ""},
         status_code=401,
     )
 
