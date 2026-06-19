@@ -116,6 +116,7 @@
             </div>
             
             <form method="POST" action="/admin/login">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <div class="form-group">
                     <label class="form-label" for="username">Username</label>
                     <input type="text" id="username" name="username" class="input" placeholder="admin" required autocomplete="username">
