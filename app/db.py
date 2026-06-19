@@ -1,4 +1,4 @@
-﻿"""Database session management.
+"""Database session management.
 
 Provides an engine and session factory. For production: Postgres. For tests: SQLite.
 """
@@ -20,10 +20,12 @@ _SessionLocal = None
 def _normalize_db_url(url: str) -> str:
     """Ensure psycopg3 driver prefix and SSL for Render.
 
-    Render gives postgresql:// but SQLAlchemy needs the psycopg3 driver prefix.
-    Force psycopg3 so we don't need the psycopg2 package.
+    Render may give postgres:// or postgresql:// — SQLAlchemy needs the
+    psycopg3 driver prefix.  Force psycopg3 so we don't need the psycopg2 package.
     """
-    if url.startswith("postgresql://"):
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql+psycopg://", 1)
+    elif url.startswith("postgresql://"):
         url = url.replace("postgresql://", "postgresql+psycopg://", 1)
     if "render.com" in url and "sslmode" not in url:
         sep = "&" if "?" in url else "?"

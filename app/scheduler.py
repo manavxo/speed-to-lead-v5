@@ -326,8 +326,10 @@ def _run_stuck_lead_sweep():
 
 
 def _normalize_db_url(url: str) -> str:
-    """Render gives postgresql:// but SQLAlchemy needs the psycopg3 driver prefix.
+    """Render may give postgres:// or postgresql:// — SQLAlchemy needs the psycopg3 driver prefix.
     Force psycopg3 so we don't need the psycopg2 package."""
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+psycopg://", 1)
     return url.replace("postgresql://", "postgresql+psycopg://", 1)
 
 
