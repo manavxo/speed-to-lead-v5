@@ -14,9 +14,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy app
 COPY . .
 
-# Create data dir for SQLite fallback
-RUN mkdir -p /app/data
-
 # Render injects PORT; default to 10000 for local Docker runs
 ENV PORT=10000
 EXPOSE ${PORT}
