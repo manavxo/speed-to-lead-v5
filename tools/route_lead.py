@@ -146,6 +146,8 @@ def ingest_lead(
     dealer_config = dealer.config or {}
 
     # 1. Dedupe: check for existing lead with same phone + dealer in rolling 24h window
+    existing = None
+    was_dryrun = False
     if lead_data.phone:
         from datetime import timedelta
         cutoff = now - timedelta(hours=24)
@@ -157,37 +159,84 @@ def ingest_lead(
             )
         ).first()
         if existing:
-            logger.info("Deduped lead for phone=%s dealer=%s -> existing lead#%s",
-                        lead_data.phone, dealer.slug, existing.id)
-            return existing
+            # Check if the existing lead's auto-reply was actually sent (not DRYRUN)
+            last_outbound = session.execute(
+                select(Message).where(
+                    Message.lead_id == existing.id,
+                    Message.direction == Direction.OUTBOUND,
+                ).order_by(Message.created_at.desc())
+            ).scalars().first()
 
-    # 2. Persist Lead (NEW)
-    vehicle_id = None
+            was_dryrun = (
+                last_outbound is not None
+                and last_outbound.provider_sid is not None
+                and last_outbound.provider_sid.startswith("DRYRUN_")
+            )
+
+            if was_dryrun:
+                logger.info("Lead#%s was DRYRUN — deleting stale messages and re-sending", existing.id)
+                from sqlalchemy import delete as sa_delete
+                session.execute(
+                    sa_delete(Message).where(
+                        Message.lead_id == existing.id,
+                        Message.provider_sid.like("DRYRUN_%"),
+                    )
+                )
+                session.execute(
+                    sa_delete(ConsentLog).where(
+                        ConsentLog.lead_id == existing.id,
+                    )
+                )
+                existing.state = LeadState.NEW
+                existing.updated_at = now
+                session.commit()
+                # Fall through — don't return early
+            else:
+                logger.info("Deduped lead for phone=%s dealer=%s -> existing lead#%s",
+                            lead_data.phone, dealer.slug, existing.id)
+                return existing
+
+    # 2. Persist Lead (NEW) or reuse existing DRYRUN lead
     vehicle = None
-    if lead_data.vehicle_ref:
-        vehicle = resolve_vehicle(session, dealer.id, lead_data.vehicle_ref)
-        if vehicle:
-            vehicle_id = vehicle.id
+    if existing and was_dryrun:
+        lead = existing
+        lead.name = lead_data.name or lead.name
+        lead.email = lead_data.email or lead.email
+        lead.vehicle_ref = lead_data.vehicle_ref or lead.vehicle_ref
+        if lead_data.vehicle_ref:
+            vehicle = resolve_vehicle(session, dealer.id, lead_data.vehicle_ref)
+            if vehicle:
+                lead.vehicle_id = vehicle.id
+        session.commit()
+        session.refresh(lead)
+        logger.info("Reusing DRYRUN lead#%s for phone=%s", lead.id, lead_data.phone)
+    else:
+        vehicle_id = None
+        vehicle = None
+        if lead_data.vehicle_ref:
+            vehicle = resolve_vehicle(session, dealer.id, lead_data.vehicle_ref)
+            if vehicle:
+                vehicle_id = vehicle.id
 
-    lead = Lead(
-        dealer_id=dealer.id,
-        source=lead_data.source,
-        name=lead_data.name,
-        phone=lead_data.phone,
-        email=lead_data.email,
-        vehicle_ref=lead_data.vehicle_ref,
-        vehicle_id=vehicle_id,
-        state=LeadState.NEW,
-        consent=lead_data.consent,
-        created_at=now,
-        updated_at=now,
-    )
-    session.add(lead)
-    session.commit()
-    session.refresh(lead)
+        lead = Lead(
+            dealer_id=dealer.id,
+            source=lead_data.source,
+            name=lead_data.name,
+            phone=lead_data.phone,
+            email=lead_data.email,
+            vehicle_ref=lead_data.vehicle_ref,
+            vehicle_id=vehicle_id,
+            state=LeadState.NEW,
+            consent=lead_data.consent,
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(lead)
+        session.commit()
+        session.refresh(lead)
 
-    logger.info("Lead#%s created for dealer=%s source=%s phone=%s",
-                lead.id, dealer.slug, lead_data.source, lead_data.phone)
+        logger.info("Lead#%s created for dealer=%s source=%s phone=%s",
+                    lead.id, dealer.slug, lead_data.source, lead_data.phone)
 
     # 3. Log consent if provided (webform express consent)
     if lead_data.consent and lead_data.phone:

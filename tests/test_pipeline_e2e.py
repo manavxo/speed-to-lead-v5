@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from sqlmodel import SQLModel
@@ -368,6 +368,54 @@ def test_dedup_prevents_duplicate_leads(e2e_session, dealer):
     lead2 = ingest_lead(e2e_session, dealer, lead_data, fake_twilio=fake_twilio, now=now)
 
     assert lead1.id == lead2.id  # Same lead returned
+
+
+def test_dedup_resends_when_previous_was_dryrun(e2e_session, dealer):
+    """Test that dedup re-sends when the existing lead's messages were DRYRUN.
+
+    When OUTBOUND_ENABLED was false during first submission, messages are logged
+    with DRYRUN_* provider_sids but never sent to Twilio. A subsequent submission
+    with the same phone should detect the DRYRUN and re-send, not silently dedup.
+    """
+    fake_twilio = E2EFakeTwilio()
+    now = datetime(2026, 6, 4, 17, 0, tzinfo=timezone.utc)
+
+    from tools.route_lead import ingest_lead
+    lead_data = NormalizedLead(
+        source=Channel.WEBFORM,
+        name="DRYRUN Test",
+        phone="+16048887777",
+        consent=True,
+        raw={},
+    )
+
+    # First submission — creates a lead with real messages
+    lead1 = ingest_lead(e2e_session, dealer, lead_data, fake_twilio=fake_twilio, now=now)
+    assert lead1.id is not None
+    initial_msg_count = len(fake_twilio.sent)
+
+    # Simulate the scenario: mark all outbound messages as DRYRUN
+    # (this is what happens when OUTBOUND_ENABLED=false during the first submission)
+    outbound_msgs = e2e_session.execute(
+        select(Message).where(
+            Message.lead_id == lead1.id,
+            Message.direction == Direction.OUTBOUND,
+        )
+    ).scalars().all()
+    for i, msg in enumerate(outbound_msgs):
+        msg.provider_sid = f"DRYRUN_{i:032d}"
+    e2e_session.commit()
+
+    # Reset fake_twilio to track new sends
+    fake_twilio.sent.clear()
+
+    # Second submission — same phone, should detect DRYRUN and re-send
+    lead2 = ingest_lead(e2e_session, dealer, lead_data, fake_twilio=fake_twilio, now=now)
+
+    # BUG: Without the fix, lead2.id == lead1.id and no messages are sent
+    # FIX: lead2 should be the same lead but messages should be re-sent
+    assert lead2.id == lead1.id  # Same lead reused, not a new one
+    assert len(fake_twilio.sent) > 0  # Messages were re-sent (not silently deduped)
 
 
 def test_idempotency_on_provider_sid(e2e_session):
