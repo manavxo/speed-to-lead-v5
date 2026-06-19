@@ -548,10 +548,15 @@ def handle_turn(
     vehicle=None,
     fake_llm=None,
     now: datetime | None = None,
+    is_proactive: bool = False,
 ) -> dict:
     """Produce the next assistant turn for `lead`.
 
     Returns a dict describing the action: {"mode": "send"|"draft", "text": ..., "tools_used": [...]}.
+
+    When is_proactive=True, this is the AI's first outreach after a webform submission.
+    The AI should use the form context (name, vehicle interest, message) to craft a
+    personalized engagement message — not wait for the customer to message first.
 
     In business hours: mode="draft" (rep approves before sending).
     After hours: mode="send" (autonomous).
@@ -636,6 +641,50 @@ def handle_turn(
                 "tools_used": [],
                 "engagement_mode": "qualify_only",
             }
+
+    # ------------------------------------------------------------------
+    # Proactive AI follow-up: engage customer immediately after webform
+    # ------------------------------------------------------------------
+    if is_proactive:
+        # For proactive messages, we want the AI to craft a personalized
+        # opening based on form data. Skip max-turns guard — this is turn 0.
+        is_biz = is_business_hours(dealer_config, now)
+
+        vehicle_context = None
+        if vehicle:
+            price_str = f"${vehicle.price:,.0f}" if vehicle.price else "TBD"
+            vehicle_context = (
+                f"{vehicle.year} {vehicle.make} {vehicle.model} {vehicle.trim or ''} — {price_str}"
+            )
+
+        system_prompt = build_system_prompt(dealer_config, vehicle_context)
+
+        # Add proactive instruction to system prompt
+        proactive_instruction = (
+            "\n\n[PROACTIVE OUTREACH]: The customer just submitted a webform. "
+            "You are initiating the conversation — they have NOT messaged you yet. "
+            "Introduce yourself, reference their specific interest (vehicle, budget, etc.), "
+            "and ask an engaging question to start the qualification conversation. "
+            "Be warm, personal, and specific to their inquiry. "
+            "Keep it under 3 sentences. Do NOT ask them to 'let you know' — ask a specific question."
+        )
+
+        tools_used: list[str] = []
+        assistant_text = _call_openrouter(
+            system_prompt + proactive_instruction, inbound_text, vehicle_context,
+            session=session, lead=lead,
+            dealer_id=lead.dealer_id if lead else None,
+            dealer_config=dealer_config,
+            tools_used=tools_used,
+        )
+
+        return {
+            "mode": "send",
+            "text": assistant_text,
+            "is_business_hours": is_biz,
+            "tools_used": tools_used,
+            "proactive": True,
+        }
 
     # ------------------------------------------------------------------
     # Max-turns guard: count inbound messages for this lead

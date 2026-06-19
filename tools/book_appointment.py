@@ -186,6 +186,21 @@ def book_appointment(
     session.add(event)
     session.commit()
 
+    # Assign the lead to a rep via round-robin NOW (not at lead creation).
+    # The AI has qualified the lead and booked an appointment — this is when
+    # the sales rep gets involved. Use notify=False — the appointment
+    # notification below handles the rep alert (not a claim ping).
+    if dealer_config:
+        sales_team = dealer_config.get("sales_team", [])
+        if sales_team and not lead.assigned_rep:
+            from app.engine.router import assign_lead
+            from app.models import Dealer
+            from sqlalchemy import select
+            dealer = session.execute(select(Dealer).where(Dealer.id == lead.dealer_id)).scalar()
+            if dealer:
+                assign_lead(session, lead, dealer, sales_team, notify=False, dealer_config=dealer_config)
+                logger.info("Lead#%s assigned to %s on appointment booking", lead.id, lead.assigned_rep)
+
     # Notify the assigned rep (or dealership) about the new appointment
     _notify_rep_of_appointment(
         session, lead, scheduled_for,

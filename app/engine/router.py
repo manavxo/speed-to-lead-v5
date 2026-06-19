@@ -40,24 +40,36 @@ def assign_lead(
     *,
     fake_twilio=None,
     sms_number: str | None = None,
+    notify: bool = True,
+    dealer_config: dict | None = None,
 ) -> Lead | None:
-    """Assign `lead` to the next rep, ping them via notify_rep, transition to ASSIGNED.
+    """Assign `lead` to the next rep. Optionally ping them via notify_rep.
 
-    If no active reps, the lead stays in AUTO_REPLIED (AI-only / after-hours path).
-    Sends via tools.notify_rep (the dealer-side chokepoint, per directive H.2.2),
-    not send_sms() directly. Default backend is WhatsApp; falls back to SMS if
-    the rep's config says so.
+    When notify=False (used by book_appointment), the rep is assigned but
+    NOT pinged with a claim message — the appointment notification handles that.
+
+    If no active reps, the lead stays in current state (AI-only / after-hours path).
     """
     rep = next_rep(dealer, sales_team)
     if rep is None:
-        # No active reps — lead stays in AUTO_REPLIED (AI handles it)
-        logger.info("No active reps for lead#%s — staying AUTO_REPLIED", lead.id)
+        logger.info("No active reps for lead#%s", lead.id)
         return None
 
     # Persist the pointer advancement
     session.commit()
 
-    # Transition to ASSIGNED (only if not already ASSIGNED)
+    # Update the lead with the assigned rep
+    lead.assigned_rep = rep["name"]
+    session.commit()
+    session.refresh(lead)
+
+    if not notify:
+        # Silent assignment — used by book_appointment. No state transition,
+        # no claim ping. The appointment notification handles the rep alert.
+        logger.info("Lead#%s silently assigned to %s (no notification)", lead.id, rep["name"])
+        return rep
+
+    # Transition to ASSIGNED and send claim ping
     if lead.state != LeadState.ASSIGNED:
         transition(
             session, lead, LeadState.ASSIGNED,
@@ -65,15 +77,9 @@ def assign_lead(
             meta={"assigned_rep": rep["name"]},
         )
 
-    # Update the lead
-    lead.assigned_rep = rep["name"]
-    session.commit()
-    session.refresh(lead)
-
     # Ping the rep via the notify_rep chokepoint (default = Twilio WhatsApp).
-    # This is the only place dealer-side notifications get sent from the router.
+    config = dealer_config or dealer.config or {}
     from tools.notify_rep import notify_rep
-    dealer_config = dealer.config or {}
     result = notify_rep(
         session=session,
         rep_config=rep,
@@ -83,7 +89,7 @@ def assign_lead(
             "customer_name": lead.name or "Customer",
             "vehicle": lead.vehicle_ref or "",
         },
-        dealer_config=dealer_config,
+        dealer_config=config,
     )
     if not result.success:
         logger.warning(

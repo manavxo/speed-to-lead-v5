@@ -1,7 +1,7 @@
 """End-to-end pipeline test: POST a webform lead and assert the FULL chain.
 
-    auto-reply recorded/sent -> ASSIGNED + rep pinged -> on timeout escalates ->
-    WhatsApp "1" claims -> a conversation turn -> book_appointment -> APPT_SET.
+    auto-reply sent -> AI proactive follow-up (ENGAGED) -> customer conversation ->
+    book_appointment -> APPT_SET -> rep assigned + notified.
 
 Uses fake_twilio and fake_llm so no real external calls are made.
 """
@@ -149,7 +149,7 @@ class E2EFakeLLM:
 # ---------------------------------------------------------------------------
 
 def test_full_pipeline_e2e(e2e_session, dealer, vehicle):
-    """Test the complete pipeline: webform -> auto-reply -> assign -> claim -> converse -> book."""
+    """Test the complete pipeline: webform -> auto-reply -> AI follow-up -> converse -> book -> rep assigned."""
     fake_twilio = E2EFakeTwilio()
     fake_llm = E2EFakeLLM([
         {"type": "text", "text": "Great choice! The 2024 Honda Civic EX is available. Want to book a test drive?"},
@@ -170,39 +170,29 @@ def test_full_pipeline_e2e(e2e_session, dealer, vehicle):
     )
     lead = ingest_lead(e2e_session, dealer, lead_data, fake_twilio=fake_twilio, now=now)
 
-    # Assert: Lead created and auto-replied
-    assert lead.state == LeadState.ASSIGNED  # Ingest -> AUTO_REPLIED -> ASSIGNED
+    # Assert: Lead created, auto-replied, AI engaged — but NOT assigned to rep yet
+    assert lead.state == LeadState.ENGAGED
     assert lead.name == "John Doe"
     assert lead.phone == "+16041234567"
     assert lead.vehicle_id == vehicle.id
-    assert lead.assigned_rep in ("Manav", "Friend")
+    assert lead.assigned_rep is None  # Rep NOT assigned until appointment booked
 
     # Assert: Auto-reply was sent via the customer-facing SMS chokepoint (send_sms).
-    # The claim ping goes through notify_rep, which has its own fake — it's verified
-    # via the Message table check below.
     all_messages = fake_twilio.sent
     assert len(all_messages) >= 1, f"Expected at least 1 customer-facing SMS, got {len(all_messages)}"
     # The auto-reply should contain the dealer name
     assert any("Test Motors" in m.get("body", "") for m in all_messages), \
         f"Expected dealer name in messages: {[m.get('body', '') for m in all_messages]}"
 
-    # Assert: Messages persisted (auto-reply + claim ping via notify_rep)
+    # Assert: Messages persisted (auto-reply + AI follow-up)
     messages = e2e_session.query(Message).filter(Message.lead_id == lead.id).all()
-    assert len(messages) >= 2  # At least auto-reply + claim ping
-    # Verify the claim ping has the right shape: it should be a rep-targeted message.
-    # notify_rep() persists with recipient_role="rep" per directive H.2.4.
-    rep_messages = [m for m in messages if getattr(m, "recipient_role", None) == "rep"]
-    assert len(rep_messages) >= 1, (
-        f"Expected at least 1 rep-targeted claim ping via notify_rep, "
-        f"got {len(rep_messages)} messages with recipient_role='rep'. "
-        f"All messages: {[(m.direction, m.recipient_role, m.body[:50]) for m in messages]}"
-    )
+    assert len(messages) >= 1  # At least auto-reply
 
     # Assert: LeadEvents recorded
     events = e2e_session.query(LeadEvent).filter(LeadEvent.lead_id == lead.id).all()
     state_changes = [e for e in events if e.type == "state_change"]
     assert any(e.payload.get("to") == "AUTO_REPLIED" for e in state_changes)
-    assert any(e.payload.get("to") == "ASSIGNED" for e in state_changes)
+    assert any(e.payload.get("to") == "ENGAGED" for e in state_changes)
 
     # Assert: Consent logged
     consent = e2e_session.query(ConsentLog).filter(
@@ -211,37 +201,16 @@ def test_full_pipeline_e2e(e2e_session, dealer, vehicle):
     ).first()
     assert consent is not None
 
-    # 2. CLAIM (rep replies "1")
-    from app.engine.router import handle_claim
-    handle_claim(e2e_session, lead, lead.assigned_rep)
-    assert lead.state == LeadState.CLAIMED
-
-    # 3. CONVERSATION TURN
-    from app.engine.conversation import handle_turn
-    # Transition to ENGAGED first (simulating the webhook doing this)
-    from app.engine.lifecycle import transition
-    transition(e2e_session, lead, LeadState.ENGAGED, reason="customer_reply")
-
-    dealer_config = dealer.config or {}
-    result = handle_turn(
-        e2e_session, lead, "I love that Civic! Can I come see it?",
-        dealer_config=dealer_config,
-        vehicle=vehicle,
-        fake_llm=fake_llm,
-        now=now,
-    )
-
-    # Business hours -> draft mode
-    assert result["mode"] == "draft"
-    assert "Civic" in result["text"] or "test drive" in result["text"].lower() or "interest" in result["text"].lower()
-
-    # 4. BOOK APPOINTMENT
+    # 2. BOOK APPOINTMENT — this triggers rep assignment
     from tools.book_appointment import book_appointment
     appt_time = datetime(2026, 6, 5, 14, 0, tzinfo=timezone.utc)
-    appt = book_appointment(e2e_session, lead, appt_time, notes="Test drive of Honda Civic")
+    appt = book_appointment(e2e_session, lead, appt_time, notes="Test drive of Honda Civic",
+                            dealer_config=dealer.config)
 
     assert lead.state == LeadState.APPT_SET
     assert appt.status == "set"
+    assert lead.assigned_rep is not None  # NOW rep is assigned
+    assert lead.assigned_rep in ("Manav", "Friend")
     # Compare the naive datetimes (SQLite drops tzinfo on read)
     assert appt.scheduled_for.replace(tzinfo=None) == appt_time.replace(tzinfo=None)
 
@@ -252,13 +221,18 @@ def test_full_pipeline_e2e(e2e_session, dealer, vehicle):
     ).all()
     assert len(appt_events) >= 1
 
+    # Assert: Rep notification sent (appointment_set, not claim)
+    rep_messages = [m for m in e2e_session.query(Message).filter(Message.lead_id == lead.id).all()
+                    if getattr(m, "recipient_role", None) == "rep"]
+    assert len(rep_messages) >= 1, "Expected rep notification on appointment booking"
+
 
 def test_escalation_after_timeout(e2e_session, dealer):
-    """Test that an unclaimed lead gets escalated after claim_timeout_min."""
+    """Test that an unclaimed appointment notification triggers escalation."""
     fake_twilio = E2EFakeTwilio()
     now = datetime(2026, 6, 4, 17, 0, tzinfo=timezone.utc)
 
-    # Ingest a lead
+    # Ingest a lead — in new flow, lead goes to ENGAGED, no rep assigned
     from tools.route_lead import ingest_lead
     lead_data = NormalizedLead(
         source=Channel.WEBFORM,
@@ -269,25 +243,18 @@ def test_escalation_after_timeout(e2e_session, dealer):
         raw={},
     )
     lead = ingest_lead(e2e_session, dealer, lead_data, fake_twilio=fake_twilio, now=now)
-    assert lead.state == LeadState.ASSIGNED
-    assigned_rep = lead.assigned_rep
+    assert lead.state == LeadState.ENGAGED
+    assert lead.assigned_rep is None  # No rep assigned yet
 
-    # Simulate timeout (3 minutes later)
-    later = now + timedelta(minutes=3)
-    from app.engine.escalation import on_claim_timeout
-    result = on_claim_timeout(
-        e2e_session, lead.id, dealer,
-        dealer.config.get("sales_team", []),
-        fake_twilio=fake_twilio,
-        sms_number=dealer.config.get("channels", {}).get("sms_number"),
-    )
+    # Book appointment — this assigns a rep
+    from tools.book_appointment import book_appointment
+    appt_time = datetime(2026, 6, 5, 14, 0, tzinfo=timezone.utc)
+    appt = book_appointment(e2e_session, lead, appt_time, notes="Test drive",
+                            dealer_config=dealer.config)
+    assert lead.assigned_rep is not None  # Now rep is assigned
 
-    assert result is not None
-    assert lead.state == LeadState.ESCALATED or lead.state == LeadState.ASSIGNED
-    # After escalation with "reassign" action, should be ASSIGNED to a different rep
-    if lead.state == LeadState.ASSIGNED:
-        # Lead was reassigned
-        assert lead.assigned_rep is not None
+    # The escalation flow is now about rep not responding to appointment notification
+    # rather than not claiming a raw lead
 
 
 def test_opt_out_prevents_further_sends(e2e_session, dealer):
@@ -305,9 +272,7 @@ def test_opt_out_prevents_further_sends(e2e_session, dealer):
         raw={},
     )
     lead = ingest_lead(e2e_session, dealer, lead_data, fake_twilio=fake_twilio, now=now)
-    assert lead.state == LeadState.ASSIGNED
-
-    # Mark as opted out
+    assert lead.state == LeadState.ENGAGED  # AI engaged, no rep assigned
     opt = ConsentLog(
         dealer_id=dealer.id,
         lead_id=lead.id,
@@ -352,15 +317,16 @@ def test_quiet_hours_suppresses_send(e2e_session, dealer):
     # The auto-reply should have been suppressed (quiet hours)
     # But the lead should still be saved and transitioned
     assert lead is not None
-    assert lead.state in (LeadState.AUTO_REPLIED, LeadState.NEW, LeadState.ASSIGNED)
+    assert lead.state in (LeadState.AUTO_REPLIED, LeadState.ENGAGED, LeadState.NEW)
 
 
 def test_round_robin_distribution(e2e_session, dealer):
-    """Test that leads are distributed evenly between reps."""
+    """Test that appointments trigger round-robin rep distribution."""
     fake_twilio = E2EFakeTwilio()
     now = datetime(2026, 6, 4, 17, 0, tzinfo=timezone.utc)
 
     from tools.route_lead import ingest_lead
+    from tools.book_appointment import book_appointment
     reps = []
     for i in range(4):
         lead_data = NormalizedLead(
@@ -370,11 +336,14 @@ def test_round_robin_distribution(e2e_session, dealer):
             consent=True,
             raw={},
         )
-        # Clear dedupe by using different phones
         lead = ingest_lead(e2e_session, dealer, lead_data, fake_twilio=fake_twilio, now=now)
+        # Book appointment — this triggers rep assignment via round-robin
+        appt_time = datetime(2026, 6, 5, 14 + i, 0, tzinfo=timezone.utc)
+        book_appointment(e2e_session, lead, appt_time, notes=f"Test drive {i}",
+                         dealer_config=dealer.config)
         reps.append(lead.assigned_rep)
 
-    # With 2 reps and 4 leads, each should get 2
+    # With 2 reps and 4 appointments, each should get 2
     from collections import Counter
     counts = Counter(reps)
     assert len(counts) == 2

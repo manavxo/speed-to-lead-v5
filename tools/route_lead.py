@@ -1,8 +1,11 @@
 """Tool: ingest a normalized lead and kick off the speed-to-lead flow.
 
-Persist Lead (NEW) -> resolve vehicle_ref against the vehicles table -> send the instant SMS
-auto-reply (AUTO_REPLIED) -> assign round-robin + WhatsApp claim ping (ASSIGNED) -> schedule
-escalation. This is the <60s core loop.
+Persist Lead (NEW) -> resolve vehicle_ref -> send instant auto-reply (AUTO_REPLIED) ->
+AI sends proactive personalized follow-up (ENGAGED) -> AI handles full conversation ->
+books appointment (APPT_SET) -> assign round-robin + notify rep.
+
+The sales rep is NOT pinged until the AI has qualified the lead and booked an appointment.
+This is the <60s core loop.
 """
 
 from __future__ import annotations
@@ -25,23 +28,88 @@ def _exec(session: Session, stmt):
     return session.execute(stmt).scalars()
 
 
-def _auto_reply_text(dealer_config: dict, vehicle=None) -> str:
-    """Generate an auto-reply message."""
-    dealer_name = dealer_config.get("dealer", {}).get("name", "us")
-    consent_text = dealer_config.get("compliance", {}).get(
-        "consent_text",
-        f"By submitting you agree to receive texts from {dealer_name}. Reply STOP to opt out."
-    )
+def _build_ai_followup_context(lead_data: NormalizedLead, vehicle=None, dealer_config: dict = None) -> str:
+    """Build context for the AI's proactive follow-up message.
 
+    Uses form data (name, vehicle interest, message) to generate a personalized
+    opening that engages the customer immediately.
+    """
+    parts = []
+    dealer_name = (dealer_config or {}).get("dealer", {}).get("name", "us")
+
+    if lead_data.name:
+        parts.append(f"Customer name: {lead_data.name}")
+    if lead_data.vehicle_ref:
+        parts.append(f"Vehicle interest: {lead_data.vehicle_ref}")
     if vehicle:
-        return (
-            f"Hi! Thanks for your interest in the {vehicle.year} {vehicle.make} {vehicle.model}. "
-            f"One of our team members will reach out shortly. {consent_text}"
+        parts.append(f"Matched inventory: {vehicle.year} {vehicle.make} {vehicle.model} ({vehicle.trim}) — ${vehicle.price:,.0f}" if vehicle.price else f"Matched inventory: {vehicle.year} {vehicle.make} {vehicle.model}")
+    if lead_data.message:
+        parts.append(f"Customer message: {lead_data.message}")
+
+    context = ". ".join(parts) if parts else "New lead from webform"
+    return context
+
+
+def _send_to_customer(
+    session: Session,
+    lead: Lead,
+    body: str,
+    *,
+    whatsapp_sender: str = "",
+    sms_number: str = "",
+    dealer_slug: str = "",
+    dealer_config: dict = None,
+    fake_twilio=None,
+    now=None,
+) -> str | None:
+    """Send a message to the customer via WhatsApp or SMS. Returns SID or None."""
+    if not lead.phone:
+        return None
+
+    sid = None
+    if whatsapp_sender:
+        from tools.send_sms import send_whatsapp
+        sid = send_whatsapp(
+            to=lead.phone,
+            body=body,
+            from_number=whatsapp_sender,
+            lead=lead,
+            session=session,
+            role="CUSTOMER",
+            fake_twilio=fake_twilio,
         )
-    return (
-        f"Hi! Thanks for reaching out to {dealer_name}. "
-        f"One of our team members will be in touch shortly. {consent_text}"
-    )
+    elif sms_number:
+        from tools.send_sms import send_sms
+        sid = send_sms(
+            session,
+            to=lead.phone,
+            body=body,
+            from_number=sms_number,
+            dealer_slug=dealer_slug,
+            dealer_config=dealer_config or {},
+            lead=lead,
+            fake_twilio=fake_twilio,
+            now=now,
+        )
+    return sid
+
+
+def _record_outbound_message(session: Session, lead: Lead, body: str, channel: Channel) -> None:
+    """Record an outbound message in the conversation thread."""
+    try:
+        session.expire_all()
+        msg = Message(
+            lead_id=lead.id,
+            direction=Direction.OUTBOUND,
+            channel=channel,
+            body=body,
+            ai_generated=True,
+        )
+        session.add(msg)
+        session.commit()
+    except Exception:
+        logger.exception("Failed to record outbound message for lead#%s", lead.id)
+        session.rollback()
 
 
 def ingest_lead(
@@ -130,101 +198,60 @@ def ingest_lead(
         _log_consent(session, lead, source="sms_inbound")
 
     # 4. Transition NEW -> AUTO_REPLIED
-    auto_text = _auto_reply_text(dealer_config, vehicle)
+    dealer_name = dealer_config.get("dealer", {}).get("name", "us")
+    consent_text = dealer_config.get("compliance", {}).get(
+        "consent_text",
+        f"By submitting you agree to receive texts from {dealer_name}. Reply STOP to opt out."
+    )
+    auto_text = f"Thanks for reaching out to {dealer_name}! {consent_text}"
     transition(session, lead, LeadState.AUTO_REPLIED, reason="auto_reply",
                meta={"reply_text": auto_text})
 
     # 5. Send the auto-reply (gated by OUTBOUND_ENABLED inside send_sms/send_whatsapp)
-    # Prefer WhatsApp if whatsapp_sender is configured, otherwise fall back to SMS
     channels = dealer_config.get("channels", {})
-    # Source senders from config, falling back to the dealer record columns.
-    # The DB-stored `dealer.config` JSON can lag the dedicated sms_number/
-    # whatsapp_sender columns (e.g. a config seeded before whatsapp_sender
-    # existed). Without this fallback an empty config whatsapp_sender silently
-    # routes the customer auto-reply down the SMS branch with the fake
-    # sms_number as From — the exact "+1778555… is not a Twilio number" 400.
     whatsapp_sender = channels.get("whatsapp_sender") or getattr(dealer, "whatsapp_sender", "") or ""
     sms_number = channels.get("sms_number") or getattr(dealer, "sms_number", "") or ""
-    logger.info(
-        "Auto-reply routing for lead#%s: whatsapp_sender=%r sms_number=%r channels_keys=%s",
-        lead.id, whatsapp_sender, sms_number, list(channels.keys()),
+
+    _send_to_customer(
+        session, lead, auto_text,
+        whatsapp_sender=whatsapp_sender, sms_number=sms_number,
+        dealer_slug=dealer.slug, dealer_config=dealer_config,
+        fake_twilio=fake_twilio, now=now,
     )
 
-    # WhatsApp template SID for customer auto-replies
-    WHATSAPP_AUTO_REPLY_TEMPLATE = "HX4ec87aebc636f28e34c42d57e3112320"
+    # Record auto-reply in message thread
+    _record_outbound_message(session, lead, auto_text, Channel.WHATSAPP if whatsapp_sender else Channel.SMS)
 
-    if lead_data.phone and (whatsapp_sender or sms_number):
-        if whatsapp_sender:
-            # Send via WhatsApp as free-form message (sandbox allows this;
-            # production will need an approved template for business-initiated)
-            from tools.send_sms import send_whatsapp
-            sid = send_whatsapp(
-                to=lead_data.phone,
-                body=auto_text,
-                from_number=whatsapp_sender,
-                lead=lead,
-                session=session,
-                role="CUSTOMER",
-                fake_twilio=fake_twilio,
-            )
-            channel = "whatsapp"
-        else:
-            # Fall back to SMS
-            from tools.send_sms import send_sms
-            sid = send_sms(
-                session,
-                to=lead_data.phone,
-                body=auto_text,
-                from_number=sms_number,
-                dealer_slug=dealer.slug,
-                dealer_config=dealer_config,
-                lead=lead,
-                fake_twilio=fake_twilio,
-                now=now,
-            )
-            channel = "sms"
-
-        if sid:
-            logger.info("Auto-reply %s sent for lead#%s sid=%s", channel, lead.id, sid)
-        else:
-            logger.info("Auto-reply %s suppressed for lead#%s (opt-out or quiet hours)", channel, lead.id)
-
-    # ALWAYS record the auto-reply message to the conversation thread.
-    # Use the caller's session — no global factory. The previous "fresh_session"
-    # hack broke tests because each `sqlite:///:memory:` is a different in-memory
-    # DB, so the factory pointed at a DB with no tables. expire_all() handles
-    # any stale entity state from the transition + send_sms above.
+    # 6. AI proactive follow-up — engage the customer immediately with personalized context
+    ai_context = _build_ai_followup_context(lead_data, vehicle, dealer_config)
     try:
-        session.expire_all()
-        existing_msg = session.execute(
-            select(Message).where(Message.lead_id == lead.id, Message.direction == Direction.OUTBOUND)
-        ).scalars().first()
-        if not existing_msg:
-            msg = Message(
-                lead_id=lead.id,
-                direction=Direction.OUTBOUND,
-                channel=Channel.SMS,
-                body=auto_text,
-                ai_generated=True,
-            )
-            session.add(msg)
-            session.commit()
-            logger.info("Auto-reply message recorded for lead#%s", lead.id)
-        else:
-            logger.info("Auto-reply message already exists for lead#%s (sid=%s)", lead.id, existing_msg.provider_sid)
-    except Exception:
-        logger.exception("Failed to record auto-reply message for lead#%s", lead.id)
-        session.rollback()
-
-    # 6. Assign round-robin + SMS claim ping
-    sales_team = dealer_config.get("sales_team", [])
-    sms_number = dealer_config.get("channels", {}).get("sms_number")
-    if sales_team:
-        from app.engine.router import assign_lead
-        assign_lead(
-            session, lead, dealer, sales_team,
-            fake_twilio=fake_twilio,
-            sms_number=sms_number,
+        from app.engine.conversation import handle_turn
+        result = handle_turn(
+            session, lead, ai_context,
+            dealer_config=dealer_config,
+            vehicle=vehicle,
+            is_proactive=True,
         )
+        ai_followup_text = result.get("text", "")
+        if ai_followup_text:
+            # Send the AI's personalized follow-up
+            _send_to_customer(
+                session, lead, ai_followup_text,
+                whatsapp_sender=whatsapp_sender, sms_number=sms_number,
+                dealer_slug=dealer.slug, dealer_config=dealer_config,
+                fake_twilio=fake_twilio, now=now,
+            )
+            _record_outbound_message(session, lead, ai_followup_text, Channel.WHATSAPP if whatsapp_sender else Channel.SMS)
+            logger.info("AI proactive follow-up sent for lead#%s", lead.id)
+    except Exception:
+        logger.exception("AI proactive follow-up failed for lead#%s — lead stays AUTO_REPLIED", lead.id)
+
+    # 7. Transition to ENGAGED — AI is now handling the conversation
+    # Rep will be assigned only when an appointment is booked (APPT_SET)
+    try:
+        transition(session, lead, LeadState.ENGAGED, reason="ai_engaged",
+                   meta={"ai_context": ai_context[:200]})
+    except ValueError:
+        logger.info("Lead#%s already past ENGAGED — skipping transition", lead.id)
 
     return lead
