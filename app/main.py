@@ -412,6 +412,13 @@ def debug_dealer(slug: str):
             return {"error": "Dealer not found"}
         config = dealer.config or {}
         channels = config.get("channels", {})
+        
+        # Also get recent leads
+        leads = session.execute(
+            select(Lead).where(Lead.dealer_id == dealer.id).order_by(Lead.id.desc()).limit(5)
+        ).scalars().all()
+        lead_info = [{"id": l.id, "phone": l.phone, "state": l.state.value if l.state else None, "created": str(l.created_at)} for l in leads]
+        
         return {
             "slug": dealer.slug,
             "whatsapp_sender": dealer.whatsapp_sender,
@@ -419,6 +426,7 @@ def debug_dealer(slug: str):
             "config_whatsapp_sender": channels.get("whatsapp_sender"),
             "config_sms_number": channels.get("sms_number"),
             "sales_team": config.get("sales_team", []),
+            "recent_leads": lead_info,
         }
     finally:
         session.close()
