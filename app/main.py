@@ -385,6 +385,28 @@ def healthz() -> dict:
     return {"ok": True}
 
 
+@app.get("/debug/dealer/{slug}")
+def debug_dealer(slug: str):
+    """Temporary diagnostic: returns dealer config for debugging rep notification issues."""
+    session = _get_session()
+    try:
+        dealer = _exec(session, select(Dealer).where(Dealer.slug == slug)).first()
+        if not dealer:
+            return {"error": f"Dealer '{slug}' not found"}
+        config = dealer.config or {}
+        return {
+            "slug": dealer.slug,
+            "whatsapp_sender_column": dealer.whatsapp_sender,
+            "sms_number_column": dealer.sms_number,
+            "config_whatsapp_sender": config.get("channels", {}).get("whatsapp_sender"),
+            "config_sms_number": config.get("channels", {}).get("sms_number"),
+            "sales_team": config.get("sales_team", []),
+            "sales_team_active": [r for r in config.get("sales_team", []) if r.get("active", True)],
+        }
+    finally:
+        session.close()
+
+
 @app.get("/readyz")
 def readyz():
     """Readiness probe — checks DB connectivity (SELECT 1). Returns 503 on failure."""
