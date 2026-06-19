@@ -64,11 +64,18 @@ def _send_to_customer(
 ) -> str | None:
     """Send a message to the customer via WhatsApp or SMS. Returns SID or None."""
     if not lead.phone:
+        logger.warning("_send_to_customer: no phone for lead#%s", lead.id)
         return None
+
+    logger.info(
+        "_send_to_customer: lead#%s to=%s whatsapp_sender=%r sms_number=%r",
+        lead.id, lead.phone, whatsapp_sender, sms_number,
+    )
 
     sid = None
     if whatsapp_sender:
         from tools.send_sms import send_whatsapp
+        logger.info("_send_to_customer: calling send_whatsapp for lead#%s", lead.id)
         sid = send_whatsapp(
             to=lead.phone,
             body=body,
@@ -78,6 +85,7 @@ def _send_to_customer(
             role="CUSTOMER",
             fake_twilio=fake_twilio,
         )
+        logger.info("_send_to_customer: send_whatsapp returned %r for lead#%s", sid, lead.id)
     elif sms_number:
         from tools.send_sms import send_sms
         sid = send_sms(
