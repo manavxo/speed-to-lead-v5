@@ -635,6 +635,22 @@ async def webhook_twilio_sms(request: Request) -> Response:
             ).order_by(Lead.created_at.desc())
         ).first()
 
+        if not existing_lead:
+            from app.adapters.intake import mask_phone
+            masked = mask_phone(from_number)
+            if masked and masked != from_number:
+                existing_lead = _exec(session,
+                    select(Lead).where(
+                        Lead.dealer_id == dealer.id,
+                        Lead.phone == masked,
+                        Lead.state.notin_([LeadState.SOLD, LeadState.LOST, LeadState.OPTED_OUT]),
+                    ).order_by(Lead.created_at.desc())
+                ).first()
+                if existing_lead:
+                    existing_lead.phone = from_number
+                    session.commit()
+                    logger.info("Fixed masked phone on lead#%s: %s → %s", existing_lead.id, masked, from_number)
+
         if existing_lead:
             # Existing conversation — route to conversation engine
             from app.engine.conversation import handle_turn
@@ -748,7 +764,7 @@ async def _handle_customer_whatsapp_test(
     if body.upper().strip() in resubscribe_keywords:
         return _twiml("Welcome back! You've been resubscribed. Reply STOP to opt out again.")
 
-    # Find or create lead
+    # Find or create lead — match by full phone first, then masked phone (legacy leads)
     existing_lead = _exec(session,
         select(Lead).where(
             Lead.dealer_id == dealer.id,
@@ -756,6 +772,24 @@ async def _handle_customer_whatsapp_test(
             Lead.state.notin_([LeadState.SOLD, LeadState.LOST, LeadState.OPTED_OUT]),
         ).order_by(Lead.created_at.desc())
     ).first()
+
+    if not existing_lead:
+        # Fallback: check for masked phone match (legacy leads stored before fix)
+        from app.adapters.intake import mask_phone
+        masked = mask_phone(from_number)
+        if masked and masked != from_number:
+            existing_lead = _exec(session,
+                select(Lead).where(
+                    Lead.dealer_id == dealer.id,
+                    Lead.phone == masked,
+                    Lead.state.notin_([LeadState.SOLD, LeadState.LOST, LeadState.OPTED_OUT]),
+                ).order_by(Lead.created_at.desc())
+            ).first()
+            if existing_lead:
+                # Fix the masked phone to full phone for future lookups
+                existing_lead.phone = from_number
+                session.commit()
+                logger.info("Fixed masked phone on lead#%s: %s → %s", existing_lead.id, masked, from_number)
 
     if existing_lead:
         # Existing conversation
