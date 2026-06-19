@@ -54,7 +54,12 @@ async def lifespan(application: FastAPI):
 app = FastAPI(title="Speed-to-Lead", version="0.2.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.public_base_url, "http://localhost:8000"],
+    allow_origins=[
+        settings.public_base_url,
+        "http://localhost:8000",
+        "https://dealership-site-snowy.vercel.app",
+        "https://speed-to-lead-v5.vercel.app",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
