@@ -29,12 +29,13 @@ class WebFormAdapter(IntakeAdapter):
         phone = mask_phone(_normalize_phone(payload.get("phone") or payload.get("phone_number")))
         email = payload.get("email") or payload.get("email_address")
 
-        # Vehicle reference: prefer stock#, fall back to VIN, then title
+        # Vehicle reference: prefer stock#, fall back to VIN, then title/interest
         vehicle_ref = (
             payload.get("vehicle_stock")
             or payload.get("vehicle_stock_no")
             or payload.get("vin")
             or payload.get("vehicle_vin")
+            or payload.get("vehicle_interest")
         )
 
         consent = bool(

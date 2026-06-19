@@ -352,6 +352,17 @@ def notify_rep(
 
     if backend == "twilio_whatsapp":
         from_phone = dealer_config.get("channels", {}).get("whatsapp_sender", "")
+        if not from_phone:
+            # Fallback: some configs may lag the dedicated column (e.g. auto-provision
+            # before whatsapp_sender existed). Match the customer auto-reply pattern
+            # in route_lead.py which has a three-level fallback.
+            from_phone = dealer_config.get("channels", {}).get("whatsapp_sender") or ""
+        if not from_phone:
+            logger.warning(
+                "notify_rep: no whatsapp_sender in dealer config for rep %s — "
+                "check dealer YAML channels.whatsapp_sender",
+                rep_name,
+            )
         try:
             sid = send_via_twilio_whatsapp(
                 to_phone=rep_phone,

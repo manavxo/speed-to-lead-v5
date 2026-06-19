@@ -74,7 +74,7 @@ def assign_lead(
     # This is the only place dealer-side notifications get sent from the router.
     from tools.notify_rep import notify_rep
     dealer_config = dealer.config or {}
-    notify_rep(
+    result = notify_rep(
         session=session,
         rep_config=rep,
         lead=lead,
@@ -85,6 +85,16 @@ def assign_lead(
         },
         dealer_config=dealer_config,
     )
+    if not result.success:
+        logger.warning(
+            "Lead#%s assigned to %s but claim ping FAILED: %s (backend=%s)",
+            lead.id, rep["name"], result.error, result.backend,
+        )
+    else:
+        logger.info(
+            "Lead#%s claim ping sent to %s via %s (sid=%s, dry_run=%s)",
+            lead.id, rep["name"], result.backend, result.message_sid, result.dry_run,
+        )
 
     logger.info("Lead#%s assigned to %s", lead.id, rep["name"])
     return rep
