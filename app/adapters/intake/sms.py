@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from app.adapters.intake import IntakeAdapter, NormalizedLead, mask_phone
+from app.adapters.intake import IntakeAdapter, NormalizedLead
 from app.models import Channel
 
 
@@ -22,7 +22,7 @@ class TwilioSmsAdapter(IntakeAdapter):
 
         Twilio sends: From, Body, To, MessageSid, etc.
         """
-        phone = mask_phone(_normalize_phone(payload.get("From") or payload.get("from")))
+        phone = _normalize_phone(payload.get("From") or payload.get("from"))
         body = payload.get("Body") or payload.get("body", "")
         to_number = payload.get("To") or payload.get("to")
 

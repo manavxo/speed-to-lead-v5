@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from app.adapters.intake import IntakeAdapter, NormalizedLead, mask_phone
+from app.adapters.intake import IntakeAdapter, NormalizedLead
 from app.models import Channel
 
 
@@ -26,7 +26,7 @@ class WebFormAdapter(IntakeAdapter):
         if not name and payload.get("first_name"):
             name = f"{payload['first_name']} {payload.get('last_name', '')}".strip()
 
-        phone = mask_phone(_normalize_phone(payload.get("phone") or payload.get("phone_number")))
+        phone = _normalize_phone(payload.get("phone") or payload.get("phone_number"))
         email = payload.get("email") or payload.get("email_address")
 
         # Vehicle reference: prefer stock#, fall back to VIN, then title/interest
