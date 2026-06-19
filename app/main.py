@@ -400,6 +400,30 @@ def debug_config():
     }
 
 
+@app.get("/debug/dealer/{slug}")
+def debug_dealer(slug: str):
+    """Temporary diagnostic: returns dealer config for debugging."""
+    session = _get_session()
+    try:
+        dealer = session.execute(
+            select(Dealer).where(Dealer.slug == slug)
+        ).scalars().first()
+        if not dealer:
+            return {"error": "Dealer not found"}
+        config = dealer.config or {}
+        channels = config.get("channels", {})
+        return {
+            "slug": dealer.slug,
+            "whatsapp_sender": dealer.whatsapp_sender,
+            "sms_number": dealer.sms_number,
+            "config_whatsapp_sender": channels.get("whatsapp_sender"),
+            "config_sms_number": channels.get("sms_number"),
+            "sales_team": config.get("sales_team", []),
+        }
+    finally:
+        session.close()
+
+
 @app.get("/readyz")
 def readyz():
     """Readiness probe — checks DB connectivity (SELECT 1). Returns 503 on failure."""
