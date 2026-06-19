@@ -390,6 +390,16 @@ def healthz() -> dict:
     return {"ok": True}
 
 
+@app.get("/debug/config")
+def debug_config():
+    """Temporary diagnostic: returns runtime config values (no secrets)."""
+    return {
+        "outbound_enabled": settings.outbound_enabled,
+        "environment": settings.environment,
+        "quiet_hours_disabled": settings.quiet_hours_disabled,
+    }
+
+
 @app.get("/readyz")
 def readyz():
     """Readiness probe — checks DB connectivity (SELECT 1). Returns 503 on failure."""
