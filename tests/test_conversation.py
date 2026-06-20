@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -142,6 +142,31 @@ def test_book_appointment(db_session):
     appt = book_appointment(db_session, lead, appt_time, notes="Test drive")
     assert appt.status == "set"
     assert lead.state == LeadState.APPT_SET
+
+
+def test_book_appointment_rejects_past_date(db_session):
+    """Booking an appointment in the past should raise ValueError."""
+    dealer = Dealer(slug="test-dealer", name="Test", config={})
+    db_session.add(dealer)
+    db_session.commit()
+    db_session.refresh(dealer)
+
+    lead = Lead(
+        dealer_id=dealer.id,
+        source=Channel.WEBFORM,
+        name="Test Customer",
+        phone="+16045551234",
+        state=LeadState.ENGAGED,
+    )
+    db_session.add(lead)
+    db_session.commit()
+    db_session.refresh(lead)
+
+    # 1 hour in the past
+    past_time = datetime.now(timezone.utc) - timedelta(hours=1)
+
+    with pytest.raises(ValueError, match="Cannot book appointment in the past"):
+        book_appointment(db_session, lead, past_time)
 
 
 def test_book_appointment_rejected_for_wrong_state(db_session):

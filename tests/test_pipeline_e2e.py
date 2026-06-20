@@ -203,7 +203,8 @@ def test_full_pipeline_e2e(e2e_session, dealer, vehicle):
 
     # 2. BOOK APPOINTMENT — this triggers rep assignment
     from tools.book_appointment import book_appointment
-    appt_time = datetime(2026, 6, 5, 14, 0, tzinfo=timezone.utc)
+    from datetime import timedelta
+    appt_time = datetime.now(timezone.utc) + timedelta(days=1)
     appt = book_appointment(e2e_session, lead, appt_time, notes="Test drive of Honda Civic",
                             dealer_config=dealer.config)
 
@@ -248,7 +249,8 @@ def test_escalation_after_timeout(e2e_session, dealer):
 
     # Book appointment — this assigns a rep
     from tools.book_appointment import book_appointment
-    appt_time = datetime(2026, 6, 5, 14, 0, tzinfo=timezone.utc)
+    from datetime import timedelta
+    appt_time = datetime.now(timezone.utc) + timedelta(days=1)
     appt = book_appointment(e2e_session, lead, appt_time, notes="Test drive",
                             dealer_config=dealer.config)
     assert lead.assigned_rep is not None  # Now rep is assigned
@@ -338,7 +340,8 @@ def test_round_robin_distribution(e2e_session, dealer):
         )
         lead = ingest_lead(e2e_session, dealer, lead_data, fake_twilio=fake_twilio, now=now)
         # Book appointment — this triggers rep assignment via round-robin
-        appt_time = datetime(2026, 6, 5, 14 + i, 0, tzinfo=timezone.utc)
+        from datetime import timedelta
+        appt_time = datetime.now(timezone.utc) + timedelta(days=1, hours=i)
         book_appointment(e2e_session, lead, appt_time, notes=f"Test drive {i}",
                          dealer_config=dealer.config)
         reps.append(lead.assigned_rep)
