@@ -1,14 +1,12 @@
 # Where to Resume Next
 
-## Current Phase: Phase 1 — Critical Bugs
+## Current Phase: Phase 2 — Database & Migrations
 
-**Just completed:** Task 1.3 (fix pass_count persistence)
+**Just completed:** Phase 1 (all 5 critical bugs)
 
-**Next up:** Task 1.4 — Fix phone masking in email adapter
+**Next up:** Task 2.1 — Install Alembic, Task 2.2 — Create initial migration, Task 2.3 — Increase connection pool size, Task 2.4 — Remove duplicated _normalize_db_url
 
-`app/adapters/intake/email_lead.py` masks phone at parse time (line 49). Same bug that was fixed in `route_lead.py` but missed here. Phone should be stored unmasked, masked only at display time.
-
-**After 1.4:** Task 1.5 (consent=False in email adapter)
+**After Phase 2:** Phase 3 — Transaction Safety
 
 ## Execution contract reminder
 

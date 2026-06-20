@@ -70,3 +70,6 @@ HTTP
 .mimocode/
 MIMO_CONTEXT_PASTE.txt
 MIMO_HANDOFF.md
+
+# Alembic runtime artifacts (not migration files themselves)
+test_migration.db
