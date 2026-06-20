@@ -114,7 +114,13 @@ def handle_claim(
     """Handle a rep's claim response (reply '1' to claim).
 
     Transitions ASSIGNED -> CLAIMED.
+    Verifies the claiming rep matches lead.assigned_rep (if assigned).
     """
+    if lead.assigned_rep and lead.assigned_rep != rep_name:
+        raise ValueError(
+            f"Lead is assigned to {lead.assigned_rep}, not {rep_name}. "
+            f"Only {lead.assigned_rep} can claim this lead."
+        )
     transition(
         session, lead, LeadState.CLAIMED,
         reason="rep_claimed",
