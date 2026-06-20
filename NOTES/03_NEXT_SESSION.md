@@ -2,13 +2,13 @@
 
 ## Current Phase: Phase 1 — Critical Bugs
 
-**Just completed:** Task 1.1 (fix daily digest crash)
+**Just completed:** Task 1.2 (fix greeting_only lifecycle bypass)
 
-**Next up:** Task 1.2 — Fix greeting_only lifecycle bypass
+**Next up:** Task 1.3 — Fix pass_count persistence
 
-The `greeting_only` mode in `app/engine/conversation.py` sets `lead.state = LeadState.ASSIGNED` directly without using `transition()`. This bypasses LeadEvent logging.
+`pass_count` is set as a runtime attribute via `getattr(lead, "pass_count", 0) + 1` in `app/engine/router.py`. May be lost on session refresh. Needs to be a proper DB column.
 
-**After 1.2:** Task 1.3 → 1.4 → 1.5 (in order)
+**After 1.3:** Task 1.4 → 1.5 (in order)
 
 ## Execution contract reminder
 

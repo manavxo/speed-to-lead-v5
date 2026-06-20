@@ -139,7 +139,7 @@ def handle_pass(
     Tracks how many times the lead has been passed. After max_pass_count
     consecutive passes, escalates to the manager instead of looping.
     """
-    lead.pass_count = getattr(lead, "pass_count", 0) + 1
+    lead.pass_count = (lead.pass_count or 0) + 1
     session.flush()
 
     if lead.pass_count >= max_pass_count:
