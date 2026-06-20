@@ -1,0 +1,26 @@
+# ════════════════════════════════════════════════════════
+# Speed to Lead v5 — AGENT STARTUP PROMPT
+# ════════════════════════════════════════════════════════
+# Copy and paste this ENTIRE block into Hermes on your desktop.
+# This is the FIRST thing the agent reads. It sets the context.
+# ════════════════════════════════════════════════════════
+
+I am refactoring Speed to Lead v5 to production readiness. No v6 will be built. v5 ships to market.
+
+Read these 5 documents in this EXACT order. Do not skip any.
+
+Document 1: _AGENT_EXECUTION_DOCS/00_START_HERE_CLAUDE.md
+Document 2: _AGENT_EXECUTION_DOCS/01_ARCHITECTURE.md
+Document 3: _AGENT_EXECUTION_DOCS/02_CODEBASE_AUDIT.md
+Document 4: _AGENT_EXECUTION_DOCS/03_TESTING_STRATEGY.md
+Document 5: _AGENT_EXECUTION_DOCS/04_REFACTORING_GUIDE.md
+
+After reading all five:
+
+1. Confirm you have read all five and understand the scope
+2. Run `pytest -x --tb=short` from the Speed to Lead v5 project directory
+3. Report the results
+4. Do NOT make any code changes yet
+
+Wait for my approval before starting Phase 0.1.
+

@@ -61,3 +61,12 @@ build/
 _archive*/
 v3/
 v4/
+
+# AI agent scaffolding (dev-only, not product code)
+.claude/
+.claude-flow/
+.mcp.json
+HTTP
+.mimocode/
+MIMO_CONTEXT_PASTE.txt
+MIMO_HANDOFF.md
