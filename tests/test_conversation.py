@@ -348,13 +348,14 @@ def test_max_turns_triggers_handoff(db_session):
     # Lead should be ASSIGNED
     assert lead.state == LeadState.ASSIGNED
 
-    # Should have logged a LeadEvent
+    # Should have logged a LeadEvent via transition()
     event = db_session.query(LeadEvent).filter(
         LeadEvent.lead_id == lead.id,
-        LeadEvent.type == "max_turns_reached",
+        LeadEvent.type == "state_change",
     ).first()
-    assert event is not None
-    assert event.payload["inbound_count"] == MAX_INBOUND_TURNS
+    assert event is not None, "max-turns handoff should create a state_change LeadEvent"
+    assert event.payload.get("reason") == "max_turns_reached"
+    assert event.payload.get("inbound_count") == MAX_INBOUND_TURNS
 
 
 def test_max_turns_not_triggered_for_non_engaged_lead(db_session):

@@ -2,15 +2,13 @@
 
 ## Current Phase: Phase 1 — Critical Bugs
 
-**Just completed:** Phase 0 (cleanup)
-- Task 0.1: Removed .claude scaffolding ✅
-- Task 0.2: Removed test-mode WhatsApp handler ✅
+**Just completed:** Task 1.1 (fix daily digest crash)
 
-**Next up:** Task 1.1 — Fix daily digest crash (CRITICAL)
+**Next up:** Task 1.2 — Fix greeting_only lifecycle bypass
 
-The `send_daily_digest()` function in `app/scheduler.py` references an undefined `dealer` variable. Will crash when the job runs. This is the #1 priority because it will hit production.
+The `greeting_only` mode in `app/engine/conversation.py` sets `lead.state = LeadState.ASSIGNED` directly without using `transition()`. This bypasses LeadEvent logging.
 
-**After 1.1:** Task 1.2 → 1.3 → 1.4 → 1.5 (in order)
+**After 1.2:** Task 1.3 → 1.4 → 1.5 (in order)
 
 ## Execution contract reminder
 

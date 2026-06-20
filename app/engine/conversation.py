@@ -589,16 +589,14 @@ def handle_turn(
         # Only send greeting on first inbound message
         if inbound_count <= 1:
             greeting = f"Hi! Thanks for reaching out to {dealer_name}. A member of our team will be with you shortly!"
-            lead.state = LeadState.ASSIGNED
-            lead.updated_at = now
-            event = LeadEvent(
-                lead_id=lead.id,
-                dealer_id=lead.dealer_id,
-                type="engagement_handoff",
-                payload={"mode": "greeting_only", "inbound_count": inbound_count},
+
+            from app.engine.lifecycle import transition
+            transition(
+                session, lead, LeadState.ASSIGNED,
+                reason="greeting_only_mode",
+                meta={"inbound_count": inbound_count},
             )
-            session.add(event)
-            session.commit()
+
             return {
                 "mode": "send",
                 "text": greeting,
@@ -624,16 +622,12 @@ def handle_turn(
                 f"Let me connect you with one of our sales specialists at {dealer_name} who can help you further. "
                 f"A team member will reach out to you shortly!"
             )
-            lead.state = LeadState.ASSIGNED
-            lead.updated_at = now
-            event = LeadEvent(
-                lead_id=lead.id,
-                dealer_id=lead.dealer_id,
-                type="engagement_handoff",
-                payload={"mode": "qualify_only", "inbound_count": inbound_count},
+            from app.engine.lifecycle import transition
+            transition(
+                session, lead, LeadState.ASSIGNED,
+                reason="qualify_only_handoff",
+                meta={"inbound_count": inbound_count},
             )
-            session.add(event)
-            session.commit()
             return {
                 "mode": "send",
                 "text": handoff,
@@ -712,17 +706,12 @@ def handle_turn(
                 f"A sales rep will follow up with you shortly to help with whatever you need."
             )
             # Transition to ASSIGNED for human follow-up
-            lead.state = LeadState.ASSIGNED
-            lead.updated_at = now
-            # Log event
-            event = LeadEvent(
-                lead_id=lead.id,
-                dealer_id=lead.dealer_id,
-                type="max_turns_reached",
-                payload={"inbound_count": inbound_count},
+            from app.engine.lifecycle import transition
+            transition(
+                session, lead, LeadState.ASSIGNED,
+                reason="max_turns_reached",
+                meta={"inbound_count": inbound_count},
             )
-            session.add(event)
-            session.commit()
 
             return {
                 "mode": "send",
