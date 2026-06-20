@@ -2,13 +2,13 @@
 
 ## Current Phase: Phase 1 — Critical Bugs
 
-**Just completed:** Task 1.2 (fix greeting_only lifecycle bypass)
+**Just completed:** Task 1.3 (fix pass_count persistence)
 
-**Next up:** Task 1.3 — Fix pass_count persistence
+**Next up:** Task 1.4 — Fix phone masking in email adapter
 
-`pass_count` is set as a runtime attribute via `getattr(lead, "pass_count", 0) + 1` in `app/engine/router.py`. May be lost on session refresh. Needs to be a proper DB column.
+`app/adapters/intake/email_lead.py` masks phone at parse time (line 49). Same bug that was fixed in `route_lead.py` but missed here. Phone should be stored unmasked, masked only at display time.
 
-**After 1.3:** Task 1.4 → 1.5 (in order)
+**After 1.4:** Task 1.5 (consent=False in email adapter)
 
 ## Execution contract reminder
 

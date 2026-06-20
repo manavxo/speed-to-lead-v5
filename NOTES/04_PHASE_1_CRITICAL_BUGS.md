@@ -65,10 +65,32 @@ if dealer is None:
 
 **Commit:** `daa6deb Phase 1.2: Fix lifecycle bypass — greeting_only, qualify_only, max_turns`
 
-## Task 1.3: Fix pass_count persistence 🔲
+## Task 1.3: Fix pass_count persistence ✅
 
-**Not started.** Next up.
+**Issue:** `pass_count` was declared as `pass_count: int = 0` in the Lead model (non-Field annotation) and accessed via `getattr(lead, "pass_count", 0)` in `router.py`.
+
+**Actual state:** SQLModel creates columns from plain type annotations too, so `pass_count` WAS persisted correctly. But `Field(default=0)` is more explicit and consistent with the rest of the model. The `getattr` pattern was defensive code that's no longer needed.
+
+**Fix:**
+- `app/models/__init__.py` — Changed `pass_count: int = 0` to `pass_count: int = Field(default=0)`
+- `app/engine/router.py` — Changed `getattr(lead, "pass_count", 0) + 1` to `(lead.pass_count or 0) + 1`
+
+**Verification:**
+- 3 new tests in `tests/test_pass_count.py`:
+  - `test_pass_count_defaults_to_zero` — new lead has pass_count=0
+  - `test_pass_count_increments_across_session_refresh` — persists after session close/reopen
+  - `test_pass_count_reaches_max_and_escalates` — works end-to-end with handle_pass
+- Full suite: 137 passed, 1 skipped (no regressions)
+
+**Note:** No DB schema change needed — `pass_count` was already a column. This is a code quality / defensive programming fix.
+
+**Files changed:**
+- `app/models/__init__.py` — explicit Field(default=0)
+- `app/engine/router.py` — removed getattr fallback
+- `tests/test_pass_count.py` — new test file (3 tests)
+
+**Commit:** `7ca8cfc Phase 1.3: Fix pass_count — explicit Field() + direct attribute access`
 
 ## Task 1.4: Fix phone masking in email adapter 🔲
 
-## Task 1.5: Fix consent=False in email adapter 🔲
+**Not started.** Next up.
