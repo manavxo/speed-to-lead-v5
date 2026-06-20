@@ -285,11 +285,11 @@ def notify_rep(
     Returns:
         NotificationResult — see the dataclass docstring.
     """
-    backend = rep_config.get("notify_backend", "twilio_whatsapp")
+    backend = rep_config.get("notify_backend", "telegram")
     rep_name = rep_config.get("name", "rep")
     rep_phone = rep_config.get("phone", "")
 
-    if not rep_phone:
+    if not rep_phone and backend != "telegram":
         return NotificationResult(
             success=False,
             backend=backend,
@@ -307,7 +307,7 @@ def notify_rep(
             error=f"{backend} backend not implemented (Phase 2)",
         )
 
-    if backend not in ("twilio_whatsapp", "sms"):
+    if backend not in ("telegram", "twilio_whatsapp", "sms"):
         return NotificationResult(
             success=False,
             backend=backend,
@@ -348,6 +348,26 @@ def notify_rep(
         _log_rep_message(session, lead, log_channel, body, sid)
         return NotificationResult(
             success=True, backend=backend, message_sid=sid, dry_run=True,
+        )
+
+    if backend == "telegram":
+        from app.transports.telegram import TelegramTransport
+        chat_id = rep_config.get("telegram_chat_id", "")
+        if not chat_id:
+            return NotificationResult(
+                success=False, backend=backend, message_sid=None,
+                error=f"rep {rep_name!r} has no telegram_chat_id; cannot notify via Telegram",
+            )
+        transport = TelegramTransport()
+        result = transport.send(to=chat_id, body=body)
+        if result.success:
+            _log_rep_message(session, lead, Channel.WHATSAPP, body, result.message_id or "")
+        return NotificationResult(
+            success=result.success,
+            backend=backend,
+            message_sid=result.message_id,
+            dry_run=result.dry_run,
+            error=result.error,
         )
 
     if backend == "twilio_whatsapp":
