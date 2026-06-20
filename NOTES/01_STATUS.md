@@ -53,7 +53,7 @@ Just before Phase 0.1. Full test suite passes (128 passed, 1 skipped). Codebase 
 | 4 | Transport abstraction (base, Telegram) | 2h | ✅ |
 | 5 | Fix stubs (email, settings, template SID) | 2h | ✅ |
 | 6 | Rate limiting & auth | 30 min | ✅ |
-| 7 | Conversation memory | 1h | 🔲 |
+| 7 | Conversation memory | 1h | ✅ |
 | 8 | Testing (ongoing) | ongoing | 🔲 |
 | 9 | Email channel | 10h | 🔲 |
 | 10 | Manager vs Rep roles | 3h | 🔲 |
