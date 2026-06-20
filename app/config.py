@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     require_twilio_signature: bool = False
     message_tags_enabled: bool = False
 
+    # Telegram — dealer-side notifications (the ONLY dealer channel per architecture decision)
+    telegram_bot_token: str = ""
+
     # Quiet hours: when True, auto-reply SMS sends 24/7 (bypasses 21:00-08:00 window).
     # Set QUIET_HOURS_DISABLED=false in .env to re-enable for production.
     quiet_hours_disabled: bool = True
