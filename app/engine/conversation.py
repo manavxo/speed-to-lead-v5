@@ -847,11 +847,26 @@ def _call_openrouter(
                 select(Message)
                 .where(Message.lead_id == lead.id)
                 .order_by(Message.created_at.desc())
-                .limit(10)
+                .limit(20)
             ).scalars().all()
 
             # Reverse so oldest-first (chronological order)
             recent_msgs.reverse()
+
+            # If we have more than 10 messages, summarize the older ones
+            # to keep context under token limits
+            if len(recent_msgs) > 10:
+                older = recent_msgs[:-10]
+                recent = recent_msgs[-10:]
+                # Build a condensed summary of older messages
+                summary_lines = []
+                for msg in older:
+                    prefix = "Customer" if msg.direction == Direction.INBOUND else "AI"
+                    body = msg.body[:200]
+                    summary_lines.append(f"{prefix}: {body}")
+                summary = " [Earlier conversation] " + " | ".join(summary_lines)
+                messages.append({"role": "system", "content": summary})
+                recent_msgs = recent
 
             for msg in recent_msgs:
                 role = "assistant" if msg.direction == Direction.OUTBOUND else "user"
