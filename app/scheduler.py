@@ -595,6 +595,38 @@ def register_jobs(scheduler) -> None:
         misfire_grace_time=600,
     )
 
+    # Email intake polling — check for new listing site leads every 5 minutes
+    scheduler.add_job(
+        _run_email_poll_for_all_dealers,
+        "interval",
+        minutes=5,
+        id="email-poll",
+        replace_existing=True,
+        misfire_grace_time=120,
+    )
+
+
+def _run_email_poll_for_all_dealers():
+    """Cron entry point: poll IMAP inbox for each dealer and create leads."""
+    from app.db import get_session_factory
+    from app.models import Dealer
+    from sqlalchemy import select
+
+    logger.info("Checking email inboxes for all dealers")
+    session = get_session_factory()()
+    try:
+        from app.adapters.intake.email_ingest import poll_inbox
+        dealers = session.execute(select(Dealer)).scalars().all()
+        for dealer in dealers:
+            try:
+                count = poll_inbox(session, dealer)
+                if count > 0:
+                    logger.info("Email poll for %s: %d new leads", dealer.slug, count)
+            except Exception:
+                logger.exception("Email poll failed for dealer %s", dealer.slug)
+    finally:
+        session.close()
+
 
 def build_scheduler() -> BlockingScheduler:
     """Build and configure the APScheduler instance with a Postgres jobstore."""

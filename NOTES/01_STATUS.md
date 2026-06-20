@@ -50,7 +50,7 @@ Just before Phase 0.1. Full test suite passes (128 passed, 1 skipped). Codebase 
 | 1 | Critical bugs (digest, lifecycle, pass_count, email) | 2.5h | ✅ Complete |
 | 2 | Database (Alembic, pool size, dedup) | 1h | ✅ |
 | 3 | Transaction safety (date val, claim, ingest tx) | 2h | ✅ |
-| 4 | Transport abstraction (base, Telegram) | 2h | 🔲 |
+| 4 | Transport abstraction (base, Telegram) | 2h | ✅ |
 | 5 | Fix stubs (email, settings, template SID) | 2h | 🔲 |
 | 6 | Rate limiting & auth | 30 min | 🔲 |
 | 7 | Conversation memory | 1h | 🔲 |
