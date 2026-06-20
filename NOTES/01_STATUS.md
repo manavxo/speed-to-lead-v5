@@ -46,7 +46,7 @@ Just before Phase 0.1. Full test suite passes (128 passed, 1 skipped). Codebase 
 
 | Phase | What | Est. time | Status |
 |-------|------|-----------|--------|
-| 0 | Cleanup (scaffolding, test handler) | 30 min | 🔲 |
+| 0 | Cleanup (scaffolding, test handler) | 30 min | ✅ |
 | 1 | Critical bugs (digest, lifecycle, pass_count) | 1.5h | 🔲 |
 | 2 | Database (Alembic, pool size, dedup) | 1h | 🔲 |
 | 3 | Transaction safety (date val, claim, ingest tx) | 2h | 🔲 |
