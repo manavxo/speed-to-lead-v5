@@ -45,8 +45,8 @@ def _pool_kwargs(url: str) -> dict:
     if _is_sqlite(url):
         return {}
     return {
-        "pool_size": 2,
-        "max_overflow": 2,
+        "pool_size": 5,
+        "max_overflow": 10,
         "pool_recycle": 300,
         "pool_pre_ping": True,
     }

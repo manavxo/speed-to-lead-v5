@@ -91,6 +91,40 @@ if dealer is None:
 
 **Commit:** `7ca8cfc Phase 1.3: Fix pass_count — explicit Field() + direct attribute access`
 
-## Task 1.4: Fix phone masking in email adapter 🔲
+## Task 1.4: Fix phone masking in email adapter ✅
 
-**Not started.** Next up.
+**Bug:** `email_lead.py` line 49 passed phone through `mask_phone()` after normalization, storing a masked value like `+160****1234` instead of `+16045551234`. This broke phone-based lookups (dedup, lead matching, rep assignment).
+
+**Fix:** Removed the `mask_phone()` call. Phone is now stored as normalized but unmasked, consistent with how `route_lead.py` handles it. Masking happens at display time in templates.
+
+**Files changed:** `app/adapters/intake/email_lead.py` — replaced `mask_phone(_normalize_phone(...))` with just `_normalize_phone(...)`
+
+## Task 1.5: Fix consent=False in email adapter ✅
+
+**Bug:** `email_lead.py` line 79 set `consent=False`. Customers submitting their info via listing site forms have implied consent — they voluntarily provided their contact details to inquire about a vehicle.
+
+**Fix:** Changed `consent=False` to `consent=True` with comment explaining implied consent.
+
+**Files changed:** `app/adapters/intake/email_lead.py` — line 79
+
+## Verification (both tasks):
+- 3 new tests in `tests/test_email_adapter.py`
+- Full suite: 140 passed, 1 skipped (no regressions)
+
+**Commit:** `5efad4b Phase 1.4+1.5: Fix email adapter phone masking + consent`
+
+---
+
+# Phase 1 Complete ✅
+
+All 5 critical bugs fixed.
+
+| Task | Bug | Status |
+|------|-----|--------|
+| 1.1 | Daily digest crash (undefined dealer var) | ✅ |
+| 1.2 | greeting_only lifecycle bypass (3 sites) | ✅ |
+| 1.3 | pass_count not persisted (explicit Field) | ✅ |
+| 1.4 | Phone masking in email adapter | ✅ |
+| 1.5 | consent=False in email adapter | ✅ |
+
+**Next: Phase 2 — Database & Migrations**

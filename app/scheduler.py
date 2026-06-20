@@ -325,13 +325,6 @@ def _run_stuck_lead_sweep():
         session.close()
 
 
-def _normalize_db_url(url: str) -> str:
-    """Render may give postgres:// or postgresql:// — SQLAlchemy needs the psycopg3 driver prefix.
-    Force psycopg3 so we don't need the psycopg2 package."""
-    if url.startswith("postgres://"):
-        return url.replace("postgres://", "postgresql+psycopg://", 1)
-    return url.replace("postgresql://", "postgresql+psycopg://", 1)
-
 
 def _run_daily_digest_for_all_dealers_session(session) -> None:
     """Business logic for the daily digest job. Takes a session for testability."""
@@ -605,6 +598,7 @@ def register_jobs(scheduler) -> None:
 
 def build_scheduler() -> BlockingScheduler:
     """Build and configure the APScheduler instance with a Postgres jobstore."""
+    from app.db import _normalize_db_url
     db_url = _normalize_db_url(settings.database_url)
     jobstores = {
         "default": SQLAlchemyJobStore(url=db_url),
