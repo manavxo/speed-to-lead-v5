@@ -10,7 +10,7 @@ NEVER call twilio.rest.Client directly from this file. Per directive H.2.2.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -143,8 +143,14 @@ def book_appointment(
         The created Appointment.
 
     Raises:
-        ValueError: If the lead is not in a bookable state.
+        ValueError: If the lead is not in a bookable state or if scheduled_for is in the past.
     """
+    if scheduled_for < datetime.now(timezone.utc):
+        raise ValueError(
+            f"Cannot book appointment in the past: {scheduled_for.isoformat()}. "
+            f"Current time: {datetime.now(timezone.utc).isoformat()}"
+        )
+
     if lead.state not in (LeadState.CLAIMED, LeadState.ENGAGED, LeadState.AUTO_REPLIED, LeadState.NEW):
         raise ValueError(
             f"Cannot book appointment for lead in state {lead.state}. "

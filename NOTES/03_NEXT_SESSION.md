@@ -1,12 +1,14 @@
 # Where to Resume Next
 
-## Current Phase: Phase 2 — Database & Migrations
+## Current Phase: Phase 3 — Transaction Safety
 
-**Just completed:** Phase 1 (all 5 critical bugs)
+**Just completed:** Phase 2 (Alembic, pool size, dedup normalize_db_url)
 
-**Next up:** Task 2.1 — Install Alembic, Task 2.2 — Create initial migration, Task 2.3 — Increase connection pool size, Task 2.4 — Remove duplicated _normalize_db_url
+**Next up:** Task 3.1 — Add future-date validation to appointments
 
-**After Phase 2:** Phase 3 — Transaction Safety
+`tools/book_appointment.py` can book appointments in the past. Need to add validation that rejects dates before now.
+
+**After 3.1:** Task 3.2 → 3.3
 
 ## Execution contract reminder
 
