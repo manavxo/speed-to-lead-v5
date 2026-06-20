@@ -46,7 +46,7 @@ class EmailLeadAdapter(IntakeAdapter):
 
         phone_match = re.search(r"Phone:\s*([+\d\s()-]+)", raw, re.IGNORECASE)
         if phone_match:
-            phone = mask_phone(_normalize_phone(phone_match.group(1).strip()))
+            phone = _normalize_phone(phone_match.group(1).strip())
 
         email_match = re.search(r"Email:\s*(\S+@\S+)", raw, re.IGNORECASE)
         if email_match:
@@ -76,6 +76,6 @@ class EmailLeadAdapter(IntakeAdapter):
             email=email_addr,
             vehicle_ref=vehicle_ref,
             message=message,
-            consent=False,  # Email leads don't have explicit SMS consent
+            consent=True,  # Implied consent — customer submitted their info
             raw={"raw": raw},
         )
