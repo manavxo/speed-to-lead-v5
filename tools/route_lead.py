@@ -281,6 +281,7 @@ def ingest_lead(
 
     # 6. AI proactive follow-up — engage the customer immediately with personalized context
     ai_context = _build_ai_followup_context(lead_data, vehicle, dealer_config)
+    ai_followup_success = False
     try:
         from app.engine.conversation import handle_turn
         result = handle_turn(
@@ -300,8 +301,16 @@ def ingest_lead(
             )
             _record_outbound_message(session, lead, ai_followup_text, Channel.WHATSAPP if whatsapp_sender else Channel.SMS)
             logger.info("AI proactive follow-up sent for lead#%s", lead.id)
+        ai_followup_success = True
     except Exception:
-        logger.exception("AI proactive follow-up failed for lead#%s — lead stays AUTO_REPLIED", lead.id)
+        logger.exception("AI proactive follow-up failed for lead#%s — deleting lead to avoid partial state", lead.id)
+        # Delete the lead and all related data to avoid a half-baked AUTO_REPLIED lead
+        from sqlalchemy import delete as sa_delete
+        session.execute(sa_delete(Message).where(Message.lead_id == lead.id))
+        session.execute(sa_delete(ConsentLog).where(ConsentLog.lead_id == lead.id))
+        session.execute(sa_delete(Lead).where(Lead.id == lead.id))
+        session.commit()
+        raise
 
     # 7. Transition to ENGAGED — AI is now handling the conversation
     # Rep will be assigned only when an appointment is booked (APPT_SET)
