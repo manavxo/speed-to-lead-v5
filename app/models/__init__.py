@@ -96,7 +96,7 @@ class Lead(SQLModel, table=True):
     vehicle_id: Optional[int] = Field(default=None, foreign_key="vehicle.id")
     state: LeadState = Field(default=LeadState.NEW, index=True)
     assigned_rep: Optional[str] = None
-    pass_count: int = 0                                           # how many times reps have passed this lead
+    pass_count: int = Field(default=0)                             # how many times reps have passed this lead
     consent: bool = False
     loss_reason: Optional[str] = None
     created_at: datetime = Field(default_factory=_utcnow)
