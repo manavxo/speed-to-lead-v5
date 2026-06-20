@@ -64,6 +64,9 @@ class Settings(BaseSettings):
     email_imap_server: str = "imap.gmail.com"
     email_imap_port: int = 993
 
+    # Debug endpoints — disabled in production by default
+    debug_endpoints_enabled: bool = False
+
     # Quiet hours: when True, auto-reply SMS sends 24/7 (bypasses 21:00-08:00 window).
     # Set QUIET_HOURS_DISABLED=false in .env to re-enable for production.
     quiet_hours_disabled: bool = True
