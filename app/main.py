@@ -774,190 +774,6 @@ async def webhook_twilio_sms(request: Request) -> Response:
         session.close()
 
 
-# *** TEST MODE ONLY ***
-# This function allows customers to test via WhatsApp.
-# In production, customer conversations happen over SMS, not WhatsApp.
-# Remove this function before deploying to real dealers.
-async def _handle_customer_whatsapp_test(
-    session, dealer, dealer_config, from_number, body, message_sid
-) -> Response:
-    """Handle customer WhatsApp messages in test mode.
-
-    Routes to conversation engine for AI responses.
-    In production, this should NOT exist — customers use SMS.
-    """
-    from app.engine.conversation import handle_turn
-    from app.engine.lifecycle import transition
-    from sqlalchemy import select
-    from app.models import Lead, LeadState, Message, Direction, Channel, ConsentLog
-
-    # Check opt-out keywords first
-    opt_out_keywords = dealer_config.get("compliance", {}).get(
-        "opt_out_keywords", ["STOP", "STOPALL", "UNSUBSCRIBE", "ARRET"]
-    )
-    if body.upper().strip() in [kw.upper() for kw in opt_out_keywords]:
-        opt = ConsentLog(
-            dealer_id=dealer.id,
-            phone=from_number,
-            action="opted_out",
-            text=body,
-        )
-        session.add(opt)
-        session.commit()
-        return _twiml("You have been unsubscribed. Reply START to resubscribe.")
-
-    # Check resubscribe keywords
-    resubscribe_keywords = ["START", "STARTALL", "JOIN", "UNSTOP"]
-    if body.upper().strip() in resubscribe_keywords:
-        return _twiml("Welcome back! You've been resubscribed. Reply STOP to opt out again.")
-
-    # Find or create lead — match by full phone first, then masked phone (legacy leads)
-    existing_lead = _exec(session,
-        select(Lead).where(
-            Lead.dealer_id == dealer.id,
-            Lead.phone == from_number,
-            Lead.state.notin_([LeadState.SOLD, LeadState.LOST, LeadState.OPTED_OUT]),
-        ).order_by(Lead.created_at.desc())
-    ).first()
-
-    if not existing_lead:
-        # Fallback: check for masked phone match (legacy leads stored before fix)
-        from app.adapters.intake import mask_phone
-        masked = mask_phone(from_number)
-        if masked and masked != from_number:
-            existing_lead = _exec(session,
-                select(Lead).where(
-                    Lead.dealer_id == dealer.id,
-                    Lead.phone == masked,
-                    Lead.state.notin_([LeadState.SOLD, LeadState.LOST, LeadState.OPTED_OUT]),
-                ).order_by(Lead.created_at.desc())
-            ).first()
-            if existing_lead:
-                # Fix the masked phone to full phone for future lookups
-                existing_lead.phone = from_number
-                session.commit()
-                logger.info("Fixed masked phone on lead#%s: %s → %s", existing_lead.id, masked, from_number)
-
-    if existing_lead:
-        # Existing conversation
-        lead_id = existing_lead.id
-        dealer_id = dealer.id
-        dealer_slug = dealer.slug
-
-        # Log inbound message
-        inbound_msg = Message(
-            lead_id=lead_id,
-            direction=Direction.INBOUND,
-            channel=Channel.WHATSAPP,
-            body=body,
-            provider_sid=message_sid,
-        )
-        session.add(inbound_msg)
-        session.commit()
-
-        # Transition AUTO_REPLIED -> ENGAGED on first customer reply
-        if existing_lead.state == LeadState.AUTO_REPLIED:
-            try:
-                transition(session, existing_lead, LeadState.ENGAGED,
-                           reason="customer_reply", meta={"first_reply": body[:200]})
-            except ValueError:
-                pass
-
-        # Get vehicle context
-        vehicle = None
-        if existing_lead.vehicle_id:
-            from app.models import Vehicle
-            vehicle = session.get(Vehicle, existing_lead.vehicle_id)
-
-        # Generate AI response
-        try:
-            result = handle_turn(
-                session, existing_lead, body,
-                dealer_config=dealer_config,
-                vehicle=vehicle,
-            )
-            ai_response = result.get("text", "Thanks for your message!")
-            logger.info("[TEST MODE] AI response to WhatsApp customer %s: %s", from_number, ai_response[:100])
-        except Exception:
-            logger.exception("[TEST MODE] AI response failed for WhatsApp customer %s", from_number)
-            ai_response = "Thanks for your message! A team member will follow up shortly."
-
-        # Send WhatsApp reply via Twilio
-        from app.transports.twilio import send_whatsapp
-        whatsapp_sender = dealer_config.get("channels", {}).get("whatsapp_sender")
-        if whatsapp_sender:
-            try:
-                send_whatsapp(
-                    to_number=from_number,
-                    from_number=whatsapp_sender,
-                    body=ai_response,
-                    dealer_id=dealer.id,
-                    lead_id=lead_id,
-                    session=session,
-                    lead=existing_lead,
-                )
-                logger.info("[TEST MODE] WhatsApp reply sent to %s", from_number)
-            except Exception:
-                logger.exception("[TEST MODE] Failed to send WhatsApp reply to %s", from_number)
-        else:
-            logger.warning("[TEST MODE] No whatsapp_sender configured for dealer %s", dealer.slug)
-
-        return _empty_twiml()
-    else:
-        # New lead — create it and send auto-reply
-        from tools.route_lead import ingest_lead
-        from app.adapters.intake import NormalizedLead
-        from app.models import Channel
-        try:
-            # Build NormalizedLead
-            lead_data = NormalizedLead(
-                source=Channel.WHATSAPP,
-                name="",
-                phone=from_number,
-                message=body,
-                consent=True,  # WhatsApp implies consent for testing
-            )
-            lead = ingest_lead(session, dealer, lead_data)
-            lead_id = lead.id
-            dealer_slug = dealer.slug
-
-            # Get vehicle context
-            vehicle = None
-            if lead.vehicle_id:
-                from app.models import Vehicle
-                vehicle = session.get(Vehicle, lead.vehicle_id)
-
-            # Generate AI response for new lead
-            result = handle_turn(
-                session, lead, body,
-                dealer_config=dealer_config,
-                vehicle=vehicle,
-            )
-            ai_response = result.get("text", "Thanks for reaching out!")
-            logger.info("[TEST MODE] AI response to new WhatsApp customer %s: %s", from_number, ai_response[:100])
-
-            # Send WhatsApp reply
-            from app.transports.twilio import send_whatsapp
-            whatsapp_sender = dealer_config.get("channels", {}).get("whatsapp_sender")
-            if whatsapp_sender:
-                try:
-                    send_whatsapp(
-                        to_number=from_number,
-                        from_number=whatsapp_sender,
-                        body=ai_response,
-                        dealer_id=dealer.id,
-                        lead_id=lead_id,
-                        session=session,
-                        lead=lead,
-                    )
-                    logger.info("[TEST MODE] WhatsApp auto-reply sent to new customer %s", from_number)
-                except Exception:
-                    logger.exception("[TEST MODE] Failed to send WhatsApp auto-reply to %s", from_number)
-
-            return _empty_twiml()
-        except Exception:
-            logger.exception("[TEST MODE] Failed to create lead for WhatsApp customer %s", from_number)
-            return _twiml("Sorry, something went wrong. Please try again later.")
 
 
 @app.post("/webhook/twilio/whatsapp")
@@ -967,10 +783,8 @@ async def webhook_twilio_whatsapp(request: Request) -> Response:
     Tenant resolved by the WhatsApp sender number.
     Returns TwiML response.
 
-    *** TEST MODE ONLY ***
-    If sender is NOT a sales rep, routes to conversation engine for testing.
+    If sender is NOT a sales rep, returns empty TwiML (no-op).
     In production, customer conversations happen over SMS, not WhatsApp.
-    Remove customer fallback before deploying to real dealers.
     """
     # P0-01: parse form first, then validate signature.
     form = await request.form()
@@ -1019,12 +833,14 @@ async def webhook_twilio_whatsapp(request: Request) -> Response:
                 rep = r
                 break
 
-        # *** TEST MODE ONLY ***
-        # If sender is NOT a rep, route to conversation engine for testing.
+        # If sender is NOT a rep, return empty TwiML (no-op).
         # In production, customer conversations happen over SMS, not WhatsApp.
         if rep is None:
-            logger.info("[TEST MODE] Non-rep WhatsApp from=%s — routing to conversation engine", from_number)
-            return await _handle_customer_whatsapp_test(session, dealer, dealer_config, from_number, body, message_sid)
+            logger.info(
+                "Non-rep WhatsApp from=%s to=%s (dealer=%s) — returning empty TwiML",
+                from_number, to_number, dealer.slug,
+            )
+            return _empty_twiml()
 
         # Find the most recent ASSIGNED lead for this dealer and rep
         assigned_lead = _exec(session,

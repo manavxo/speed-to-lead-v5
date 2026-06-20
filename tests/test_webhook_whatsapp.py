@@ -335,8 +335,13 @@ def test_rep_reply_when_no_pending_leads(wa_session, wa_client):
 # Tests: customer-initiated WhatsApp
 # ---------------------------------------------------------------------------
 
-def test_customer_initiated_whatsapp_unknown_rep(wa_session, wa_client):
-    """Customer sends a WhatsApp (not a rep number) -> empty TwiML."""
+def test_customer_initiated_whatsapp_returns_empty_twiml(wa_session, wa_client):
+    """Customer sends a WhatsApp (not a rep number) -> empty TwiML (no rep fallback).
+    
+    The WhatsApp test mode handler has been removed. Non-rep WhatsApp
+    messages should receive empty TwiML — no AI response, no lead creation.
+    Customers should use SMS for new conversations.
+    """
     dealer = _seed_dealer(wa_session)
 
     resp = _signed_wa_post(
