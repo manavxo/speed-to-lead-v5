@@ -20,7 +20,7 @@ TRANSITIONS: dict[LeadState, set[LeadState]] = {
     LeadState.ASSIGNED: {LeadState.CLAIMED, LeadState.ESCALATED, LeadState.ENGAGED, LeadState.OPTED_OUT},
     LeadState.ESCALATED: {LeadState.ASSIGNED, LeadState.CLAIMED, LeadState.ENGAGED, LeadState.OPTED_OUT},
     LeadState.CLAIMED: {LeadState.ENGAGED, LeadState.APPT_SET, LeadState.LOST, LeadState.OPTED_OUT},
-    LeadState.ENGAGED: {LeadState.APPT_SET, LeadState.LOST, LeadState.OPTED_OUT},
+    LeadState.ENGAGED: {LeadState.APPT_SET, LeadState.ASSIGNED, LeadState.LOST, LeadState.OPTED_OUT},
     LeadState.APPT_SET: {LeadState.SHOWED, LeadState.LOST, LeadState.OPTED_OUT},
     LeadState.SHOWED: {LeadState.SOLD, LeadState.LOST},
     LeadState.SOLD: set(),
