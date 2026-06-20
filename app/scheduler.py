@@ -386,7 +386,7 @@ def send_daily_digest(session, dealer_slug: str, dealer_config: dict = None):
     existing send_sms chokepoint.
     """
     from sqlalchemy import select, func as sa_func
-    from app.models import Lead, LeadEvent, LeadState, Message, Direction
+    from app.models import Dealer, Lead, LeadEvent, LeadState, Message, Direction
 
     if dealer_config is None:
         return
@@ -395,6 +395,14 @@ def send_daily_digest(session, dealer_slug: str, dealer_config: dict = None):
     manager_phone = routing.get("manager_phone")
     if not manager_phone:
         logger.info("No manager_phone for %s — skipping digest", dealer_slug)
+        return
+
+    # Load the Dealer object so dealer.id is available (fix: was previously undefined)
+    dealer = session.execute(
+        select(Dealer).where(Dealer.slug == dealer_slug)
+    ).scalars().first()
+    if dealer is None:
+        logger.warning("No dealer found for slug %s — skipping digest", dealer_slug)
         return
 
     # Calculate yesterday in dealer timezone

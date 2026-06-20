@@ -1,19 +1,16 @@
 # Where to Resume Next
 
-## Current Phase: Phase 0 — Cleanup
+## Current Phase: Phase 1 — Critical Bugs
 
-**Just completed:** Task 0.1 (remove scaffolding)
+**Just completed:** Phase 0 (cleanup)
+- Task 0.1: Removed .claude scaffolding ✅
+- Task 0.2: Removed test-mode WhatsApp handler ✅
 
-**Next up:** Task 0.2 — Remove test-mode WhatsApp handler (`_handle_customer_whatsapp_test` at `app/main.py:781`)
+**Next up:** Task 1.1 — Fix daily digest crash (CRITICAL)
 
-This is ~180 lines of production logic running inside a "test" handler. It duplicates the SMS conversation flow. Delete the function and the route that calls it. Make sure WhatsApp messages still work after (they'd route through the normal handler — need to verify).
+The `send_daily_digest()` function in `app/scheduler.py` references an undefined `dealer` variable. Will crash when the job runs. This is the #1 priority because it will hit production.
 
-**After Phase 0:** Phase 1 — Critical bugs. Priority order:
-1. Fix daily digest crash (CRITICAL — will hit production)
-2. Fix greeting_only lifecycle bypass
-3. Fix pass_count persistence
-4. Fix phone masking in email adapter
-5. Fix consent=False in email adapter
+**After 1.1:** Task 1.2 → 1.3 → 1.4 → 1.5 (in order)
 
 ## Execution contract reminder
 
