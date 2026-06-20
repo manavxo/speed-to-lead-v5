@@ -1301,6 +1301,127 @@ async def save_channel_settings(
     finally:
         session.close()
 
+
+@router.post("/settings/business")
+async def save_business_settings(
+    request: Request,
+    _auth: None = Depends(require_auth),
+):
+    """Save business info settings (name, phone, address, website, hours)."""
+    from fastapi.responses import JSONResponse
+    session = _get_session()
+    try:
+        cookie_value = request.cookies.get("session")
+        current_dealer = get_dealer_from_auth(session, cookie_value) if cookie_value else None
+        if not current_dealer:
+            return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+        form = await request.form()
+        config = current_dealer.config or {}
+
+        # Dealer info
+        config["dealer"] = config.get("dealer", {})
+        if form.get("dealer_name"):
+            current_dealer.name = form["dealer_name"]
+            config["dealer"]["name"] = form["dealer_name"]
+        if form.get("dealer_phone"):
+            config["channels"] = config.get("channels", {})
+            config["channels"]["sms_number"] = form["dealer_phone"]
+        if form.get("dealer_address"):
+            config["address"] = form["dealer_address"]
+        if form.get("dealer_website"):
+            config["website"] = form["dealer_website"]
+
+        # Business hours
+        hours = {}
+        for day in ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]:
+            closed = form.get(f"{day}_closed") == "on"
+            if closed:
+                hours[day] = "closed"
+            else:
+                open_val = form.get(f"{day}_open", "09:00")
+                close_val = form.get(f"{day}_close", "17:00")
+                hours[day] = f"{open_val}-{close_val}"
+        config["hours"] = hours
+
+        current_dealer.config = config
+        session.commit()
+
+        return JSONResponse({"status": "success", "message": "Business info saved"})
+    finally:
+        session.close()
+
+
+@router.post("/settings/ai")
+async def save_ai_settings(
+    request: Request,
+    _auth: None = Depends(require_auth),
+):
+    """Save AI personality settings (persona, engagement mode, guardrails)."""
+    from fastapi.responses import JSONResponse
+    session = _get_session()
+    try:
+        cookie_value = request.cookies.get("session")
+        current_dealer = get_dealer_from_auth(session, cookie_value) if cookie_value else None
+        if not current_dealer:
+            return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+        form = await request.form()
+        config = current_dealer.config or {}
+
+        config["ai"] = config.get("ai", {})
+        if form.get("engagement_mode"):
+            config["ai"]["engagement_mode"] = form["engagement_mode"]
+        if form.get("ai_persona"):
+            config["ai"]["persona"] = form["ai_persona"]
+
+        guardrails = []
+        for g in ["no_price_negotiation", "no_financing_promises", "no_inventory_guarantees", "no_competitor_comparisons"]:
+            if form.get(f"guardrail_{g}"):
+                guardrails.append(g)
+        config["ai"]["guardrails"] = {g: True for g in guardrails}
+
+        current_dealer.config = config
+        session.commit()
+
+        return JSONResponse({"status": "success", "message": "AI personality saved"})
+    finally:
+        session.close()
+
+
+@router.post("/settings/compliance")
+async def save_compliance_settings(
+    request: Request,
+    _auth: None = Depends(require_auth),
+):
+    """Save compliance settings (quiet hours, consent text, opt-out keywords)."""
+    from fastapi.responses import JSONResponse
+    session = _get_session()
+    try:
+        cookie_value = request.cookies.get("session")
+        current_dealer = get_dealer_from_auth(session, cookie_value) if cookie_value else None
+        if not current_dealer:
+            return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+        form = await request.form()
+        config = current_dealer.config or {}
+
+        config["compliance"] = config.get("compliance", {})
+        quiet_start = form.get("quiet_start", "21:00")
+        quiet_end = form.get("quiet_end", "08:00")
+        config["compliance"]["quiet_hours"] = f"{quiet_start}-{quiet_end}"
+        if form.get("consent_text"):
+            config["compliance"]["consent_text"] = form["consent_text"]
+        if form.get("opt_out_keywords"):
+            config["compliance"]["opt_out_keywords"] = [kw.strip() for kw in form["opt_out_keywords"].split(",")]
+
+        current_dealer.config = config
+        session.commit()
+
+        return JSONResponse({"status": "success", "message": "Compliance settings saved"})
+    finally:
+        session.close()
+
 @router.post("/leads/{lead_id}/reassign")
 async def reassign_lead(
     request: Request,

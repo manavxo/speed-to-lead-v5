@@ -58,6 +58,12 @@ class Settings(BaseSettings):
     # Telegram — dealer-side notifications (the ONLY dealer channel per architecture decision)
     telegram_bot_token: str = ""
 
+    # Email ingestion — IMAP inbox for listing site leads
+    email_inbox_username: str = ""
+    email_inbox_password: str = ""
+    email_imap_server: str = "imap.gmail.com"
+    email_imap_port: int = 993
+
     # Quiet hours: when True, auto-reply SMS sends 24/7 (bypasses 21:00-08:00 window).
     # Set QUIET_HOURS_DISABLED=false in .env to re-enable for production.
     quiet_hours_disabled: bool = True
@@ -117,11 +123,14 @@ class SalesRep(BaseModel):
     phone: str = Field(..., description="Phone number for round-robin claim pings")
     active: bool = True
     notify_backend: str = Field(
-        "twilio_whatsapp",
-        description="How to ping this rep: twilio_whatsapp (default) | sms | email | dashboard",
+        "telegram",
+        description="How to ping this rep: telegram (default) | twilio_whatsapp | sms | email | dashboard",
     )
     notify_template_sid: Optional[str] = Field(
         None, description="Twilio approved-template SID for business-initiated rep pings"
+    )
+    telegram_chat_id: Optional[str] = Field(
+        None, description="Telegram chat_id for telegram notify_backend"
     )
 
 

@@ -360,7 +360,7 @@
         </div>
         
         <div style="display: flex; justify-content: flex-end; padding-top: 16px; border-top: 1px solid var(--border);">
-            <button class="btn btn-primary" onclick="showToast('Business info saved', 'success')">
+            <button class="btn btn-primary" hx-post="/dashboard/settings/business" hx-target="this" hx-swap="outerHTML" hx-include="closest form">
                 Save Business Info
             </button>
         </div>
@@ -433,7 +433,7 @@
         </div>
         
         <div style="display: flex; justify-content: flex-end; padding-top: 16px; border-top: 1px solid var(--border);">
-            <button class="btn btn-primary" onclick="showToast('AI personality saved', 'success')">
+            <button class="btn btn-primary" hx-post="/dashboard/settings/ai" hx-target="this" hx-swap="outerHTML" hx-include="closest form">
                 Save AI Personality
             </button>
         </div>
@@ -625,7 +625,7 @@
         </div>
         
         <div style="display: flex; justify-content: flex-end; padding-top: 16px; border-top: 1px solid var(--border);">
-            <button class="btn btn-primary" onclick="showToast('Compliance settings saved', 'success')">
+            <button class="btn btn-primary" hx-post="/dashboard/settings/compliance" hx-target="this" hx-swap="outerHTML" hx-include="closest form">
                 Save Compliance Settings
             </button>
         </div>

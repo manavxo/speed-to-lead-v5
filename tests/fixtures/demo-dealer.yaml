@@ -21,9 +21,9 @@ channels:
   web_form_token: "demo-token-abc123"
 
 sales_team:
-  - { name: "Mike", phone: "+16045550121", active: true }
-  - { name: "Dana", phone: "+16045550122", active: true }
-  - { name: "Priya", phone: "+16045550123", active: false }   # inactive: discovery should skip
+  - { name: "Mike", phone: "+16045550121", active: true, notify_backend: telegram, telegram_chat_id: "9998887771" }
+  - { name: "Dana", phone: "+16045550122", active: true, notify_backend: telegram, telegram_chat_id: "9998887772" }
+  - { name: "Priya", phone: "+16045550123", active: false, notify_backend: telegram, telegram_chat_id: "9998887773" }   # inactive: discovery should skip
 
 routing:
   strategy: round_robin
