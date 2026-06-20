@@ -52,6 +52,15 @@ async def lifespan(application: FastAPI):
 
 
 app = FastAPI(title="Speed-to-Lead", version="0.2.0", lifespan=lifespan)
+
+# Rate limiting — slowapi keyed on client IP (enabled only in production)
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+_enforce_limits = settings.environment == "production"
+limiter = Limiter(key_func=get_remote_address, default_limits=["30/minute"] if _enforce_limits else ["10000/minute"])
+app.state.limiter = limiter
+app.add_exception_handler(429, _rate_limit_exceeded_handler)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -393,6 +402,9 @@ def healthz() -> dict:
 @app.get("/debug/config")
 def debug_config():
     """Temporary diagnostic: returns runtime config values (no secrets)."""
+    if not settings.debug_endpoints_enabled:
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "Debug endpoints disabled"}, status_code=404)
     return {
         "outbound_enabled": settings.outbound_enabled,
         "environment": settings.environment,
@@ -403,6 +415,9 @@ def debug_config():
 @app.get("/debug/dealer/{slug}")
 def debug_dealer(slug: str):
     """Temporary diagnostic: returns dealer config for debugging."""
+    if not settings.debug_endpoints_enabled:
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "Debug endpoints disabled"}, status_code=404)
     session = _get_session()
     try:
         dealer = session.execute(
@@ -455,7 +470,7 @@ def readyz():
 # ---- AXIS 3 intake webhooks -----------------------------------------------------------
 
 @app.post("/webhook/form/{token}")
-async def webhook_form(token: str, request: Request) -> dict:
+async def webhook_form(request: Request, token: str):
     """Dealer website form. Tenant resolved by `token` (channels.web_form_token).
 
     Expects JSON body with at least: full_name, phone/email, consent_sms.
@@ -955,7 +970,6 @@ async def webhook_twilio_voice(request: Request) -> Response:
 
 @app.post("/webhook/twilio/status")
 async def webhook_twilio_status(request: Request) -> dict:
-    """Twilio delivery status callback. Updates Message rows with delivery_status + error_code."""
     session = _get_session()
     try:
         form = await request.form()
