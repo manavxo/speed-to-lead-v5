@@ -216,6 +216,16 @@ def _build_body(message_type: str, payload: dict, rep_name: str) -> str:
         # State machine SOLD notification. Rep needs to know fast — they're
         # tracking the commission. Keep it punchy: just the close + customer.
         return f"{rep_name} — sold: {customer}{vehicle_str}. Congrats 🎉"
+    if message_type == "email_reply":
+        reply_text = payload.get("reply_text", "")
+        return (
+            f"🔵 EMAIL REPLY — {customer}\n"
+            f"(no phone available)\n"
+            f"🚗 {vehicle or 'Vehicle inquiry'}\n"
+            f"Source: listing site\n\n"
+            f"💬 Their reply:\n"
+            f"{reply_text}\n"
+        )
     # Fallback: generic
     return f"{rep_name} — update on {customer}{vehicle_str}."
 
