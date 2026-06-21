@@ -108,24 +108,6 @@ def _send_to_customer(
     return sid
 
 
-def _record_outbound_message(session: Session, lead: Lead, body: str, channel: Channel) -> None:
-    """Record an outbound message in the conversation thread."""
-    try:
-        session.expire_all()
-        msg = Message(
-            lead_id=lead.id,
-            direction=Direction.OUTBOUND,
-            channel=channel,
-            body=body,
-            ai_generated=True,
-        )
-        session.add(msg)
-        session.commit()
-    except Exception:
-        logger.exception("Failed to record outbound message for lead#%s", lead.id)
-        session.rollback()
-
-
 def ingest_lead(
     session: Session,
     dealer,
