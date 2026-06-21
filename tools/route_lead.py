@@ -275,6 +275,9 @@ def ingest_lead(
     whatsapp_sender = channels.get("whatsapp_sender") or getattr(dealer, "whatsapp_sender", "") or ""
     sms_number = channels.get("sms_number") or getattr(dealer, "sms_number", "") or ""
 
+    # send_sms records the Message row itself (correct channel + provider SID),
+    # so we must NOT call _record_outbound_message here — doing so would create a
+    # duplicate row tagged channel=whatsapp with no SID.
     _send_to_customer(
         session, lead, auto_text,
         channel="sms",
@@ -282,9 +285,6 @@ def ingest_lead(
         dealer_slug=dealer.slug, dealer_config=dealer_config,
         fake_twilio=fake_twilio, now=now,
     )
-
-    # Record auto-reply in message thread
-    _record_outbound_message(session, lead, auto_text, Channel.WHATSAPP if whatsapp_sender else Channel.SMS)
 
     # 6. AI proactive follow-up — engage the customer immediately with personalized context
     ai_context = _build_ai_followup_context(lead_data, vehicle, dealer_config)
@@ -300,6 +300,8 @@ def ingest_lead(
         ai_followup_text = result.get("text", "")
         if ai_followup_text:
             # Send the AI's personalized follow-up
+            # send_sms records the Message row itself — no _record_outbound_message
+            # here, or we'd duplicate the row with the wrong channel and no SID.
             _send_to_customer(
                 session, lead, ai_followup_text,
                 channel="sms",
@@ -307,7 +309,6 @@ def ingest_lead(
                 dealer_slug=dealer.slug, dealer_config=dealer_config,
                 fake_twilio=fake_twilio, now=now,
             )
-            _record_outbound_message(session, lead, ai_followup_text, Channel.WHATSAPP if whatsapp_sender else Channel.SMS)
             logger.info("AI proactive follow-up sent for lead#%s", lead.id)
         ai_followup_success = True
     except Exception:
