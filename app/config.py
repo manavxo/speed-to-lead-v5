@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     openrouter_model: str = "deepseek/deepseek-v4-flash"
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
 
+    # DeepSeek direct API — used when DEEPSEEK_API_KEY is set (cheaper than OpenRouter)
+    deepseek_api_key: str = ""
+    deepseek_base_url: str = "https://api.deepseek.com"
+
     # Public base URL of the always-on service (for Twilio/Meta webhooks).
     public_base_url: str = "http://localhost:8000"
 
