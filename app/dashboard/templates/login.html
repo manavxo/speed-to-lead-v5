@@ -137,25 +137,7 @@
             color: var(--text-muted);
         }
         
-        .pin-toggle {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 16px;
-            font-size: 13px;
-            color: var(--text-secondary);
-            cursor: pointer;
-        }
-        
-        .pin-toggle input[type="checkbox"] {
-            accent-color: var(--accent);
-        }
-        
         #pin-field {
-            display: none;
-        }
-        
-        #pin-field.show {
             display: block;
         }
         
@@ -242,21 +224,23 @@
                                     {{ rep.name }}
                                 </option>
                             {% endfor %}
+                            {% if show_manager_option %}
+                                <option value="Manager" {% if rep_name == 'Manager' %}selected{% endif %} disabled style="color: var(--text-muted); font-size: 11px;">──────────</option>
+                                <option value="Manager" {% if rep_name == 'Manager' %}selected{% endif %}>
+                                    Manager
+                                </option>
+                            {% endif %}
                         {% else %}
                             <option value="Manager">Manager</option>
                         {% endif %}
                     </select>
-                    <div class="help-text">Sales reps select their name. Managers select their name + enter PIN below.</div>
+                    <div class="help-text">Select your name and enter your personal PIN to sign in.</div>
                 </div>
                 
-                <label class="pin-toggle">
-                    <input type="checkbox" id="show-pin" onclick="document.getElementById('pin-field').classList.toggle('show')">
-                    I'm a manager — enter PIN
-                </label>
-                
                 <div class="form-group" id="pin-field">
-                    <label class="form-label" for="manager_pin">Manager PIN</label>
-                    <input type="password" id="manager_pin" name="manager_pin" class="input" placeholder="Enter manager PIN" autocomplete="off">
+                    <label class="form-label" for="pin">PIN</label>
+                    <input type="password" id="pin" name="pin" class="input" placeholder="Enter your PIN" required autocomplete="off" inputmode="numeric" pattern="[0-9]*">
+                    <div class="help-text">Ask your manager if you don't have a PIN yet.</div>
                 </div>
                 
                 <button type="submit" class="btn-signin">Sign In</button>

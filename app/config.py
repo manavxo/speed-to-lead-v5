@@ -132,6 +132,7 @@ class Channels(BaseModel):
 
 class SalesRep(BaseModel):
     name: str
+    pin: str = Field("", description="4-digit PIN for dashboard login — each rep gets their own")
     phone: str = Field(..., description="Phone number for round-robin claim pings")
     active: bool = True
     notify_backend: str = Field(
