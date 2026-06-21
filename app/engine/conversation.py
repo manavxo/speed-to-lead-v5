@@ -47,8 +47,10 @@ _OPENAI_CLIENT = None
 
 
 def _get_openai_client():
-    """Lazy module-level singleton for the OpenAI-compatible (OpenRouter) client.
+    """Lazy module-level singleton for the AI model client.
 
+    Uses DeepSeek direct API when DEEPSEEK_API_KEY is configured (cheaper).
+    Falls back to OpenRouter when only OPENROUTER_API_KEY is set.
     Instantiated on first use, then reused for the lifetime of the process.
     Replaces the per-request `OpenAI(...)` call that was leaking connections
     under load. Safe to call from any thread.
@@ -57,11 +59,28 @@ def _get_openai_client():
     if _OPENAI_CLIENT is None:
         from openai import OpenAI
         from app.config import settings as _settings
-        _OPENAI_CLIENT = OpenAI(
-            base_url=_settings.openrouter_base_url,
-            api_key=_settings.openrouter_api_key,
-        )
+
+        if _settings.deepseek_api_key:
+            base_url = _settings.deepseek_base_url
+            api_key = _settings.deepseek_api_key
+        else:
+            base_url = _settings.openrouter_base_url
+            api_key = _settings.openrouter_api_key
+
+        _OPENAI_CLIENT = OpenAI(base_url=base_url, api_key=api_key)
     return _OPENAI_CLIENT
+
+
+def _get_model_name() -> str:
+    """Return the model name for the active AI provider.
+
+    DeepSeek direct uses 'deepseek-v4-flash' (no OpenRouter prefix).
+    OpenRouter uses the full path 'deepseek/deepseek-v4-flash'.
+    """
+    from app.config import settings as _settings
+    if _settings.deepseek_api_key:
+        return "deepseek-v4-flash"
+    return _settings.openrouter_model
 
 
 def is_business_hours(dealer_config: dict, now: datetime | None = None) -> bool:
@@ -828,7 +847,7 @@ def _call_openrouter(
     """
     from app.config import settings
 
-    if not settings.openrouter_api_key:
+    if not settings.openrouter_api_key and not settings.deepseek_api_key:
         return "Thank you for your interest! One of our team members will be in touch shortly."
 
     try:
@@ -876,7 +895,7 @@ def _call_openrouter(
 
         response = _call_openrouter_with_retry(
             client,
-            model=settings.openrouter_model,
+            model=_get_model_name(),
             messages=messages,
             tools=TOOL_DEFINITIONS,
             tool_choice="auto",
@@ -908,7 +927,7 @@ def _call_openrouter(
 
             final_response = _call_openrouter_with_retry(
                 client,
-                model=settings.openrouter_model,
+                model=_get_model_name(),
                 messages=messages,
                 max_tokens=1024,
                 temperature=0.7,
