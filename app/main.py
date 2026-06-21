@@ -30,6 +30,11 @@ logger = logging.getLogger("speed-to-lead")
 
 _scheduler: BackgroundScheduler | None = None
 
+# Strong references to in-flight background tasks. asyncio only keeps a weak
+# reference to tasks created via create_task(), so without this set the SMS-reply
+# task can be garbage-collected mid-execution and the customer never gets a reply.
+_background_tasks: set = set()
+
 
 @asynccontextmanager
 async def lifespan(application: FastAPI):
@@ -762,7 +767,9 @@ async def webhook_twilio_sms(request: Request) -> Response:
                 finally:
                     bg_session.close()
 
-            asyncio.create_task(_process_and_send())
+            task = asyncio.create_task(_process_and_send())
+            _background_tasks.add(task)
+            task.add_done_callback(_background_tasks.discard)
             return _empty_twiml()
         else:
             # New lead via SMS
