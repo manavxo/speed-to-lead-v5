@@ -17,6 +17,7 @@ from __future__ import annotations
 import email
 import imaplib
 import logging
+import re
 from email.header import decode_header
 from typing import TYPE_CHECKING
 
@@ -26,6 +27,112 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
 logger = logging.getLogger("speed-to-lead.email_ingest")
+
+
+def _extract_email_addr(raw_from: str) -> str | None:
+    """Extract a clean email address from a From header (e.g. 'John <john@example.com>')."""
+    match = re.search(r"(\S+@\S+)", raw_from)
+    return match.group(1).strip().lower() if match else None
+
+
+def _find_existing_lead(session: Session, dealer_id: int, sender_email: str) -> "Lead | None":
+    """Look up an existing lead by email address for this dealer."""
+    from sqlmodel import select
+    from app.models import Lead, LeadState
+    return session.execute(
+        select(Lead).where(
+            Lead.dealer_id == dealer_id,
+            Lead.email == sender_email,
+            Lead.state.notin_([LeadState.OPTED_OUT, LeadState.LOST, LeadState.SOLD]),
+        )
+    ).scalars().first()
+
+
+def _handle_email_reply(
+    session: Session,
+    lead: "Lead",
+    sender: str,
+    body: str,
+    subject: str,
+    mail: imaplib.IMAP4_SSL,
+    num_str: str,
+) -> bool:
+    """Handle an email reply to an existing lead."""
+    from app.models import Direction, Message
+
+    # Store the reply as a new customer message in the conversation thread
+    msg = Message(
+        lead_id=lead.id,
+        direction=Direction.INBOUND,
+        channel=Channel.EMAIL,
+        body=body or "(no content)",
+        ai_generated=False,
+    )
+    session.add(msg)
+    session.commit()
+
+    # Mark as seen so we don't reprocess
+    mail.store(num_str, "+FLAGS", "\\Seen")
+
+    # Notify the assigned rep via Telegram
+    if lead.assigned_rep:
+        _notify_rep_of_email_reply(session, lead, body)
+
+    logger.info("Email reply recorded for existing lead#%s from %s", lead.id, sender)
+    return True
+
+
+def _notify_rep_of_email_reply(session: Session, lead: "Lead", reply_body: str | None) -> None:
+    """Send a Telegram notification to the assigned rep about an email reply."""
+    from tools.notify_rep import notify_rep
+    from app.models import Dealer
+
+    dealer = session.execute(
+        select(Dealer).where(Dealer.id == lead.dealer_id)
+    ).scalars().first()
+
+    if not dealer:
+        return
+
+    dealer_config = dealer.config or {}
+    sales_team = dealer_config.get("sales_team", [])
+
+    # Find the assigned rep's config
+    rep_config = None
+    for rep in sales_team:
+        if rep.get("name") == lead.assigned_rep:
+            rep_config = rep
+            break
+
+    if not rep_config:
+        return
+
+    vehicle_info = lead.vehicle_ref or "Vehicle inquiry"
+    reply_text = (reply_body or "")[:200]
+
+    # Build the email-specific notification framing
+    notification_text = (
+        f"\U0001f535 EMAIL REPLY \u2014 {lead.name or 'Unknown'}\n"
+        f"(no phone available)\n"
+        f"\U0001f697 {vehicle_info}\n"
+        f"Source: listing site\n\n"
+        f"\U0001f4ac Their reply:\n"
+        f"{reply_text}\n"
+    )
+
+    notify_rep.dealer_pipeline_notifier = lambda *a, **kw: None  # no-op if not available
+    from tools.notify_rep import notify_rep_dealer
+
+    notify_rep_dealer(
+        dealer, lead, notification_text,
+        rep_config=rep_config,
+        notify_backend="telegram",
+    )
+
+    logger.info(
+        "Telegram notification sent for email reply to lead#%s rep=%s",
+        lead.id, lead.assigned_rep,
+    )
 
 
 def _decode_mime_header(value: str) -> str:
@@ -98,16 +205,37 @@ def poll_inbox(session: Session, dealer) -> int:
                     subject[:80], sender[:80], len(body or ""),
                 )
 
+                # Check if this is a reply to an existing lead
+                sender_email = _extract_email_addr(sender)
+                existing_lead = (
+                    _find_existing_lead(session, dealer.id, sender_email)
+                    if sender_email
+                    else None
+                )
+
+                if existing_lead:
+                    # This is a reply — store it, notify rep, don't create new lead
+                    _handle_email_reply(
+                        session, existing_lead, sender,
+                        body or "", subject, mail, num_str,
+                    )
+                    seen_uids.append(num_str)
+                    continue
+
                 # Parse via site-specific parser registry
                 from app.adapters.intake.email_parsers import parse_email
 
                 lead_data = parse_email(body or "", subject=subject, from_addr=sender)
 
                 if lead_data:
-                    # Ingest via the standard pipeline
-                    from tools.route_lead import ingest_lead
+                    # Route based on phone availability
+                    if lead_data.phone:
+                        from tools.route_lead import ingest_lead
+                        lead = ingest_lead(session, dealer, lead_data)
+                    else:
+                        from tools.route_lead import ingest_lead_email_no_phone
+                        lead = ingest_lead_email_no_phone(session, dealer, lead_data)
 
-                    lead = ingest_lead(session, dealer, lead_data)
                     if lead:
                         created_count += 1
                         logger.info(

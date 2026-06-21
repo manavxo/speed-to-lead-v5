@@ -321,3 +321,162 @@ def ingest_lead(
         logger.info("Lead#%s already past ENGAGED — skipping transition", lead.id)
 
     return lead
+
+
+# ---------------------------------------------------------------------------
+# Email-only lead with no phone number
+# ---------------------------------------------------------------------------
+
+def _dedup_by_email(session: Session, dealer_id: int, email: str) -> Lead | None:
+    """Check for existing lead with same email + dealer, excluding terminal states."""
+    existing = _exec(session,
+        select(Lead).where(
+            Lead.dealer_id == dealer_id,
+            Lead.email == email,
+            Lead.state.notin_([LeadState.OPTED_OUT, LeadState.LOST, LeadState.SOLD]),
+        )
+    ).first()
+    return existing
+
+
+def _send_email_followup(lead: Lead, dealer_config: dict) -> str | None:
+    """Send one AI-generated email follow-up for a no-phone lead.
+
+    Returns the email body that was sent, or None if sending failed/skipped.
+    """
+    from app.transports.email import send_email
+
+    dealer_name = dealer_config.get("dealer", {}).get("name", "the dealership")
+    vehicle_ref = lead.vehicle_ref or "a vehicle"
+    customer_name = lead.name or "there"
+
+    # Build a simple personalized email
+    subject = f"Re: Your inquiry about {vehicle_ref}"
+    body = (
+        f"Hi {customer_name},\n\n"
+        f"Thanks for reaching out to {dealer_name} about the {vehicle_ref}.\n\n"
+        f"We'd love to help you with this vehicle. Feel free to reply to this email "
+        f"with any questions, or give us a call at your convenience.\n\n"
+        f"Best regards,\n"
+        f"The {dealer_name} Team\n"
+        f"---\n"
+        f"Reply STOP to opt out of further emails."
+    )
+
+    result = send_email(
+        to=lead.email,
+        subject=subject,
+        body_text=body,
+    )
+
+    if result.success:
+        logger.info("Email follow-up sent to %s for lead#%s: id=%s", lead.email, lead.id, result.message_id)
+    else:
+        logger.warning("Email follow-up failed for lead#%s to %s: %s", lead.id, lead.email, result.error)
+
+    return body if result.success else None
+
+
+def _record_email_message(session: Session, lead: Lead, body: str, direction=Direction.OUTBOUND) -> None:
+    """Record an email message in the conversation thread."""
+    msg = Message(
+        lead_id=lead.id,
+        direction=direction,
+        channel=Channel.EMAIL,
+        body=body,
+        ai_generated=(direction == Direction.OUTBOUND),
+    )
+    session.add(msg)
+    session.commit()
+
+
+def ingest_lead_email_no_phone(
+    session: Session,
+    dealer,
+    lead_data: NormalizedLead,
+    *,
+    now: datetime | None = None,
+) -> Lead | None:
+    """Handle an email lead with NO usable phone number.
+
+    Steps:
+    1. Dedup by email (same email + dealer = one lead)
+    2. Persist Lead (NEW)
+    3. Assign to rep (round-robin, no notification ping)
+    4. Generate and send one AI follow-up email
+    5. Log the outbound email as a Message
+    6. Transition to ASSIGNED (AI is done — rep handles from here)
+    7. No Telegram notification — lead sits in dashboard
+
+    Args:
+        session: SQLAlchemy session.
+        dealer: The Dealer ORM object.
+        lead_data: NormalizedLead from email parsing.
+        now: Optional fixed timestamp for testing.
+
+    Returns:
+        The persisted Lead, or existing lead if deduplicated.
+    """
+    if now is None:
+        now = datetime.now(timezone.utc)
+
+    if not lead_data.email:
+        logger.warning("ingest_lead_email_no_phone: no email address — cannot process")
+        return None
+
+    # 1. Dedup by email
+    existing = _dedup_by_email(session, dealer.id, lead_data.email)
+    if existing:
+        logger.info("Deduped email lead for %s -> existing lead#%s", lead_data.email, existing.id)
+        return existing
+
+    dealer_config = dealer.config or {}
+
+    # 2. Persist lead
+    vehicle_id = None
+    vehicle = None
+    if lead_data.vehicle_ref:
+        vehicle = resolve_vehicle(session, dealer.id, lead_data.vehicle_ref)
+        if vehicle:
+            vehicle_id = vehicle.id
+
+    lead = Lead(
+        dealer_id=dealer.id,
+        source=Channel.EMAIL,
+        name=lead_data.name,
+        phone=None,
+        email=lead_data.email,
+        vehicle_ref=lead_data.vehicle_ref,
+        vehicle_id=vehicle_id,
+        state=LeadState.NEW,
+        consent=lead_data.consent,
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(lead)
+    session.commit()
+    session.refresh(lead)
+    logger.info("Email-only lead#%s created for %s", lead.id, lead_data.email)
+
+    # 3. Assign to rep (round-robin, silent — no Telegram notification)
+    sales_team = dealer_config.get("sales_team", [])
+    if sales_team:
+        from app.engine.router import assign_lead
+        from app.models import Dealer as DealerModel
+        dealer_obj = session.execute(select(DealerModel).where(DealerModel.id == dealer.id)).scalar()
+        if dealer_obj:
+            assign_lead(session, lead, dealer_obj, sales_team, notify=False, dealer_config=dealer_config)
+            logger.info("Email-only lead#%s silently assigned to %s", lead.id, lead.assigned_rep)
+
+    # 4. Send one AI follow-up email
+    email_body = _send_email_followup(lead, dealer_config)
+
+    # 5. Log the outbound email
+    if email_body:
+        _record_email_message(session, lead, email_body)
+
+    # 6. Transition to ASSIGNED (AI is done — rep handles from here)
+    transition(session, lead, LeadState.ASSIGNED, reason="email_no_phone",
+               meta={"email_sent": email_body is not None, "email": lead_data.email})
+
+    return lead
