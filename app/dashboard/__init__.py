@@ -872,6 +872,9 @@ async def leads_list(request: Request, _auth: None = Depends(require_auth)):
             "avg_response_display": response_metrics["avg_response_display"],
             "avg_response_seconds": response_metrics["avg_response_seconds"],
             "stale_leads": stale_leads,
+            "user_role": role.title(),
+            "user_name": rep_name or role.title(),
+            "user_initials": (rep_name[:2].upper() if rep_name else (role[0].upper() if role else "U")),
         })
     except Exception:
         logging.exception("Error in leads_list route")
