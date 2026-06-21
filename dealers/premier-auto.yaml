@@ -27,10 +27,7 @@ channels:
 
 manager_pin: "1234"            # PIN for manager login (rep picks their name from dropdown + enters PIN)
 sales_team:
-  # LIVE TEST (2026-06-18): Harsh is the only active rep for Phase 1 testing.
-  # He must join the Twilio WhatsApp sandbox first (send "join hello-hungry" to +14155238886).
-  # Restore the real team / set others active:true after testing.
-  - { name: "Harsh",  phone: "+17786685103", active: true,  notify_backend: telegram, telegram_chat_id: "1256853392", notify_template_sid: null }
+  - { name: "Helly",  phone: "+17785550199", active: true,  notify_backend: telegram, telegram_chat_id: "8990699115", notify_template_sid: null }
   - { name: "Vishva", phone: "+16049168418", active: false, notify_backend: telegram, telegram_chat_id: "1256853392", notify_template_sid: null }
   - { name: "Mike",   phone: "+16045550121", active: false, notify_backend: telegram, telegram_chat_id: "1256853392", notify_template_sid: null }
   - { name: "Dana",   phone: "+16045550122", active: false, notify_backend: telegram, telegram_chat_id: "1256853392", notify_template_sid: null }
