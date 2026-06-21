@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     # Debug endpoints — disabled in production by default
     debug_endpoints_enabled: bool = False
 
+    # Email transport — outbound follow-ups and rep replies
+    sendgrid_api_key: str = ""
+    email_from_address: str = ""
+    email_from_name: str = ""
+
     # Quiet hours: when True, auto-reply SMS sends 24/7 (bypasses 21:00-08:00 window).
     # Set QUIET_HOURS_DISABLED=false in .env to re-enable for production.
     quiet_hours_disabled: bool = True

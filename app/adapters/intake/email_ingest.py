@@ -98,16 +98,10 @@ def poll_inbox(session: Session, dealer) -> int:
                     subject[:80], sender[:80], len(body or ""),
                 )
 
-                # Parse via EmailLeadAdapter
-                from app.adapters.intake.email_lead import EmailLeadAdapter
+                # Parse via site-specific parser registry
+                from app.adapters.intake.email_parsers import parse_email
 
-                adapter = EmailLeadAdapter()
-                payload = {
-                    "raw": body or "",
-                    "subject": subject,
-                    "from": sender,
-                }
-                lead_data = adapter.parse(payload)
+                lead_data = parse_email(body or "", subject=subject, from_addr=sender)
 
                 if lead_data:
                     # Ingest via the standard pipeline
