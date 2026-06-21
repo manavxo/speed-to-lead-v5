@@ -120,13 +120,18 @@ def _notify_rep_of_email_reply(session: Session, lead: "Lead", reply_body: str |
         f"{reply_text}\n"
     )
 
-    notify_rep.dealer_pipeline_notifier = lambda *a, **kw: None  # no-op if not available
-    from tools.notify_rep import notify_rep_dealer
-
-    notify_rep_dealer(
-        dealer, lead, notification_text,
+    notify_rep(
+        session=session,
         rep_config=rep_config,
-        notify_backend="telegram",
+        lead=lead,
+        message_type="email_reply",
+        payload={
+            "customer_name": lead.name or "Unknown",
+            "vehicle": vehicle_info,
+            "reply_text": reply_text,
+            "notification_text": notification_text,
+        },
+        dealer_config=dealer_config,
     )
 
     logger.info(
