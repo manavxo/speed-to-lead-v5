@@ -27,11 +27,11 @@ channels:
 
 manager_pin: "1234"            # PIN for manager login (rep picks their name from dropdown + enters PIN)
 sales_team:
-  - { name: "Helly",  phone: "+17785550199", active: true,  notify_backend: telegram, telegram_chat_id: "8990699115", notify_template_sid: null }
-  - { name: "Vishva", phone: "+16049168418", active: false, notify_backend: telegram, telegram_chat_id: "1256853392", notify_template_sid: null }
-  - { name: "Mike",   phone: "+16045550121", active: false, notify_backend: telegram, telegram_chat_id: "1256853392", notify_template_sid: null }
-  - { name: "Dana",   phone: "+16045550122", active: false, notify_backend: telegram, telegram_chat_id: "1256853392", notify_template_sid: null }
-  - { name: "Sarah",  phone: "+16045550123", active: false, notify_backend: telegram, telegram_chat_id: "1256853392", notify_template_sid: null }
+  - { name: "Helly",  pin: "7721", phone: "+17785550199", active: true,  notify_backend: telegram, telegram_chat_id: "8990699115", notify_template_sid: null }
+  - { name: "Vishva", pin: "4826", phone: "+16049168418", active: false, notify_backend: telegram, telegram_chat_id: "1256853392", notify_template_sid: null }
+  - { name: "Mike",   pin: "9153", phone: "+16045550121", active: false, notify_backend: telegram, telegram_chat_id: "1256853392", notify_template_sid: null }
+  - { name: "Dana",   pin: "6387", phone: "+16045550122", active: false, notify_backend: telegram, telegram_chat_id: "1256853392", notify_template_sid: null }
+  - { name: "Sarah",  pin: "2049", phone: "+16045550123", active: false, notify_backend: telegram, telegram_chat_id: "1256853392", notify_template_sid: null }
 
 routing:
   strategy: round_robin

@@ -1,0 +1,166 @@
+CRITICAL — Speed to Lead v5 Core Pipeline Verification
+
+MISSION: Verify the entire pipeline works end-to-end. A real customer submits a form on the landing page → backend creates lead → SMS auto-reply sent → AI generates personalized follow-up → SMS sent → customer can reply and get AI response.
+
+COST WARNING: Twilio balance is ~$9. Use dry-run mode where possible. Only send real SMS when explicitly told to.
+
+CURRENT STATE (before you start):
+- OUTBOUND_ENABLED is set to true on Render (env var was just flipped back)
+- Deploy is live with the latest code
+- All test leads have been cleaned from DB
+- Twilio sender number: +17787623122 (BC 778 number)
+- Landing page: https://speed-to-lead-v5.onrender.com/
+
+=============================================================================
+STEP 1 — Auth & Config Check
+=============================================================================
+Run:
+  RENDER_API_KEY=***REMOVED-RENDER-API-KEY*** python skills/fix_twilio_sms_auth.py
+
+Expected: Local 200, Render 200, PHONE_NUMBER = +17787623122
+
+=============================================================================
+STEP 2 — Landing Page Live
+=============================================================================
+Run:
+  curl -s -o /dev/null -w "%{http_code}" https://speed-to-lead-v5.onrender.com/
+
+Expected: 200
+
+=============================================================================
+STEP 3 — Full Codebase Audit
+=============================================================================
+Read these files and identify ALL bugs:
+
+a) app/main.py — read the full file (1017 lines)
+   Focus: webhook_form() handler, webhook_twilio_sms() handler, _process_and_send_sync()
+   Check: Is message_sid defined before use? Are imports correct? Does the background task work?
+
+b) tools/route_lead.py — read the full file (481 lines)
+   Focus: ingest_lead(), _send_to_customer()
+   Check: Is _record_outbound_message() being called in addition to send_sms/send_whatsapp?
+          Is there a duplicate logging issue creating extra Message rows?
+          Does the dedup logic work correctly?
+          Is the channel set to "sms" for webform leads?
+
+c) tools/send_sms.py — read the full file (420 lines)
+   Focus: send_sms(), send_whatsapp()
+   Check: Outbound gating logic. DRYRUN behaviour.
+
+d) app/engine/conversation.py — read key sections
+   Focus: handle_turn(), is_proactive mode
+   Check: Does the AI use the customer's name from the lead? Does it reference the vehicle of interest?
+
+e) dealers/premier-auto.yaml — read full file
+   Focus: sms_number, whatsapp_sender, ai.persona, ai.goal
+
+=============================================================================
+STEP 4 — Identify Every Bug
+=============================================================================
+List every bug you find with:
+- File and line number
+- What the bug is
+- What the impact is (customer doesn't get SMS, AI doesn't respond, wrong name, etc.)
+- The fix
+
+=============================================================================
+STEP 5 — Fix Every Bug
+=============================================================================
+For each bug:
+1. Write the fix
+2. Deploy: 
+   curl -X POST https://api.render.com/v1/services/srv-d8misim7r5hc739rf7sg/deploys \
+     -H "Authorization: Bearer ***REMOVED-RENDER-API-KEY***" \
+     -H "Content-Type: application/json" \
+     -d '{}'
+3. Poll for 'live':
+   curl -s "https://api.render.com/v1/services/srv-d8misim7r5hc739rf7sg/deploys?limit=1" \
+     -H "Authorization: Bearer ***REMOVED-RENDER-API-KEY***" \
+     -H "Accept: application/json" \
+     | python -c "import sys,json; print(json.load(sys.stdin)[0]['deploy']['status'])"
+
+=============================================================================
+STEP 6 — Test Full Pipeline (Dry-Run Mode)
+=============================================================================
+a) Clean any existing leads for +16048392870:
+
+python -c "
+import sys; sys.path.insert(0,'.'); import os
+os.environ['DATABASE_URL']='postgresql+psycopg://speedtoleadv5:SzVZWqSHaT6U9lA9faFxQC1leTAVKVoo@dpg-d8qc97og4nts7386i000-a.oregon-postgres.render.com/speedtoleadv5'
+from app.db import get_session_factory, init_db; init_db()
+session=get_session_factory()()
+from app.models import Lead, Message, ConsentLog, LeadEvent
+from sqlalchemy import select, delete as sa_delete
+phone='+16048392870'
+leads=session.execute(select(Lead).where(Lead.phone==phone)).scalars().all()
+for l in leads:
+  session.execute(sa_delete(LeadEvent).where(LeadEvent.lead_id==l.id))
+  session.execute(sa_delete(Message).where(Message.lead_id==l.id))
+  session.execute(sa_delete(ConsentLog).where(ConsentLog.lead_id==l.id))
+  session.delete(l); print(f'Deleted lead#{l.id}')
+session.commit(); session.close()
+"
+
+b) Set OUTBOUND_ENABLED=false for dry-run test:
+curl -s -X PUT "https://api.render.com/v1/services/srv-d8misim7r5hc739rf7sg/env-vars/OUTBOUND_ENABLED" \
+  -H "Authorization: Bearer ***REMOVED-RENDER-API-KEY***" \
+  -H "Content-Type: application/json" \
+  -d '{"value": "false"}'
+
+Then deploy and wait for live.
+
+c) Submit a test lead:
+curl -s -X POST "https://speed-to-lead-v5.onrender.com/webhook/form/premier-auto-group-token" \
+  -H "Content-Type: application/json" \
+  -d '{"full_name":"Manav","phone":"+16048392870","email":"manav@gmail.com","consent":true,"vehicle_of_interest":"PAG005","message":"Hi interested in the Tesla Model 3","referrer":"premier-auto","inquiry_type":"general"}'
+
+d) Check DB for dry-run messages:
+
+python -c "
+import sys; sys.path.insert(0,'.'); import os
+os.environ['DATABASE_URL']='postgresql+psycopg://speedtoleadv5:SzVZWqSHaT6U9lA9faFxQC1leTAVKVoo@dpg-d8qc97og4nts7386i000-a.oregon-postgres.render.com/speedtoleadv5'
+from app.db import get_session_factory, init_db; init_db()
+session=get_session_factory()()
+from app.models import Message, Lead
+from sqlalchemy import select
+phone='+16048392870'
+lead=session.execute(select(Lead).where(Lead.phone==phone).order_by(Lead.id.desc())).scalars().first()
+if lead:
+  msgs=session.execute(select(Message).where(Message.lead_id==lead.id).order_by(Message.id)).scalars().all()
+  print(f'Lead #{lead.id} state={lead.state} name={lead.name}')
+  for m in msgs:
+    print(f'  msg#{m.id}  dir={m.direction}  channel={m.channel}  ai={m.ai_generated}  sid={(m.provider_sid or \"\")[:35]}  body={m.body[:80]}')
+else:
+  print('No lead found')
+session.close()
+"
+
+EXPECTED: Exactly 2 messages. Channel MUST be 'sms' (NOT 'whatsapp'). Both must have DRYRUN_ SIDs. Body must say "Manav" not "John" or anything else.
+
+e) Simulate a customer reply:
+curl -s -X POST "https://speed-to-lead-v5.onrender.com/webhook/twilio/sms" \
+  -d "To=%2B17787623122&From=%2B16048392870&Body=What+do+you+have+that%27s+similar+to+the+Tesla&MessageSid=TEST_$(date +%s)"
+
+f) Check DB again. Should see a 3rd message (DRYRUN_) with AI's reply about similar vehicles.
+
+=============================================================================
+STEP 7 — Final Real Test (Only When Authorized)
+=============================================================================
+Run only when user says "go ahead":
+a) Set OUTBOUND_ENABLED=true
+b) Deploy, wait for live
+c) Submit lead to +16048392870 (real SMS will be sent)
+d) Check Twilio logs:
+   curl -s -u "AC9c402b4729de1e43469b7d21f3eeb58a:***REMOVED-TWILIO-AUTH-TOKEN***" \
+     "https://api.twilio.com/2010-04-01/Accounts/AC9c402b4729de1e43469b7d21f3eeb58a/Messages.json?PageSize=5" \
+     | python -c "import sys,json; data=json.load(sys.stdin); [print(f'From: {m[\"from\"]}  To: {m[\"to\"]}  Status: {m[\"status\"]}  Body: {m.get(\"body\",\"\")[:80]}') for m in data.get('messages',[])]"
+
+=============================================================================
+FINAL REPORT
+=============================================================================
+Tell the user:
+- What bugs you found and fixed
+- What the pipeline looks like now
+- Whether a real customer would get an SMS
+- The remaining balance on Twilio
+- What's next

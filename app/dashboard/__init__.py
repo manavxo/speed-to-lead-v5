@@ -658,6 +658,7 @@ async def login_page(request: Request, dealer_slug: str = ""):
     
     # Load sales_team from dealer config if dealer_slug is provided
     sales_team = []
+    dealer = None
     if dealer_slug:
         session = _get_session()
         try:
@@ -677,6 +678,7 @@ async def login_page(request: Request, dealer_slug: str = ""):
             "active_page": "login",
             "sales_team": sales_team,
             "dealer_slug": dealer_slug,
+            "show_manager_option": bool(dealer.config.get("manager_pin")) if dealer else False,
         },
     )
     response.set_cookie(
@@ -695,7 +697,7 @@ async def login_submit(
     request: Request,
     dealer_slug: str = Form(...),
     rep_name: str = Form(...),
-    manager_pin: str = Form(""),
+    pin: str = Form(""),
     csrf_token: str = Form(""),  # P0-08: default empty so missing field → 403, not 422
 ):
     # P0-08: CSRF check FIRST, before rate limit. Putting CSRF before the
@@ -730,47 +732,94 @@ async def login_submit(
 
     dealer_config = dealer.config or {}
     sales_team = dealer_config.get("sales_team", [])
+    manager_pin = dealer_config.get("manager_pin", "")
 
-    # Determine role: if manager_pin is provided and matches → manager, else → rep
-    role = "rep"
-    config_pin = dealer_config.get("manager_pin", "")
-    if manager_pin and manager_pin == config_pin:
+    # Determine if user selected Manager (special sentinel)
+    is_manager = (rep_name == "Manager")
+
+    if is_manager:
+        # Manager login — validate against manager_pin
+        if not manager_pin:
+            return templates.TemplateResponse(
+                request=request,
+                name="login.html",
+                context={
+                    "request": request,
+                    "error": "Manager login is not configured for this dealer",
+                    "sales_team": sales_team,
+                    "dealer_slug": dealer_slug,
+                },
+                status_code=401,
+            )
+        if not pin or pin != manager_pin:
+            return templates.TemplateResponse(
+                request=request,
+                name="login.html",
+                context={
+                    "request": request,
+                    "error": "Invalid PIN",
+                    "sales_team": sales_team,
+                    "dealer_slug": dealer_slug,
+                },
+                status_code=401,
+            )
         role = "manager"
-    elif manager_pin and manager_pin != config_pin:
-        # PIN provided but doesn't match
-        return templates.TemplateResponse(
-            request=request,
-            name="login.html",
-            context={
-                "request": request,
-                "error": "Invalid manager PIN",
-                "sales_team": sales_team,
-                "dealer_slug": dealer_slug,
-            },
-            status_code=401,
-        )
+        logged_rep_name = "Manager"
+    else:
+        # Rep login — validate rep_name exists in sales_team and PIN matches
+        rep_config = None
+        for r in sales_team:
+            if r.get("name") == rep_name:
+                rep_config = r
+                break
 
-    # Verify the rep_name is valid (for reps: must be in sales_team; for managers: optional)
-    valid_rep_names = [r.get("name") for r in sales_team if r.get("name")]
-    if role == "rep" and rep_name not in valid_rep_names:
-        return templates.TemplateResponse(
-            request=request,
-            name="login.html",
-            context={
-                "request": request,
-                "error": "Please select your name from the list",
-                "sales_team": sales_team,
-                "dealer_slug": dealer_slug,
-            },
-            status_code=401,
-        )
+        if not rep_config:
+            return templates.TemplateResponse(
+                request=request,
+                name="login.html",
+                context={
+                    "request": request,
+                    "error": "Please select your name from the list",
+                    "sales_team": sales_team,
+                    "dealer_slug": dealer_slug,
+                },
+                status_code=401,
+            )
+
+        rep_pin = rep_config.get("pin", "")
+        if not rep_pin:
+            return templates.TemplateResponse(
+                request=request,
+                name="login.html",
+                context={
+                    "request": request,
+                    "error": f"No PIN configured for {rep_name}. Contact your manager.",
+                    "sales_team": sales_team,
+                    "dealer_slug": dealer_slug,
+                },
+                status_code=401,
+            )
+        if not pin or pin != rep_pin:
+            return templates.TemplateResponse(
+                request=request,
+                name="login.html",
+                context={
+                    "request": request,
+                    "error": "Invalid PIN",
+                    "sales_team": sales_team,
+                    "dealer_slug": dealer_slug,
+                },
+                status_code=401,
+            )
+        role = "rep"
+        logged_rep_name = rep_name
 
     # Success — create session
     _clear_rate_limit(ip)
     serializer = _get_serializer()
     token = serializer.dumps({
         "role": role,
-        "rep_name": rep_name,
+        "rep_name": logged_rep_name,
         "dealer_slug": dealer_slug,
         "ts": time.time(),
     })
