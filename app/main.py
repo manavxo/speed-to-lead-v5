@@ -528,6 +528,7 @@ async def webhook_twilio_sms(request: Request) -> Response:
         from_number = normalize_phone(payload.get("From", ""))
         to_number = normalize_phone(payload.get("To", ""))
         body = (payload.get("Body", "") or "").strip()[:4000]
+        message_sid = payload.get("MessageSid", "")
 
         # Idempotency: short-circuit on duplicate webhook
         if _idempotency_check(session, message_sid):
