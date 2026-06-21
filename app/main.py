@@ -141,6 +141,10 @@ def _process_and_send_sync(
         from app.models import Vehicle
         vehicle = session.get(Vehicle, bg_lead.vehicle_id)
 
+    # handle_turn is only imported locally inside the SMS webhook handler, which
+    # is a different scope — import it here so the background task can call it.
+    from app.engine.conversation import handle_turn
+
     result = handle_turn(
         session, bg_lead, body,
         dealer_config=bg_dealer_config,
