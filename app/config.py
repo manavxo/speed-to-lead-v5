@@ -33,9 +33,9 @@ class Settings(BaseSettings):
 
     # OpenRouter — the conversation reasoning layer (OpenAI-compatible API).
     openrouter_api_key: str = ""
-    # NOTE: google/gemini-2.0-flash-001 was retired from OpenRouter (no 2.0 flash
-    # variants remain). gemini-2.5-flash is the tool-capable successor, same price tier.
-    openrouter_model: str = "google/gemini-2.5-flash"
+    # NOTE: Using DeepSeek V4 Flash — cheaper than Gemini 2.5 Flash and better
+    # conversational quality per production testing.
+    openrouter_model: str = "deepseek/deepseek-v4-flash"
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
 
     # Public base URL of the always-on service (for Twilio/Meta webhooks).
