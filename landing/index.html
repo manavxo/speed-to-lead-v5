@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premier Auto Group — Vancouver's Trusted Dealership</title>
+    <style>
+        /* ── Design System ── */
+        :root {
+            --black: #0a0a0f;
+            --dark: #12121a;
+            --surface: #1a1a25;
+            --border: rgba(255,255,255,0.08);
+            --text: #e8e8ed;
+            --text-secondary: #9ca3af;
+            --accent: #6366f1;
+            --accent-hover: #818cf8;
+            --success: #22c55e;
+            --gold: #f59e0b;
+            --radius: 8px;
+            --radius-lg: 12px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--black);
+            color: var(--text);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { color: var(--accent-hover); }
+
+        /* ── Container ── */
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+        /* ── Navbar ── */
+        .navbar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 16px 24px; background: var(--dark); border-bottom: 1px solid var(--border);
+            position: sticky; top: 0; z-index: 100;
+        }
+        .navbar-brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 18px; }
+        .navbar-logo { width: 32px; height: 32px; background: var(--accent); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 16px; }
+        .nav-links { display: flex; gap: 24px; }
+        .nav-links a { color: var(--text-secondary); font-size: 14px; transition: color 0.15s; }
+        .nav-links a:hover { color: var(--text); }
+        .nav-cta { padding: 8px 20px; background: var(--accent); color: white; border-radius: var(--radius); font-size: 13px; font-weight: 500; border: none; cursor: pointer; }
+        .nav-cta:hover { background: var(--accent-hover); color: white; }
+
+        /* ── Hero ── */
+        .hero {
+            padding: 100px 0 80px;
+            background: linear-gradient(135deg, var(--dark) 0%, var(--black) 100%);
+            text-align: center;
+        }
+        .hero h1 { font-size: 48px; font-weight: 700; margin-bottom: 16px; letter-spacing: -0.02em; }
+        .hero p { font-size: 18px; color: var(--text-secondary); max-width: 600px; margin: 0 auto 32px; }
+        .hero-buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+        .btn-primary { padding: 12px 28px; background: var(--accent); color: white; border-radius: var(--radius); font-size: 15px; font-weight: 500; border: none; cursor: pointer; transition: background 0.15s; }
+        .btn-primary:hover { background: var(--accent-hover); }
+        .btn-secondary { padding: 12px 28px; background: transparent; color: var(--text); border-radius: var(--radius); font-size: 15px; font-weight: 500; border: 1px solid var(--border); cursor: pointer; transition: border-color 0.15s; }
+        .btn-secondary:hover { border-color: var(--accent); }
+
+        /* ── Inventory Grid ── */
+        .section { padding: 80px 0; }
+        .section-title { font-size: 32px; font-weight: 600; margin-bottom: 8px; }
+        .section-subtitle { color: var(--text-secondary); margin-bottom: 40px; }
+        .inventory-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+        .vehicle-card {
+            background: var(--dark); border: 1px solid var(--border); border-radius: var(--radius-lg);
+            overflow: hidden; transition: transform 0.15s, border-color 0.15s; cursor: pointer;
+        }
+        .vehicle-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+        .vehicle-image { height: 180px; background: var(--surface); display: flex; align-items: center; justify-content: center; color: var(--text-secondary); font-size: 13px; position: relative; }
+        .vehicle-badge { position: absolute; top: 12px; left: 12px; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+        .badge-new { background: var(--success); color: white; }
+        .badge-used { background: var(--gold); color: var(--black); }
+        .vehicle-details { padding: 16px; }
+        .vehicle-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+        .vehicle-meta { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; }
+        .vehicle-price { font-size: 20px; font-weight: 700; color: var(--accent); }
+        .vehicle-price small { font-size: 12px; color: var(--text-secondary); font-weight: 400; }
+        .vehicle-actions { display: flex; gap: 8px; margin-top: 12px; }
+        .vehicle-actions .btn { padding: 6px 14px; font-size: 12px; border-radius: var(--radius); border: none; cursor: pointer; font-weight: 500; }
+        .btn-test-drive { background: var(--accent); color: white; }
+        .btn-details { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+
+        /* ── Features ── */
+        .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+        .feature-card { background: var(--dark); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 32px; text-align: center; }
+        .feature-icon { width: 48px; height: 48px; margin: 0 auto 16px; background: var(--accent-subtle); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; background: rgba(99,102,241,0.1); }
+        .feature-card h3 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+        .feature-card p { font-size: 14px; color: var(--text-secondary); line-height: 1.6; }
+        .feature-card a { font-size: 13px; margin-top: 12px; display: inline-block; }
+
+        /* ── Contact Form ── */
+        .contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+        .contact-info { display: flex; flex-direction: column; gap: 20px; }
+        .contact-info-item { display: flex; gap: 12px; align-items: flex-start; }
+        .contact-info-item svg { flex-shrink: 0; margin-top: 2px; }
+        .form-card { background: var(--dark); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 32px; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 6px; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 10px 12px; background: var(--black); border: 1px solid var(--border);
+            border-radius: 6px; color: var(--text); font-size: 14px; font-family: inherit; transition: border-color 0.15s;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none; border-color: var(--accent);
+        }
+        .form-group .error { border-color: #ef4444; }
+        .form-group .error-text { font-size: 11px; color: #ef4444; margin-top: 4px; display: none; }
+        .form-group .error-text.show { display: block; }
+        .form-checkbox { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; }
+        .form-checkbox input[type="checkbox"] { margin-top: 2px; accent-color: var(--accent); }
+
+        /* ── Footer ── */
+        .footer { border-top: 1px solid var(--border); padding: 40px 0; color: var(--text-secondary); font-size: 13px; text-align: center; }
+
+        /* ── Modal ── */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 200; align-items: center; justify-content: center; }
+        .modal-overlay.show { display: flex; }
+        .modal { background: var(--dark); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 32px; max-width: 480px; width: 90%; }
+        .modal h2 { margin-bottom: 8px; }
+        .modal p { color: var(--text-secondary); margin-bottom: 20px; font-size: 14px; }
+
+        /* ── Mobile ── */
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 32px; }
+            .nav-links { display: none; }
+            .contact-grid { grid-template-columns: 1fr; }
+            .inventory-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ── Navbar ── -->
+    <nav class="navbar">
+        <div class="navbar-brand">
+            <div class="navbar-logo">P</div>
+            Premier Auto Group
+        </div>
+        <div class="nav-links">
+            <a href="#inventory">Inventory</a>
+            <a href="#features">Services</a>
+            <a href="#contact">Contact</a>
+            <a href="/dashboard/login">Dealer Login</a>
+        </div>
+        <a href="#contact" class="nav-cta" style="color:white; text-decoration:none;">Contact Us</a>
+    </nav>
+
+    <!-- ── Hero ── -->
+    <section class="hero">
+        <div class="container">
+            <h1>Find Your Next Car in Vancouver</h1>
+            <p>Premier Auto Group offers Vancouver's best selection of quality pre-owned and new vehicles. Get pre-approved in minutes, not days.</p>
+            <div class="hero-buttons">
+                <a href="#inventory" class="btn-primary">Browse Inventory</a>
+                <a href="#contact" class="btn-secondary">Get Pre-Approved</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Inventory ── -->
+    <section class="section" id="inventory">
+        <div class="container">
+            <h2 class="section-title">Current Inventory</h2>
+            <p class="section-subtitle">Every vehicle comes with a Carfax report, 30-day warranty, and a test drive guarantee.</p>
+            <div class="inventory-grid" id="inventory-grid">
+                <!-- Vehicles loaded via JS -->
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Features ── -->
+    <section class="section" id="features">
+        <div class="container">
+            <h2 class="section-title" style="text-align:center;">Why Premier Auto Group?</h2>
+            <p class="section-subtitle" style="text-align:center;">Vancouver's most trusted dealership experience — online and in person.</p>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>60-Second Response</h3>
+                    <p>Submit an inquiry and get a personalized response within 60 seconds. No waiting, no forms getting lost.</p>
+                    <a href="#contact">Try it now →</a>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3>Pre-Approval in Minutes</h3>
+                    <p>Get pre-approved for financing from your phone. Rates starting at 5.99% APR. No obligation, no hidden fees.</p>
+                    <a href="#contact">Start pre-approval →</a>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🛡️</div>
+                    <h3>Carfax Certified</h3>
+                    <p>Every vehicle includes a free Carfax report. Transparent pricing. No surprises. We stand behind every car we sell.</p>
+                    <a href="#inventory">View inventory →</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Contact ── -->
+    <section class="section" id="contact">
+        <div class="container">
+            <h2 class="section-title">Get in Touch</h2>
+            <p class="section-subtitle">Call, visit, or fill out the form — we'll respond within 60 seconds.</p>
+            <div class="contact-grid">
+                <div class="contact-info">
+                    <div class="contact-info-item">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                        <div><strong>Phone</strong><br><span style="color:var(--text-secondary);">(604) 555-0121</span></div>
+                    </div>
+                    <div class="contact-info-item">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                        <div><strong>Address</strong><br><span style="color:var(--text-secondary);">1234 Kingsway Ave, Vancouver, BC</span></div>
+                    </div>
+                    <div class="contact-info-item">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                        <div><strong>Hours</strong><br><span style="color:var(--text-secondary);">Mon-Sat: 9AM-6PM · Sun: Closed</span></div>
+                    </div>
+                </div>
+
+                <div class="form-card">
+                    <div id="form-success" style="display:none; text-align:center; padding:20px;">
+                        <div style="font-size:40px; margin-bottom:8px;">✅</div>
+                        <h3>We received your inquiry!</h3>
+                        <p style="color:var(--text-secondary);margin-top:8px;">A sales team member will text you within 60 seconds. Thanks for choosing Premier Auto Group.</p>
+                    </div>
+                    <form id="contact-form" onsubmit="return submitContactForm(event)">
+                        <div class="form-group">
+                            <label>Full Name *</label>
+                            <input type="text" name="full_name" required placeholder="John Smith">
+                        </div>
+                        <div class="form-group">
+                            <label>Phone *</label>
+                            <input type="tel" name="phone" required placeholder="+1 (604) 555-1234" id="phone-input">
+                            <div class="error-text" id="phone-error">Please enter a valid phone number</div>
+                        </div>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" name="email" placeholder="john@example.com">
+                        </div>
+                        <div class="form-group">
+                            <label>Vehicle of Interest</label>
+                            <select name="vehicle_of_interest" id="vehicle-select">
+                                <option value="">General inquiry</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Message</label>
+                            <textarea name="message" rows="3" placeholder="Tell us what you're looking for..." style="resize:vertical;"></textarea>
+                        </div>
+                        <label class="form-checkbox">
+                            <input type="checkbox" name="consent" required>
+                            <span>By submitting this form, you consent to receive SMS messages from Premier Auto Group at the number provided. Reply STOP to opt out. Message rates may apply. <a href="#" style="font-size:12px;">Privacy Policy</a></span>
+                        </label>
+                        <button type="submit" class="btn-primary" style="width:100%;" id="form-submit-btn">Send Inquiry</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Footer ── -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2026 Premier Auto Group. All rights reserved. | Vancouver, BC | <a href="/dashboard/login">Dealer Dashboard</a></p>
+        </div>
+    </footer>
+
+    <!-- ── Success Modal ── -->
+    <div class="modal-overlay" id="success-modal">
+        <div class="modal" style="text-align:center;">
+            <div style="font-size:48px; margin-bottom:12px;">🚗</div>
+            <h2>We're on it!</h2>
+            <p>A sales team member will text you within 60 seconds. In the meantime, check out our full inventory — you might find something you love.</p>
+            <a href="#inventory" class="btn-secondary" onclick="document.getElementById('success-modal').classList.remove('show')">Browse Inventory</a>
+        </div>
+    </div>
+
+    <script>
+        // ── Inventory Data ──
+        const vehicles = [
+            {id:"PAG001", year:2022, make:"Honda", model:"Civic LX", trim:"Sedan", price:18900, mileage:28000, condition:"used", color:"Modern Steel", fuel:"Gas", transmission:"Automatic", image:"https://placehold.co/600x400/1a1a25/6366f1?text=2022+Honda+Civic"},
+            {id:"PAG002", year:2023, make:"Toyota", model:"RAV4 XLE", trim:"SUV", price:29900, mileage:15000, condition:"used", color:"Ice Cap", fuel:"Gas", transmission:"Automatic", image:"https://placehold.co/600x400/1a1a25/6366f1?text=2023+Toyota+RAV4"},
+            {id:"PAG003", year:2024, make:"Ford", model:"F-150 XLT", trim:"Truck", price:42500, mileage:8000, condition:"used", color:"Oxford White", fuel:"Gas", transmission:"Automatic", image:"https://placehold.co/600x400/1a1a25/6366f1?text=2024+Ford+F-150"},
+            {id:"PAG004", year:2024, make:"Mazda", model:"CX-5 GT", trim:"SUV", price:33400, mileage:12000, condition:"used", color:"Soul Red", fuel:"Gas", transmission:"Automatic", image:"https://placehold.co/600x400/1a1a25/6366f1?text=2024+Mazda+CX-5"},
+            {id:"PAG005", year:2025, make:"Tesla", model:"Model 3", trim:"Sedan", price:49900, mileage:5000, condition:"new", color:"Pearl White", fuel:"Electric", transmission:"Automatic", image:"https://placehold.co/600x400/1a1a25/22c55e?text=2025+Tesla+Model+3"},
+            {id:"PAG006", year:2024, make:"BMW", model:"3 Series", trim:"Sedan", price:38500, mileage:18000, condition:"used", color:"Alpine White", fuel:"Gas", transmission:"Automatic", image:"https://placehold.co/600x400/1a1a25/6366f1?text=2024+BMW+3+Series"},
+        ];
+
+        function renderInventory(filter) {
+            const grid = document.getElementById('inventory-grid');
+            let filtered = vehicles;
+            if (filter) {
+                const f = filter.toLowerCase();
+                filtered = vehicles.filter(v =>
+                    v.make.toLowerCase().includes(f) ||
+                    v.model.toLowerCase().includes(f) ||
+                    v.trim.toLowerCase().includes(f) ||
+                    v.year.toString() === f
+                );
+            }
+            grid.innerHTML = filtered.map(v => `
+                <div class="vehicle-card" onclick="openModal('${v.id}')">
+                    <div class="vehicle-image" style="background-image:url('${v.image}'); background-size:cover; background-position:center;">
+                        <span class="vehicle-badge ${v.condition === 'new' ? 'badge-new' : 'badge-used'}">${v.condition.toUpperCase()}</span>
+                    </div>
+                    <div class="vehicle-details">
+                        <div class="vehicle-title">${v.year} ${v.make} ${v.model}</div>
+                        <div class="vehicle-meta">${v.trim} · ${v.mileage.toLocaleString()} km · ${v.color}</div>
+                        <div class="vehicle-price">$${v.price.toLocaleString()} <small>or $${Math.round(v.price * 1000 / 72 / 100).toFixed()}${v.price > 30000 ? '0' : ''}/mo</small></div>
+                        <div class="vehicle-actions">
+                            <button class="btn btn-test-drive" onclick="event.stopPropagation(); document.getElementById('contact').scrollIntoView({behavior:'smooth'});">Book Test Drive</button>
+                            <button class="btn btn-details" onclick="event.stopPropagation(); openModal('${v.id}')">Details</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openModal(id) {
+            const v = vehicles.find(x => x.id === id);
+            if (!v) return;
+            const overlay = document.getElementById('success-modal');
+            overlay.querySelector('h2').textContent = `${v.year} ${v.make} ${v.model}`;
+            overlay.querySelector('p').innerHTML = `
+                <strong>Trim:</strong> ${v.trim}<br>
+                <strong>Price:</strong> $${v.price.toLocaleString()}<br>
+                <strong>Mileage:</strong> ${v.mileage.toLocaleString()} km<br>
+                <strong>Color:</strong> ${v.color}<br>
+                <strong>Fuel:</strong> ${v.fuel}<br>
+                <strong>Stock #:</strong> ${v.id}<br><br>
+                Interested? Fill out the contact form above and mention this vehicle.
+            `;
+            overlay.querySelector('a').textContent = 'Back to Inventory';
+            overlay.classList.add('show');
+        }
+
+        // Close modal on backdrop click
+        document.getElementById('success-modal').addEventListener('click', function(e) {
+            if (e.target === this) this.classList.remove('show');
+        });
+
+        // ── Populate vehicle dropdown ──
+        const select = document.getElementById('vehicle-select');
+        vehicles.forEach(v => {
+            const opt = document.createElement('option');
+            opt.value = v.id;
+            opt.textContent = `${v.year} ${v.make} ${v.model} — $${v.price.toLocaleString()}`;
+            select.appendChild(opt);
+        });
+
+        // ── Form Submission ──
+        function validatePhone(phone) {
+            const cleaned = phone.replace(/[^\d+]/g, '');
+            return cleaned.length >= 10;
+        }
+
+        async function submitContactForm(event) {
+            event.preventDefault();
+            const btn = document.getElementById('form-submit-btn');
+            const phoneInput = document.getElementById('phone-input');
+            const phoneError = document.getElementById('phone-error');
+
+            // Validate phone
+            if (!validatePhone(phoneInput.value)) {
+                phoneInput.classList.add('error');
+                phoneError.classList.add('show');
+                return false;
+            }
+            phoneInput.classList.remove('error');
+            phoneError.classList.remove('show');
+
+            const form = document.getElementById('contact-form');
+            const data = new FormData(form);
+            data.set('referrer', 'premier-auto');
+            data.set('inquiry_type', 'general');
+
+            btn.disabled = true;
+            btn.textContent = 'Sending...';
+
+            try {
+                const response = await fetch('/webhook/form/premier-auto-group-token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(Object.fromEntries(data)),
+                });
+                if (response.ok) {
+                    document.getElementById('form-success').style.display = 'block';
+                    form.style.display = 'none';
+                } else {
+                    alert('Something went wrong. Please try again or call us directly.');
+                }
+            } catch (e) {
+                alert('Network error. Please try again.');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Send Inquiry';
+            }
+            return false;
+        }
+
+        // ── Init ──
+        renderInventory();
+
+        // Mobile keyboard shortcut for search: Cmd/Ctrl+K
+        document.addEventListener('keydown', function(e) {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                const input = document.querySelector('input[name="search"]');
+                if (input) input.focus();
+            }
+        });
+    </script>
+</body>
+</html>
