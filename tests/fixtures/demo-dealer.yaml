@@ -20,6 +20,7 @@ channels:
   lead_email_inbox: "leads+demo@yourdomain.com"
   web_form_token: "demo-token-abc123"
 
+manager_pin: "1234"            # PIN for manager login
 sales_team:
   - { name: "Mike", phone: "+16045550121", active: true, notify_backend: telegram, telegram_chat_id: "9998887771" }
   - { name: "Dana", phone: "+16045550122", active: true, notify_backend: telegram, telegram_chat_id: "9998887772" }
