@@ -21,6 +21,7 @@
             --accent: #6366f1;
             --accent-hover: #818cf8;
             --error: #ef4444;
+            --success: #22c55e;
             --radius-sm: 6px;
             --radius-lg: 12px;
             --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
@@ -105,7 +106,7 @@
             margin-bottom: 6px;
         }
         
-        .input {
+        .input, .select {
             width: 100%;
             padding: 10px 12px;
             background: var(--bg);
@@ -115,9 +116,18 @@
             font-family: inherit;
             font-size: 14px;
             transition: all 0.2s ease;
+            appearance: none;
         }
         
-        .input:focus {
+        .select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 36px;
+            cursor: pointer;
+        }
+        
+        .input:focus, .select:focus {
             outline: none;
             border-color: var(--accent);
             box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
@@ -125,6 +135,28 @@
         
         .input::placeholder {
             color: var(--text-muted);
+        }
+        
+        .pin-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+        
+        .pin-toggle input[type="checkbox"] {
+            accent-color: var(--accent);
+        }
+        
+        #pin-field {
+            display: none;
+        }
+        
+        #pin-field.show {
+            display: block;
         }
         
         .btn-signin {
@@ -162,6 +194,13 @@
             display: block;
         }
         
+        .help-text {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 4px;
+            line-height: 1.4;
+        }
+        
         .login-footer {
             text-align: center;
             margin-top: 24px;
@@ -180,25 +219,44 @@
         
         <div class="login-card">
             <div class="error-message {% if error %}show{% endif %}" id="error-message">
-                {% if error %}{{ error }}{% else %}Invalid credentials. Please try again.{% endif %}
+                {% if error %}{{ error }}{% else %}Could not sign in. Please check your details.{% endif %}
             </div>
             
             <form method="POST" action="/dashboard/login">
                 <!-- P0-08: CSRF token (double-submit cookie pattern) -->
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                
                 <div class="form-group">
                     <label class="form-label" for="dealer_slug">Dealer ID</label>
-                    <input type="text" id="dealer_slug" name="dealer_slug" class="input" placeholder="your-dealer-slug" required autocomplete="off">
+                    <input type="text" id="dealer_slug" name="dealer_slug" class="input" placeholder="your-dealer-slug" 
+                           required autocomplete="off" value="{{ dealer_slug or '' }}">
                 </div>
                 
                 <div class="form-group">
-                    <label class="form-label" for="username">Username</label>
-                    <input type="text" id="username" name="username" class="input" placeholder="admin" required autocomplete="username">
+                    <label class="form-label" for="rep_name">Your Name</label>
+                    <select id="rep_name" name="rep_name" class="select" required>
+                        <option value="">Select your name...</option>
+                        {% if sales_team %}
+                            {% for rep in sales_team %}
+                                <option value="{{ rep.name }}" {% if rep.name == rep_name %}selected{% endif %}>
+                                    {{ rep.name }}
+                                </option>
+                            {% endfor %}
+                        {% else %}
+                            <option value="Manager">Manager</option>
+                        {% endif %}
+                    </select>
+                    <div class="help-text">Sales reps select their name. Managers select their name + enter PIN below.</div>
                 </div>
                 
-                <div class="form-group">
-                    <label class="form-label" for="password">Password</label>
-                    <input type="password" id="password" name="password" class="input" placeholder="Enter your password" required autocomplete="current-password">
+                <label class="pin-toggle">
+                    <input type="checkbox" id="show-pin" onclick="document.getElementById('pin-field').classList.toggle('show')">
+                    I'm a manager — enter PIN
+                </label>
+                
+                <div class="form-group" id="pin-field">
+                    <label class="form-label" for="manager_pin">Manager PIN</label>
+                    <input type="password" id="manager_pin" name="manager_pin" class="input" placeholder="Enter manager PIN" autocomplete="off">
                 </div>
                 
                 <button type="submit" class="btn-signin">Sign In</button>
@@ -206,7 +264,7 @@
         </div>
         
         <div class="login-footer">
-            Speed to Lead v4 &middot; Built for Canadian dealerships
+            Speed to Lead v5 &middot; Built for Canadian dealerships
         </div>
     </div>
 </body>

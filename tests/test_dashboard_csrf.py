@@ -70,8 +70,7 @@ def test_login_post_without_csrf_token_returns_403(client):
         "/dashboard/login",
         data={
             "dealer_slug": "smoke-test",
-            "username": "admin",
-            "password": "any-password",
+            "rep_name": "Mike",
         },
     )
     assert response.status_code == 403, (
@@ -93,8 +92,7 @@ def test_login_post_with_mismatched_csrf_token_returns_403(client):
         "/dashboard/login",
         data={
             "dealer_slug": "smoke-test",
-            "username": "admin",
-            "password": "any-password",
+            "rep_name": "Mike",
             "csrf_token": "attacker-controlled-fake-token",
         },
     )

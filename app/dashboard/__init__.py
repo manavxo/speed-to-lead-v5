@@ -611,7 +611,9 @@ def get_lead_health(lead: Lead) -> str:
 
 def require_auth(session: str = Cookie(None)):
     """FastAPI dependency — raises a redirect to /dashboard/login if the
-    session cookie is missing, expired, tampered with, or not a dealer-role cookie."""
+    session cookie is missing, expired, tampered with, or not a rep/manager role cookie.
+    
+    Returns: dict with 'role', 'rep_name', 'dealer_slug'."""
     if session is None:
         raise HTTPException(
             status_code=303,
@@ -625,12 +627,24 @@ def require_auth(session: str = Cookie(None)):
             status_code=303,
             headers={"Location": "/dashboard/login"},
         )
-    # Must be a dealer-role cookie with a dealer_slug
-    if data.get("role") != "dealer" or not data.get("dealer_slug"):
+    # Must be a rep or manager role with a dealer_slug
+    if data.get("role") not in ("rep", "manager") or not data.get("dealer_slug"):
         raise HTTPException(
             status_code=303,
             headers={"Location": "/dashboard/login"},
         )
+    return data  # Returns {"role": "rep"|"manager", "rep_name": "...", "dealer_slug": "...", "ts": ...}
+
+
+def get_auth_role(cookie_value: str | None) -> tuple[str, str]:
+    """Extract role and rep_name from session cookie. Returns ("rep", "") on error."""
+    if not cookie_value:
+        return ("rep", "")
+    try:
+        data = _get_serializer().loads(cookie_value, max_age=86400)
+        return (data.get("role", "rep"), data.get("rep_name", ""))
+    except Exception:
+        return ("rep", "")
 
 
 # ---------------------------------------------------------------------------
@@ -638,13 +652,32 @@ def require_auth(session: str = Cookie(None)):
 # ---------------------------------------------------------------------------
 
 @router.get("/login")
-async def login_page(request: Request):
+async def login_page(request: Request, dealer_slug: str = ""):
     # P0-08: generate CSRF token, set double-submit cookie, mirror in form
     token = _generate_csrf_token()
+    
+    # Load sales_team from dealer config if dealer_slug is provided
+    sales_team = []
+    if dealer_slug:
+        session = _get_session()
+        try:
+            dealer = session.execute(select(Dealer).where(Dealer.slug == dealer_slug)).scalars().first()
+            if dealer:
+                config = dealer.config or {}
+                sales_team = config.get("sales_team", [])
+        finally:
+            session.close()
+    
     response = templates.TemplateResponse(
         request=request,
         name="login.html",
-        context={"request": request, "csrf_token": token, "active_page": "login"},
+        context={
+            "request": request,
+            "csrf_token": token,
+            "active_page": "login",
+            "sales_team": sales_team,
+            "dealer_slug": dealer_slug,
+        },
     )
     response.set_cookie(
         "csrf_token",
@@ -661,8 +694,8 @@ async def login_page(request: Request):
 async def login_submit(
     request: Request,
     dealer_slug: str = Form(...),
-    username: str = Form(...),
-    password: str = Form(...),
+    rep_name: str = Form(...),
+    manager_pin: str = Form(""),
     csrf_token: str = Form(""),  # P0-08: default empty so missing field → 403, not 422
 ):
     # P0-08: CSRF check FIRST, before rate limit. Putting CSRF before the
@@ -682,9 +715,9 @@ async def login_submit(
         )
 
     # Validate dealer_slug exists
-    session = _get_session()
+    db_session = _get_session()
     try:
-        dealer = session.execute(select(Dealer).where(Dealer.slug == dealer_slug)).scalars().first()
+        dealer = db_session.execute(select(Dealer).where(Dealer.slug == dealer_slug)).scalars().first()
         if not dealer:
             return templates.TemplateResponse(
                 request=request,
@@ -693,23 +726,57 @@ async def login_submit(
                 status_code=401,
             )
     finally:
-        session.close()
+        db_session.close()
 
-    if username == settings.dashboard_user and _verify_password(password):
-        _clear_rate_limit(ip)
-        serializer = _get_serializer()
-        token = serializer.dumps({"user": username, "role": "dealer", "dealer_slug": dealer_slug, "ts": time.time()})
-        response = RedirectResponse("/dashboard/leads", status_code=303)
-        response.set_cookie("session", token, httponly=True, secure=(settings.environment == "production"), max_age=86400, samesite="lax")
-        return response
+    dealer_config = dealer.config or {}
+    sales_team = dealer_config.get("sales_team", [])
 
-    _record_failure(ip)
-    return templates.TemplateResponse(
-        request=request,
-        name="login.html",
-        context={"request": request, "error": "Invalid credentials"},
-        status_code=401,
-    )
+    # Determine role: if manager_pin is provided and matches → manager, else → rep
+    role = "rep"
+    config_pin = dealer_config.get("manager_pin", "")
+    if manager_pin and manager_pin == config_pin:
+        role = "manager"
+    elif manager_pin and manager_pin != config_pin:
+        # PIN provided but doesn't match
+        return templates.TemplateResponse(
+            request=request,
+            name="login.html",
+            context={
+                "request": request,
+                "error": "Invalid manager PIN",
+                "sales_team": sales_team,
+                "dealer_slug": dealer_slug,
+            },
+            status_code=401,
+        )
+
+    # Verify the rep_name is valid (for reps: must be in sales_team; for managers: optional)
+    valid_rep_names = [r.get("name") for r in sales_team if r.get("name")]
+    if role == "rep" and rep_name not in valid_rep_names:
+        return templates.TemplateResponse(
+            request=request,
+            name="login.html",
+            context={
+                "request": request,
+                "error": "Please select your name from the list",
+                "sales_team": sales_team,
+                "dealer_slug": dealer_slug,
+            },
+            status_code=401,
+        )
+
+    # Success — create session
+    _clear_rate_limit(ip)
+    serializer = _get_serializer()
+    token = serializer.dumps({
+        "role": role,
+        "rep_name": rep_name,
+        "dealer_slug": dealer_slug,
+        "ts": time.time(),
+    })
+    response = RedirectResponse("/dashboard", status_code=303)
+    response.set_cookie("session", token, httponly=True, secure=(settings.environment == "production"), max_age=86400, samesite="lax")
+    return response
 
 
 @router.get("/logout")
@@ -741,7 +808,18 @@ async def leads_list(request: Request, _auth: None = Depends(require_auth)):
             return RedirectResponse("/dashboard/login", status_code=303)
         dealer_id = current_dealer.id
         
-        query = select(Lead).where(Lead.dealer_id == dealer_id).order_by(Lead.created_at.desc()).limit(100)
+        # Rep-scoped query: reps see only their leads + unassigned
+        role, rep_name = get_auth_role(cookie_value)
+        if role == "rep" and rep_name:
+            query = (
+                select(Lead)
+                .where(Lead.dealer_id == dealer_id)
+                .where((Lead.assigned_rep == rep_name) | (Lead.assigned_rep.is_(None)))
+                .order_by(Lead.created_at.desc())
+                .limit(100)
+            )
+        else:
+            query = select(Lead).where(Lead.dealer_id == dealer_id).order_by(Lead.created_at.desc()).limit(100)
         all_leads = session.execute(query).scalars().all()
 
         total = len(all_leads)
@@ -891,6 +969,11 @@ async def lead_detail(request: Request, lead_id: int, _auth: None = Depends(requ
 
         # Verify the lead belongs to the current dealer (404 if not)
         if lead.dealer_id != current_dealer.id:
+            return HTMLResponse("<h1>Lead not found</h1>", status_code=404)
+        
+        # Rep URL guard: rep can only access their own leads
+        role, rep_name = get_auth_role(cookie_value)
+        if role == "rep" and rep_name and lead.assigned_rep and lead.assigned_rep != rep_name:
             return HTMLResponse("<h1>Lead not found</h1>", status_code=404)
 
         messages = session.execute(

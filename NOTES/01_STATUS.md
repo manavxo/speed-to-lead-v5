@@ -55,7 +55,7 @@ Just before Phase 0.1. Full test suite passes (128 passed, 1 skipped). Codebase 
 | 6 | Rate limiting & auth | 30 min | ✅ |
 | 7 | Conversation memory | 1h | ✅ |
 | 8 | Testing (ongoing) | ongoing | ✅ |
-| 9 | Email channel | 10h | 🔲 |
+| 9 | Email channel | 8h | ✅ |
 | 10 | Manager vs Rep roles | 3h | 🔲 |
 | 11 | UI redesign | 4h | 🔲 |
 | 12 | Dealership demo site | 8h | 🔲 |
