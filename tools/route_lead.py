@@ -55,6 +55,7 @@ def _send_to_customer(
     lead: Lead,
     body: str,
     *,
+    channel: str = "sms",
     whatsapp_sender: str = "",
     sms_number: str = "",
     dealer_slug: str = "",
@@ -62,18 +63,23 @@ def _send_to_customer(
     fake_twilio=None,
     now=None,
 ) -> str | None:
-    """Send a message to the customer via WhatsApp or SMS. Returns SID or None."""
+    """Send a message to the customer via SMS (default) or WhatsApp.
+
+    Webform leads use SMS (channel='sms') since customers aren't in the
+    WhatsApp sandbox.  Rep-facing notifications use WhatsApp.
+    Returns SID or None.
+    """
     if not lead.phone:
         logger.warning("_send_to_customer: no phone for lead#%s", lead.id)
         return None
 
     logger.info(
-        "_send_to_customer: lead#%s to=%s whatsapp_sender=%r sms_number=%r",
-        lead.id, lead.phone, whatsapp_sender, sms_number,
+        "_send_to_customer: lead#%s to=%s channel=%s whatsapp_sender=%r sms_number=%r",
+        lead.id, lead.phone, channel, whatsapp_sender, sms_number,
     )
 
     sid = None
-    if whatsapp_sender:
+    if channel == "whatsapp" and whatsapp_sender:
         from tools.send_sms import send_whatsapp
         logger.info("_send_to_customer: calling send_whatsapp for lead#%s", lead.id)
         sid = send_whatsapp(
@@ -271,6 +277,7 @@ def ingest_lead(
 
     _send_to_customer(
         session, lead, auto_text,
+        channel="sms",
         whatsapp_sender=whatsapp_sender, sms_number=sms_number,
         dealer_slug=dealer.slug, dealer_config=dealer_config,
         fake_twilio=fake_twilio, now=now,
@@ -295,6 +302,7 @@ def ingest_lead(
             # Send the AI's personalized follow-up
             _send_to_customer(
                 session, lead, ai_followup_text,
+                channel="sms",
                 whatsapp_sender=whatsapp_sender, sms_number=sms_number,
                 dealer_slug=dealer.slug, dealer_config=dealer_config,
                 fake_twilio=fake_twilio, now=now,
