@@ -212,6 +212,18 @@ def _build_body(message_type: str, payload: dict, rep_name: str) -> str:
             f"{rep_name} — missed call from {customer}. "
             f"AI already texted them a follow-up."
         )
+    if message_type == "cover_me":
+        return (
+            f"🆘 COVER REQUEST — {rep_name}\n"
+            f"{customer}{vehicle_str} has been reassigned to you.\n"
+            f"Please take over this lead."
+        )
+    if message_type == "handoff_received":
+        return (
+            f"📨 HANDED TO YOU — {rep_name}\n"
+            f"{customer}{vehicle_str} has been sent your way.\n"
+            f"Claim it or pass to the next rep."
+        )
     if message_type == "sale":
         # State machine SOLD notification. Rep needs to know fast — they're
         # tracking the commission. Keep it punchy: just the close + customer.
