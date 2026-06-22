@@ -105,6 +105,52 @@ def test_morning_sweep_sends_once_and_is_idempotent(db_session, dealer, monkeypa
     assert _event_count(db_session, lead.id, "morning_sent") == 1
 
 
+def test_saturday_night_lead_released_sunday_morning_even_if_closed(db_session, dealer, monkeypatch):
+    """A lead queued Saturday night must go out Sunday morning (quiet-hours end),
+    even though the dealer is CLOSED on Sunday — otherwise it ages out and is lost.
+    """
+    monkeypatch.setattr(settings, "quiet_hours_disabled", False)
+    lead = _make_lead(db_session, dealer)
+    queue_morning_followup(db_session, lead, "Good morning!")
+
+    # Sat 23:00 Vancouver = Sun 06:00 UTC (quiet, and Sunday is 'closed').
+    sat_night = datetime(2026, 6, 7, 6, 0, tzinfo=timezone.utc)
+    _run_morning_followup_session(db_session, now=sat_night)
+    assert _event_count(db_session, lead.id, "morning_sent") == 0  # still quiet
+
+    # Sun 08:30 Vancouver = Sun 15:30 UTC — quiet hours over, lot still closed.
+    sun_morning = datetime(2026, 6, 7, 15, 30, tzinfo=timezone.utc)
+    _run_morning_followup_session(db_session, now=sun_morning)
+    assert _outbound_count(db_session, lead.id) == 1
+    assert _event_count(db_session, lead.id, "morning_sent") == 1
+
+
+def test_missed_call_after_hours_queues_and_morning_send_is_not_suppressed(db_session, dealer, monkeypatch):
+    """An after-hours missed call queues a text-back, and the morning send must
+    NOT be suppressed for 'no consent' — the inbound call is implied consent."""
+    monkeypatch.setattr(settings, "quiet_hours_disabled", False)
+    from tools.detect_missed_call import handle_missed_call
+
+    result = handle_missed_call(
+        session=db_session, dealer=dealer, caller_phone="+16045559876",
+        call_sid="CA_night_1", call_status="no-answer", call_duration=0,
+        sms_sender=None, now=NIGHT_UTC,
+    )
+    # After-hours: queued, nothing sent at night.
+    lead_id = result.lead_id
+    assert result.success is True
+    assert _event_count(db_session, lead_id, "morning_queue") == 1
+    assert _outbound_count(db_session, lead_id) == 0
+
+    # Morning sweep at 10:00 — must actually send (consent was logged at intake).
+    _run_morning_followup_session(db_session, now=MORNING_UTC)
+    sent = db_session.query(Message).filter(
+        Message.lead_id == lead_id, Message.direction == Direction.OUTBOUND,
+    ).all()
+    assert len(sent) == 1
+    assert not (sent[0].provider_sid or "").startswith("SUPPRESSED_NO_CONSENT")
+
+
 def test_opted_out_lead_is_not_sent(db_session, dealer, monkeypatch):
     monkeypatch.setattr(settings, "quiet_hours_disabled", False)
     lead = _make_lead(db_session, dealer)

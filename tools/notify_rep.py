@@ -352,7 +352,10 @@ def notify_rep(
     # deliver to. Skip them best-effort (still log the Message row for the lead
     # timeline) instead of letting a Twilio 400/63015 bubble up as noise — and,
     # importantly, never crash the ingest pipeline over a fake rep number.
-    if _is_placeholder_phone(rep_phone):
+    # The placeholder-phone guard only applies to phone-based backends. Telegram
+    # reps are reached by chat_id, so a fake/placeholder phone must NOT skip them
+    # (demo dealers often have real telegram_chat_ids but 555-line phones).
+    if backend != "telegram" and _is_placeholder_phone(rep_phone):
         sid = f"SKIPPED_FAKE_{uuid.uuid4().hex[:12]}"
         logger.info(
             "notify_rep: skipping placeholder rep phone %s for lead#%s (sid=%s)",

@@ -143,8 +143,9 @@ def test_inventory_upload_creates_vehicles(db_session, monkeypatch):
     )
     request = types.SimpleNamespace(cookies={"session": token})
 
+    # Capitalized headers — the normal export casing that used to be rejected.
     csv_bytes = (
-        b"stock_no,year,make,model,trim,body,price,mileage\n"
+        b"Stock_No,Year,Make,Model,Trim,Body,Price,Mileage\n"
         b"A100,2022,Honda,Civic,Sport,Sedan,18900,48000\n"
         b"BADROW,notayear,Toyota,Corolla,,Sedan,15000,30000\n"   # bad year -> row error
     )
