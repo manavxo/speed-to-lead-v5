@@ -81,23 +81,27 @@ def handle_missed_call(
             error=f"Call status '{call_status}' is not a missed call",
         )
 
-    # Check for duplicate call (prevent double text-back)
+    # Dedup: skip if a missed-call Lead exists for this number within the last
+    # 24 hours (catches both duplicate Twilio webhook deliveries AND repeat
+    # callers on the same day). Beyond 24h, allow a fresh lead so repeat callers
+    # on different days get a new text-back.
+    from datetime import timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
     existing = session.query(Lead).filter(
         Lead.dealer_id == dealer.id,
         Lead.phone == caller_phone,
         Lead.source == Channel.PHONE,
+        Lead.created_at >= cutoff,
     ).first()
 
     if existing:
-        # Already have a lead for this caller — don't double-text
         logger.info(
-            "Missed call from %s already has lead %d, skipping",
-            caller_phone,
-            existing.id,
+            "Missed call from %s: lead#%s exists within 24h (created %s) — skipping",
+            caller_phone, existing.id, existing.created_at,
         )
         return MissedCallResult(
             success=False,
-            error=f"Lead already exists for {caller_phone}",
+            error=f"Lead already exists for {caller_phone} within 24h window",
         )
 
     # Create lead

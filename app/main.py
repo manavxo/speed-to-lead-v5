@@ -956,9 +956,9 @@ async def webhook_twilio_voice(request: Request) -> Response:
 
         # Handle the missed call
         def _sms_sender(to, from_, body):
-            """Send SMS via Twilio."""
+            """Send SMS via the send_sms chokepoint."""
             from tools.send_sms import send_sms
-            return send_sms(to=to, from_=from_, body=body)
+            return send_sms(session, to, body, from_number=from_)
 
         result = handle_missed_call_from_webhook(
             session=session,
