@@ -55,7 +55,15 @@ def dealer_with_assigned_rep(sm_session):
         sms_number="+177****0099",
         whatsapp_sender="+141****0099",
         config={
-            "dealer": {"name": "State Machine Test Dealer", "timezone": "America/Vancouver"},
+            "dealer": {
+                "name": "State Machine Test Dealer",
+                "timezone": "America/Vancouver",
+                "hours": {
+                    "mon": "09:00-19:00", "tue": "09:00-19:00", "wed": "09:00-19:00",
+                    "thu": "09:00-19:00", "fri": "09:00-19:00", "sat": "10:00-17:00",
+                    "sun": "closed",
+                },
+            },
             "channels": {
                 "sms_number": "+177****0099",
                 "whatsapp_sender": "+141****0099",
@@ -123,7 +131,8 @@ def test_book_appointment_calls_notify_rep_for_appointment_set(
 
     monkeypatch.setattr("tools.notify_rep.notify_rep", fake_notify_rep)
 
-    appt_time = datetime.now(timezone.utc) + timedelta(days=1)
+    # Use a future business-hours time (Fri June 26 2026, 17:00 UTC = 10 AM PDT)
+    appt_time = datetime(2026, 6, 26, 17, 0, tzinfo=timezone.utc)
     book_appointment(
         sm_session, lead, appt_time,
         notes="Test drive",

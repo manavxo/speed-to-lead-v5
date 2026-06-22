@@ -157,6 +157,31 @@ def book_appointment(
             f"Lead must be CLAIMED, ENGAGED, AUTO_REPLIED, or NEW."
         )
 
+    # Guard: reject if outside business hours
+    if dealer_config:
+        from app.engine.conversation import is_business_hours
+        if not is_business_hours(dealer_config, now=scheduled_for):
+            raise ValueError(
+                "Cannot book appointment outside business hours. "
+                "Only offer slots during open hours listed in the dealer config."
+            )
+
+    # Guard: reject if the slot is already occupied (double-book prevention)
+    if dealer_config:
+        from sqlalchemy import select as sa_select
+        existing_appt = session.execute(
+            sa_select(Appointment).where(
+                Appointment.dealer_id == lead.dealer_id,
+                Appointment.scheduled_for == scheduled_for,
+                Appointment.status.in_(["set", "confirmed"]),
+            )
+        ).scalars().first()
+        if existing_appt:
+            raise ValueError(
+                "This time slot is already booked. Please offer a different time from "
+                "the available slots returned by check_availability."
+            )
+
     appt = Appointment(
         lead_id=lead.id,
         dealer_id=lead.dealer_id,

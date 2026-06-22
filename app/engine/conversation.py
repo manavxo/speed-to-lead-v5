@@ -143,12 +143,26 @@ TOOL_DEFINITIONS = [
     {
         "type": "function",
         "function": {
-            "name": "book_appointment",
-            "description": "Book a test drive or visit appointment. Use this when a customer wants to see a vehicle, test drive, or visit the dealership. Always suggest 2 specific time slots first, then book when they choose one.",
+            "name": "check_availability",
+            "description": "Check available appointment slots for the next 7 days. Returns ONLY valid slots during business hours that are not already booked. Use this BEFORE suggesting any appointment times. NEVER invent time slots.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "date_time": {"type": "string", "description": "ISO 8601 datetime for the appointment (e.g. 2026-06-12T14:00:00)"},
+                    "days_ahead": {"type": "number", "description": "How many days to check (default 7)"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "book_appointment",
+            "description": "Book a test drive or visit appointment. Use this when a customer wants to see a vehicle, test drive, or visit the dealership. ONLY offer times returned by check_availability.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "date_time": {"type": "string", "description": "ISO 8601 datetime for the appointment (e.g. 2026-06-12T14:00:00). Must be a slot returned by check_availability."},
                     "notes": {"type": "string", "description": "What the appointment is for (e.g. 'Test drive of 2023 Honda Civic Sport', 'Look at SUVs under $30k')"},
                 },
                 "required": ["date_time"],
@@ -206,7 +220,6 @@ def _execute_tool_call(
                     "body": v.body,
                     "status": v.status,
                 }
-                # Always include specs from the raw column (enriched data)
                 result_entry["specs"] = {
                     "engine": specs.get("engine"),
                     "transmission": specs.get("transmission"),
@@ -221,6 +234,19 @@ def _execute_tool_call(
                 results.append(result_entry)
             return {"vehicles": results, "count": len(results)}
         return {"vehicles": [], "message": "No matching vehicles found."}
+
+    elif tool_name == "check_availability":
+        if session and dealer_id is not None:
+            from tools.check_availability import check_availability as check_avail
+            slots = check_avail(
+                session, dealer_id,
+                days_ahead=args.get("days_ahead", 7),
+                dealer_config=dealer_config,
+            )
+            if not slots:
+                return {"slots": [], "message": "No available slots in the next 7 days."}
+            return {"slots": slots, "count": len(slots)}
+        return {"slots": [], "message": "Cannot check availability right now."}
 
     elif tool_name == "book_appointment":
         if session and lead is not None:
@@ -387,21 +413,15 @@ def build_system_prompt(dealer_config: dict, vehicle_context: str | None = None)
         "",
         "═══ BOOKING APPOINTMENTS (YOUR #1 JOB) ═══",
         "",
-        "You have a book_appointment tool. USE IT. This is your primary purpose.",
+        "You have two tools: check_availability and book_appointment. USE BOTH.",
         "",
-        "YOU ARE THE CALENDAR. You do not need to check availability. You do not need to",
-        "verify the slot. If the customer gives you a date and time, BOOK IT IMMEDIATELY.",
-        "There is no conflict checking. There is no slot availability. Just book it.",
+        "YOU MUST call check_availability BEFORE offering any time slots.",
+        "If check_availability returns 0 slots, say: 'We don't have any availability",
+        "right now — let me connect you with our team to find a time that works.'",
         "",
-        "IMPORTANT: You can book appointments ANY time — day or night, weekdays or weekends.",
-        "It does NOT matter what time it is right now. If a customer texts at 2am asking for",
-        "Monday at 6pm, you book Monday at 6pm. Do NOT say 'I can't book that slot' or",
-        "'the team will get back to you.' BOOK IT. The notification goes to the sales team",
-        "instantly so they can prepare.",
-        "",
-        "Business hours listed below are for SUGGESTING good times only — they do NOT",
-        "restrict when you can book. If a customer requests a time outside business hours,",
-        "book it anyway and let the team handle it.",
+        "ONLY offer slots that check_availability returned. NEVER invent a time.",
+        "If a customer asks for a specific time NOT in the returned slots, politely",
+        "offer the closest available alternative.",
         "",
         "When to book (don't wait for the perfect moment — any of these is enough):",
         "  - Customer says they want to see a vehicle in person",
@@ -412,18 +432,16 @@ def build_system_prompt(dealer_config: dict, vehicle_context: str | None = None)
         "  - Customer gives you ANY specific date/time (e.g., 'Monday at 6pm', 'next Saturday')",
         "",
         "How to book:",
-        "  1. If the customer gives you a date/time → call book_appointment IMMEDIATELY with that datetime.",
-        "     Example: Customer says 'Monday June 8 at 6pm' → book_appointment(date_time='2026-06-08T18:00:00', notes='Test drive')",
-        "  2. If the customer doesn't specify a time → suggest 2 specific slots: 'How about Thursday at 2pm or Saturday morning at 10am?'",
-        "  3. When they pick a time, call book_appointment with an ISO 8601 datetime.",
+        "  1. FIRST call check_availability() to get available slots.",
+        "  2. Suggest 1-2 slots from the returned list.",
+        "  3. When the customer picks a slot, call book_appointment with that ISO 8601 datetime.",
         "  4. After booking, confirm: 'You're all set! We'll see you [day] at [time] at [address].",
         "     Bring your driver's license. Looking forward to it!'",
         "",
-        "NEVER say 'I can't book that slot.' You CAN always book. There is no calendar conflict.",
-        "NEVER say 'the team will get back to you.' YOU book it. The team gets notified automatically.",
-        "NEVER say 'I'll have someone reach out to schedule' — YOU schedule it.",
-        "NEVER ask 'when works for you?' — offer specific times instead.",
-        "NEVER hesitate to book. If they're interested, move to booking immediately.",
+        "NEVER book without calling check_availability first.",
+        "NEVER invent time slots that check_availability didn't return.",
+        "The system enforces: no bookings outside business hours and no double-bookings.",
+        "Only the slots from check_availability are valid.",
         "",
         "═══ HANDLING OBJECTIONS (BE INDEPENDENT) ═══",
         "",
