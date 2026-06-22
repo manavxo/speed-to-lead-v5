@@ -203,8 +203,7 @@ def test_full_pipeline_e2e(e2e_session, dealer, vehicle):
 
     # 2. BOOK APPOINTMENT — this triggers rep assignment
     from tools.book_appointment import book_appointment
-    from datetime import timedelta
-    appt_time = datetime.now(timezone.utc) + timedelta(days=1)
+    appt_time = datetime(2026, 6, 26, 17, 0, tzinfo=timezone.utc)  # Fri 10 AM PDT
     appt = book_appointment(e2e_session, lead, appt_time, notes="Test drive of Honda Civic",
                             dealer_config=dealer.config)
 
@@ -249,8 +248,7 @@ def test_escalation_after_timeout(e2e_session, dealer):
 
     # Book appointment — this assigns a rep
     from tools.book_appointment import book_appointment
-    from datetime import timedelta
-    appt_time = datetime.now(timezone.utc) + timedelta(days=1)
+    appt_time = datetime(2026, 6, 26, 17, 0, tzinfo=timezone.utc)  # Fri 10 AM PDT
     appt = book_appointment(e2e_session, lead, appt_time, notes="Test drive",
                             dealer_config=dealer.config)
     assert lead.assigned_rep is not None  # Now rep is assigned
