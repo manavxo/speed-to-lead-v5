@@ -127,6 +127,18 @@ def handle_missed_call(
     if main_phone:
         text_body += f" Or call us back at {main_phone}."
 
+    # After-hours: don't text back in the middle of the night (quiet hours would
+    # drop it silently). Queue the text-back for the morning sweep instead so the
+    # caller still gets a follow-up first thing — just not at 2am.
+    from tools.route_lead import is_after_hours, queue_morning_followup
+    if is_after_hours(dealer_config):
+        lead.state = LeadState.AUTO_REPLIED
+        queue_morning_followup(session, lead, text_body, reason="missed_call_after_hours")
+        session.commit()
+        session.refresh(lead)
+        logger.info("Missed call after-hours: lead %d text-back queued for morning", lead.id)
+        return MissedCallResult(success=True, lead_id=lead.id, message_sid=None)
+
     # Send SMS
     sms_sid = None
     if sms_sender:

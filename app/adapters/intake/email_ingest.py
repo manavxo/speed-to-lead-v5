@@ -29,6 +29,27 @@ if TYPE_CHECKING:
 logger = logging.getLogger("speed-to-lead.email_ingest")
 
 
+_OPT_OUT_PHRASES = (
+    "stop", "unsubscribe", "opt out", "opt-out", "remove me",
+    "take me off", "no more emails", "do not contact", "don't contact",
+)
+
+
+def _is_email_opt_out(body: str) -> bool:
+    """True if an email reply is a reasonable expression of opt-out intent (CASL).
+
+    Matches a bare 'STOP' as well as common phrases ('unsubscribe', 'remove me',
+    'take me off your list'). Only looks at the first ~200 chars so a quoted prior
+    message lower down doesn't trigger a false opt-out.
+    """
+    head = (body or "").strip().lower()[:200]
+    if not head:
+        return False
+    if head in ("stop", "stop.", "unsubscribe", "unsubscribe."):
+        return True
+    return any(phrase in head for phrase in _OPT_OUT_PHRASES)
+
+
 def _extract_email_addr(raw_from: str) -> str | None:
     """Extract a clean email address from a From header (e.g. 'John <john@example.com>')."""
     match = re.search(r"(\S+@\S+)", raw_from)
@@ -58,7 +79,27 @@ def _handle_email_reply(
     num_str: str,
 ) -> bool:
     """Handle an email reply to an existing lead."""
-    from app.models import Direction, Message
+    from app.models import Channel, ConsentLog, Direction, LeadState, Message
+
+    # CASL: honor an email opt-out ("STOP"/"unsubscribe"/"remove me") before anything else.
+    if _is_email_opt_out(body or ""):
+        session.add(ConsentLog(
+            dealer_id=lead.dealer_id,
+            lead_id=lead.id,
+            phone=lead.phone or (lead.email or ""),
+            action="opted_out",
+            text=(body or "")[:500],
+        ))
+        if lead.state not in (LeadState.SOLD, LeadState.LOST, LeadState.OPTED_OUT):
+            from app.engine.lifecycle import transition
+            try:
+                transition(session, lead, LeadState.OPTED_OUT, reason="email_opt_out")
+            except ValueError:
+                pass
+        session.commit()
+        mail.store(num_str, "+FLAGS", "\\Seen")
+        logger.info("Email opt-out honored for lead#%s (%s)", lead.id, sender)
+        return True
 
     # Store the reply as a new customer message in the conversation thread
     msg = Message(
@@ -84,6 +125,7 @@ def _handle_email_reply(
 
 def _notify_rep_of_email_reply(session: Session, lead: "Lead", reply_body: str | None) -> None:
     """Send a Telegram notification to the assigned rep about an email reply."""
+    from sqlalchemy import select
     from tools.notify_rep import notify_rep
     from app.models import Dealer
 

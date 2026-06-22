@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db import get_session_factory
-from app.models import Appointment, Dealer, Lead, LeadEvent, LeadState, Message
+from app.models import Appointment, Dealer, Lead, LeadEvent, LeadState, Message, Vehicle
 from app.models import Channel, Direction
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -1962,15 +1962,29 @@ async def add_team_member(
         if not current_dealer:
             return HTMLResponse("Unauthorized", status_code=401)
 
+        import json as _json
+        import secrets as _secrets
         config = current_dealer.config or {}
         if "sales_team" not in config:
             config["sales_team"] = []
-        config["sales_team"].append({"name": name, "phone": phone})
-        current_dealer.config = config
+        # Give every new rep a working login PIN + the defaults they need to be
+        # reachable, otherwise they can never log in or receive claim pings.
+        new_pin = f"{_secrets.randbelow(10000):04d}"
+        config["sales_team"].append({
+            "name": name,
+            "phone": phone,
+            "pin": new_pin,
+            "active": True,
+            "notify_backend": "telegram",
+            "telegram_chat_id": None,
+        })
+        # Reassign a fresh object so SQLAlchemy reliably detects the JSON change.
+        current_dealer.config = _json.loads(_json.dumps(config))
         session.commit()
 
         response = HTMLResponse(
-            f'<div class="toast success">Team member {name} added</div>',
+            f'<div class="toast success">Team member {name} added — login PIN: {new_pin}. '
+            f'They still need to tap their Telegram link to get lead pings.</div>',
             status_code=200,
         )
         response.headers["HX-Trigger"] = "showToast"
@@ -2015,7 +2029,11 @@ async def upload_inventory(
                 return HTMLResponse("XLSX support requires openpyxl", status_code=500)
             wb = load_workbook(io.BytesIO(content), read_only=True)
             ws = wb.active
-            headers = [str(cell.value).strip() if cell.value else "" for cell in next(ws.iter_rows(min_row=1, max_row=1))]
+            header_row = next(ws.iter_rows(min_row=1, max_row=1), None)
+            if header_row is None:
+                wb.close()
+                return HTMLResponse("Empty file.", status_code=400)
+            headers = [str(cell.value).strip() if cell.value else "" for cell in header_row]
             header_map = {h.lower(): i for i, h in enumerate(headers) if h}
             for row in ws.iter_rows(min_row=2, values_only=True):
                 row_dict = {h: row[i] for h, i in header_map.items() if i < len(row)}

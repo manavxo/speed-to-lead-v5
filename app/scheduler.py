@@ -544,6 +544,98 @@ def send_daily_digest(session, dealer_slug: str, dealer_config: dict = None):
         logger.exception("Failed to send daily digest for %s", dealer_slug)
 
 
+def _run_morning_followup_session(session, now: datetime | None = None) -> None:
+    """Send first-touch messages that were queued overnight, now that the dealer is open.
+
+    Leads that arrive after hours don't get texted at night (quiet hours). Instead
+    they carry a 'morning_queue' LeadEvent holding the intended message body. As soon
+    as the dealer is back inside business hours, we send that body and write a
+    'morning_sent' event so the same lead is never messaged twice.
+
+    Takes a session (and optional fixed `now`) for testability.
+    """
+    from app.models import Dealer, Lead, LeadEvent, LeadState
+    from app.engine.conversation import is_business_hours
+    from sqlalchemy import select
+
+    if now is None:
+        now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=24)  # don't resurrect leads older than a day
+    dealers = session.execute(select(Dealer)).scalars().all()
+
+    for dealer in dealers:
+        config = dealer.config or {}
+        if not is_business_hours(config, now):
+            continue  # still closed — leave the queue alone
+
+        queued = session.execute(
+            select(LeadEvent).where(
+                LeadEvent.dealer_id == dealer.id,
+                LeadEvent.type == "morning_queue",
+                LeadEvent.created_at >= cutoff,
+            ).order_by(LeadEvent.created_at.asc())
+        ).scalars().all()
+
+        for ev in queued:
+            lead = session.get(Lead, ev.lead_id)
+            if lead is None or not lead.phone:
+                continue
+            if lead.state in (LeadState.SOLD, LeadState.LOST, LeadState.OPTED_OUT):
+                continue
+
+            # Idempotency: skip anything we've already flushed.
+            already_sent = session.execute(
+                select(LeadEvent).where(
+                    LeadEvent.lead_id == lead.id,
+                    LeadEvent.type == "morning_sent",
+                )
+            ).scalars().first()
+            if already_sent:
+                continue
+
+            body = (ev.payload or {}).get("body", "")
+            if not body:
+                continue
+
+            sms_number = config.get("channels", {}).get("sms_number", "")
+            try:
+                from tools.send_sms import send_sms
+                # Business hours now, so send_sms will NOT suppress for quiet hours.
+                sid = send_sms(
+                    session,
+                    to=lead.phone,
+                    body=body,
+                    from_number=sms_number,
+                    dealer_slug=dealer.slug,
+                    dealer_config=config,
+                    lead=lead,
+                )
+                # Mark sent even if send_sms suppressed (e.g. opted out) — that's a
+                # terminal outcome, not something to retry every 15 minutes.
+                session.add(LeadEvent(
+                    lead_id=lead.id, dealer_id=dealer.id, type="morning_sent",
+                    payload={"sid": sid}, synced=False,
+                ))
+                session.commit()
+                logger.info("Morning first-touch sent for lead#%s (sid=%s)", lead.id, sid)
+            except Exception:
+                logger.exception("Morning first-touch failed for lead#%s", lead.id)
+                session.rollback()
+
+
+def _run_morning_followup():
+    """Cron entry point: creates a session, delegates to _run_morning_followup_session."""
+    from app.db import get_session_factory
+    logger.info("Running morning follow-up sweep")
+    session = get_session_factory()()
+    try:
+        _run_morning_followup_session(session)
+    except Exception:
+        logger.exception("Morning follow-up sweep failed")
+    finally:
+        session.close()
+
+
 def register_jobs(scheduler) -> None:
     """Register all background jobs on the given scheduler instance.
 
@@ -603,6 +695,17 @@ def register_jobs(scheduler) -> None:
         id="email-poll",
         replace_existing=True,
         misfire_grace_time=120,
+    )
+
+    # Morning follow-up — flush after-hours leads queued overnight once the dealer
+    # reopens. Every 15 min so the first message lands shortly after opening time.
+    scheduler.add_job(
+        _run_morning_followup,
+        "interval",
+        minutes=15,
+        id="morning-followup",
+        replace_existing=True,
+        misfire_grace_time=600,
     )
 
 

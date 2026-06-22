@@ -6,10 +6,13 @@ via SMS to claim, and schedules an escalation timer. See workflows/escalation.md
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
+
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.engine.lifecycle import transition
-from app.models import Dealer, Lead, LeadState
+from app.models import Dealer, Lead, LeadEvent, LeadState
 
 logger = logging.getLogger("speed-to-lead.router")
 
@@ -50,12 +53,22 @@ def assign_lead(
 
     If no active reps, the lead stays in current state (AI-only / after-hours path).
     """
+    # Lock the dealer row so two leads ingested at the same moment can't read the
+    # same round-robin pointer and both land on the same rep (fair distribution is
+    # the core promise). with_for_update serializes this in Postgres; on SQLite it
+    # is a harmless no-op (tests run single-threaded).
+    locked_dealer = session.execute(
+        select(Dealer).where(Dealer.id == dealer.id).with_for_update()
+    ).scalar_one_or_none()
+    if locked_dealer is not None:
+        dealer = locked_dealer
+
     rep = next_rep(dealer, sales_team)
     if rep is None:
         logger.info("No active reps for lead#%s", lead.id)
         return None
 
-    # Persist the pointer advancement
+    # Persist the pointer advancement (releases the row lock)
     session.commit()
 
     # Update the lead with the assigned rep
@@ -76,6 +89,21 @@ def assign_lead(
             reason="round_robin_assign",
             meta={"assigned_rep": rep["name"]},
         )
+    else:
+        # Reassignment (the lead was passed): it's already ASSIGNED, so a normal
+        # transition is a no-op and the escalation timer would keep ticking from
+        # the FIRST rep's assignment — yanking the lead from the new rep almost
+        # immediately. Emit a fresh state_change event to reset that timer.
+        session.add(LeadEvent(
+            lead_id=lead.id,
+            dealer_id=lead.dealer_id,
+            type="state_change",
+            payload={"from": "ASSIGNED", "to": "ASSIGNED",
+                     "reason": "reassigned", "assigned_rep": rep["name"]},
+            synced=False,
+        ))
+        lead.updated_at = datetime.now(timezone.utc)
+        session.commit()
 
     # Ping the rep via the notify_rep chokepoint (default = Twilio WhatsApp).
     config = dealer_config or dealer.config or {}
