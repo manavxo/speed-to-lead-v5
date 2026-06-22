@@ -167,6 +167,12 @@ class AIConfig(BaseModel):
     guardrails: dict[str, bool] = Field(
         default_factory=lambda: {"no_price_negotiation": True, "no_financing_promises": True}
     )
+    business_facts: str = Field(
+        "",
+        description="Per-dealer facts the AI can state verbatim (fees, inspection reports, "
+        "sub-prime credit, trade-ins, warranty). If a fact is NOT listed here, the AI must "
+        "defer ('let me check with the team'). Empty = no extra facts.",
+    )
 
 
 class Followups(BaseModel):

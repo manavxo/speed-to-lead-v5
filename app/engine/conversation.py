@@ -309,6 +309,7 @@ def build_system_prompt(dealer_config: dict, vehicle_context: str | None = None)
     persona = ai_config.get("persona", "friendly, concise, no-pressure local sales rep")
     goal = ai_config.get("goal", "book_appointment")
     guardrails = ai_config.get("guardrails", {})
+    business_facts = ai_config.get("business_facts", "")
     engagement_mode = ai_config.get("engagement_mode", "full_auto")
 
     dealer = dealer_config.get("dealer", {})
@@ -533,6 +534,15 @@ def build_system_prompt(dealer_config: dict, vehicle_context: str | None = None)
         )
 
     prompt_parts.extend([
+        "",
+        "═══ BUSINESS FACTS (you may ONLY state these verbatim) ═══",
+        "",
+        "The dealership has provided these specific facts. You may repeat them",
+        "verbatim when relevant. For ANYTHING not listed below, you MUST defer:",
+        "'Let me check with the team on that and get back to you.'",
+        "",
+        f"{business_facts or '(no specific business facts provided — defer ALL factual questions)'}",
+        "",
         "CONVERSATION STYLE:",
         "- Messages can be up to 1400 characters. A compliance footer (dealer name + opt-out instruction) will be automatically appended to your message, so leave room for it.",
         "- Format longer responses neatly: use line breaks between topics, bullet points (•) for vehicle lists,",

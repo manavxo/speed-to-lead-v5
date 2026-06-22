@@ -647,6 +647,21 @@ def get_auth_role(cookie_value: str | None) -> tuple[str, str]:
         return ("rep", "")
 
 
+def _check_lead_access(lead: Lead, auth: dict) -> bool:
+    """Return True if the authenticated user can read/modify this lead.
+
+    Managers can access all leads in their dealer.
+    Reps can only access their own leads or unassigned leads.
+    """
+    role = auth.get("role", "rep")
+    if role == "manager":
+        return True
+    rep_name = auth.get("rep_name", "")
+    if not rep_name:
+        return False
+    return lead.assigned_rep == rep_name or lead.assigned_rep is None
+
+
 # ---------------------------------------------------------------------------
 # Login / Logout
 # ---------------------------------------------------------------------------
@@ -824,7 +839,7 @@ async def login_submit(
         "ts": time.time(),
     })
     response = RedirectResponse("/dashboard", status_code=303)
-    response.set_cookie("session", token, httponly=True, secure=(settings.environment == "production"), max_age=86400, samesite="lax")
+    response.set_cookie("session", token, httponly=True, secure=(settings.environment == "production"), samesite="lax")
     return response
 
 
@@ -938,7 +953,7 @@ async def leads_partial(
     status: str | None = None,
     date_range: str | None = None,
     search: str | None = None,
-    _auth: None = Depends(require_auth),
+    _auth: dict = Depends(require_auth),
 ):
     """HTMX partial: return filtered lead table rows (tbody content)."""
     session = _get_session()
@@ -1409,7 +1424,7 @@ async def settings_page(request: Request, _auth: None = Depends(require_auth)):
 @router.post("/settings/channels")
 async def save_channel_settings(
     request: Request,
-    _auth: None = Depends(require_auth),
+    _auth: dict = Depends(require_auth),
 ):
     """Save channel settings (digest toggle + time)."""
     from fastapi.responses import JSONResponse
@@ -1440,7 +1455,7 @@ async def save_channel_settings(
 @router.post("/settings/business")
 async def save_business_settings(
     request: Request,
-    _auth: None = Depends(require_auth),
+    _auth: dict = Depends(require_auth),
 ):
     """Save business info settings (name, phone, address, website, hours)."""
     from fastapi.responses import JSONResponse
@@ -1490,7 +1505,7 @@ async def save_business_settings(
 @router.post("/settings/ai")
 async def save_ai_settings(
     request: Request,
-    _auth: None = Depends(require_auth),
+    _auth: dict = Depends(require_auth),
 ):
     """Save AI personality settings (persona, engagement mode, guardrails)."""
     from fastapi.responses import JSONResponse
@@ -1527,7 +1542,7 @@ async def save_ai_settings(
 @router.post("/settings/compliance")
 async def save_compliance_settings(
     request: Request,
-    _auth: None = Depends(require_auth),
+    _auth: dict = Depends(require_auth),
 ):
     """Save compliance settings (quiet hours, consent text, opt-out keywords)."""
     from fastapi.responses import JSONResponse
@@ -1562,7 +1577,7 @@ async def reassign_lead(
     request: Request,
     lead_id: int,
     rep: str = Form(...),
-    _auth: None = Depends(require_auth),
+    _auth: dict = Depends(require_auth),
 ):
     """Reassign a lead to a different rep."""
     session = _get_session()
@@ -1575,6 +1590,9 @@ async def reassign_lead(
         lead = session.get(Lead, lead_id)
         if not lead or lead.dealer_id != current_dealer.id:
             return HTMLResponse("Lead not found", status_code=404)
+
+        if not _check_lead_access(lead, _auth):
+            return HTMLResponse("Access denied — this lead is assigned to another rep", status_code=403)
 
         old_rep = lead.assigned_rep or "Unassigned"
         lead.assigned_rep = rep
@@ -1622,7 +1640,7 @@ async def update_lead_status(
     request: Request,
     lead_id: int,
     status: str = Form(...),
-    _auth: None = Depends(require_auth),
+    _auth: dict = Depends(require_auth),
 ):
     """Update a lead's status via lifecycle transition."""
     session = _get_session()
@@ -1635,6 +1653,9 @@ async def update_lead_status(
         lead = session.get(Lead, lead_id)
         if not lead or lead.dealer_id != current_dealer.id:
             return HTMLResponse("Lead not found", status_code=404)
+
+        if not _check_lead_access(lead, _auth):
+            return HTMLResponse("Access denied — this lead is assigned to another rep", status_code=403)
 
         try:
             target_state = LeadState(status)
@@ -1671,7 +1692,7 @@ async def send_lead_message(
     request: Request,
     lead_id: int,
     message: str = Form(...),
-    _auth: None = Depends(require_auth),
+    _auth: dict = Depends(require_auth),
 ):
     """Send an SMS message to a lead."""
     session = _get_session()
@@ -1684,6 +1705,9 @@ async def send_lead_message(
         lead = session.get(Lead, lead_id)
         if not lead or lead.dealer_id != current_dealer.id:
             return HTMLResponse("Lead not found", status_code=404)
+
+        if not _check_lead_access(lead, _auth):
+            return HTMLResponse("Access denied", status_code=403)
 
         if not lead.phone:
             return HTMLResponse("Lead has no phone number", status_code=400)
@@ -1732,7 +1756,7 @@ async def schedule_lead_followup(
     request: Request,
     lead_id: int,
     follow_up: str = Form(...),
-    _auth: None = Depends(require_auth),
+    _auth: dict = Depends(require_auth),
 ):
     """Schedule a follow-up for a lead."""
     session = _get_session()
@@ -1745,6 +1769,9 @@ async def schedule_lead_followup(
         lead = session.get(Lead, lead_id)
         if not lead or lead.dealer_id != current_dealer.id:
             return HTMLResponse("Lead not found", status_code=404)
+
+        if not _check_lead_access(lead, _auth):
+            return HTMLResponse("Access denied", status_code=403)
 
         try:
             followup_dt = datetime.fromisoformat(follow_up)
@@ -1793,7 +1820,7 @@ async def log_lead_activity(
     request: Request,
     lead_id: int,
     note: str = Form(...),
-    _auth: None = Depends(require_auth),
+    _auth: dict = Depends(require_auth),
 ):
     """Log a quick activity note on a lead (no-answer, voicemail, spoke, etc.)."""
     session = _get_session()
@@ -1806,6 +1833,9 @@ async def log_lead_activity(
         lead = session.get(Lead, lead_id)
         if not lead or lead.dealer_id != current_dealer.id:
             return HTMLResponse("Lead not found", status_code=404)
+
+        if not _check_lead_access(lead, _auth):
+            return HTMLResponse("Access denied", status_code=403)
 
         event = LeadEvent(
             lead_id=lead.id,
@@ -1831,7 +1861,7 @@ async def log_lead_activity(
 async def mark_lead_sold(
     request: Request,
     lead_id: int,
-    _auth: None = Depends(require_auth),
+    _auth: dict = Depends(require_auth),
 ):
     """Mark a lead as sold."""
     session = _get_session()
@@ -1844,6 +1874,9 @@ async def mark_lead_sold(
         lead = session.get(Lead, lead_id)
         if not lead or lead.dealer_id != current_dealer.id:
             return HTMLResponse("Lead not found", status_code=404)
+
+        if not _check_lead_access(lead, _auth):
+            return HTMLResponse("Access denied", status_code=403)
 
         try:
             from app.engine.lifecycle import transition
@@ -1872,7 +1905,7 @@ async def mark_lead_lost(
     request: Request,
     lead_id: int,
     reason: str = Form(""),
-    _auth: None = Depends(require_auth),
+    _auth: dict = Depends(require_auth),
 ):
     """Mark a lead as lost."""
     session = _get_session()
@@ -1885,6 +1918,9 @@ async def mark_lead_lost(
         lead = session.get(Lead, lead_id)
         if not lead or lead.dealer_id != current_dealer.id:
             return HTMLResponse("Lead not found", status_code=404)
+
+        if not _check_lead_access(lead, _auth):
+            return HTMLResponse("Access denied", status_code=403)
 
         try:
             from app.engine.lifecycle import transition
@@ -1916,7 +1952,7 @@ async def add_team_member(
     request: Request,
     name: str = Form(...),
     phone: str = Form(...),
-    _auth: None = Depends(require_auth),
+    _auth: dict = Depends(require_auth),
 ):
     """Add a new team member to the dealer's sales team."""
     session = _get_session()
