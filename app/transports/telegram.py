@@ -31,7 +31,7 @@ class TelegramTransport(Transport):
         Args:
             to: Telegram chat_id (numeric string, e.g. "123456789").
             body: Message text.
-            **kwargs: Unused — accepts extra args for interface compatibility.
+            **kwargs: Accepts inline_keyboard for inline button markup.
 
         Returns:
             TransportResult.
@@ -58,16 +58,19 @@ class TelegramTransport(Transport):
 
         import httpx
         url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+
+        payload: dict = {
+            "chat_id": to,
+            "text": body,
+            "parse_mode": "HTML",
+        }
+
+        inline_keyboard = kwargs.get("inline_keyboard")
+        if inline_keyboard:
+            payload["reply_markup"] = {"inline_keyboard": inline_keyboard}
+
         try:
-            resp = httpx.post(
-                url,
-                json={
-                    "chat_id": to,
-                    "text": body,
-                    "parse_mode": "HTML",
-                },
-                timeout=10.0,
-            )
+            resp = httpx.post(url, json=payload, timeout=10.0)
             data = resp.json()
             if resp.status_code == 200 and data.get("ok"):
                 message_id = str(data["result"]["message_id"])

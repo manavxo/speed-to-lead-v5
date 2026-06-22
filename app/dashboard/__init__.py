@@ -1589,6 +1589,24 @@ async def reassign_lead(
         session.add(event)
         session.commit()
 
+        # Notify the new rep via Telegram (single dealer notification channel)
+        dealer_config = current_dealer.config or {}
+        sales_team = dealer_config.get("sales_team", [])
+        new_rep_config = next((r for r in sales_team if r.get("name") == rep), None)
+        if new_rep_config:
+            from tools.notify_rep import notify_rep
+            notify_rep(
+                session=session,
+                rep_config=new_rep_config,
+                lead=lead,
+                message_type="cover_me",
+                payload={
+                    "customer_name": lead.name or "A customer",
+                    "vehicle": lead.vehicle_ref or "",
+                },
+                dealer_config=dealer_config,
+            )
+
         response = HTMLResponse(
             f'<div class="toast success">Lead reassigned to {rep}</div>',
             status_code=200,
