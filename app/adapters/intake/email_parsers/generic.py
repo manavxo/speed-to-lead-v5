@@ -37,8 +37,20 @@ def parse_generic(raw: str, subject: str = "", from_addr: str = "") -> Normalize
         # Extract anything that looks like a name at the start of the email
         lines = raw.strip().split("\n")
         first_line = lines[0].strip() if lines else ""
-        # If the first line looks like a person's name (2-3 words, not all caps)
-        if first_line and len(first_line.split()) in (2, 3) and not first_line.isupper():
+        # If the first line looks like a person's name (2-3 words, not all caps,
+        # not a greeting/boilerplate opener that would otherwise become the "name").
+        _GREETING_OPENERS = {
+            "hi", "hello", "hey", "dear", "good", "greetings", "thanks",
+            "thank", "re", "fwd", "fw", "to", "from", "subject",
+        }
+        first_word = first_line.split()[0].lower().rstrip(",:") if first_line else ""
+        if (
+            first_line
+            and len(first_line.split()) in (2, 3)
+            and not first_line.isupper()
+            and first_word not in _GREETING_OPENERS
+            and "@" not in first_line
+        ):
             result.name = first_line
         # Try to find any email address in the body
         email_match = re.search(r"(\S+@\S+\.\S+)", raw)

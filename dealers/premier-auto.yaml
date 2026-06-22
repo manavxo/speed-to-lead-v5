@@ -47,6 +47,15 @@ ai:
   guardrails:
     no_price_negotiation: true
     no_financing_promises: true
+  # NOTE (Manav): confirm/replace these with the dealer's REAL policies before go-live.
+  # The AI may ONLY state facts listed here; anything not listed, it defers to the team.
+  business_facts: |
+    - We accept trade-ins on any make or model. We'll appraise your current vehicle in person and apply its value toward your purchase.
+    - We work with all credit situations, including new credit and past credit challenges (sub-prime), through multiple lending partners.
+    - Every vehicle goes through a full mechanical safety inspection before sale. A vehicle history report (CarFax) is available on request.
+    - We offer financing through several banks and lenders; final rates and approval are confirmed by our finance team in person.
+    - Test drives are welcome — bring a valid driver's license.
+    - We are located at 4567 Kingsway, Burnaby, BC, with free customer parking on site.
 
 followups:
   cadence_min: [60, 1440, 4320, 10080]

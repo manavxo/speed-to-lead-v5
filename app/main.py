@@ -390,6 +390,36 @@ def _validate_twilio_signature(request: Request, form_data: dict | None = None) 
     return validator.validate(url, form_data or {}, signature)
 
 
+_OPT_OUT_PHRASES = (
+    "opt out", "opt-out", "unsubscribe", "remove me", "take me off",
+    "stop texting", "stop messaging", "stop sending", "no more texts",
+    "do not text", "don't text", "leave me alone",
+)
+
+
+def _is_sms_opt_out(body: str, keywords: list[str]) -> bool:
+    """True if an inbound SMS is a reasonable expression of opt-out intent (CASL).
+
+    CASL requires honoring any reasonable opt-out, not just the exact word STOP.
+    Matches: an exact keyword (STOP/UNSUBSCRIBE/ARRET/…), a keyword as a standalone
+    word anywhere in a short message, or a common opt-out phrase.
+    """
+    import re as _re
+    norm = (body or "").strip().lower()
+    if not norm:
+        return False
+    kw_lower = [k.lower() for k in keywords]
+    if norm in kw_lower:
+        return True
+    # Standalone keyword token (e.g. "please STOP") — only on short messages to
+    # avoid false positives like "stop by the dealership" in a long sentence.
+    if len(norm) <= 60:
+        tokens = set(_re.findall(r"[a-z]+", norm))
+        if tokens & set(kw_lower):
+            return True
+    return any(phrase in norm for phrase in _OPT_OUT_PHRASES)
+
+
 def _idempotency_check(session: Session, provider_sid: str | None) -> bool:
     """Return True if a Message with this provider_sid already exists (duplicate webhook)."""
     if not provider_sid:
@@ -670,8 +700,8 @@ async def webhook_twilio_sms(request: Request) -> Response:
                 # Not opted out — just acknowledge
                 return _twiml("You're already subscribed. Reply STOP to opt out.")
 
-        # Check for opt-out keyword
-        if body.upper().strip() in [kw.upper() for kw in opt_out_keywords]:
+        # Check for opt-out keyword or phrase (CASL: honor any reasonable intent)
+        if _is_sms_opt_out(body, opt_out_keywords):
             opt = ConsentLog(
                 dealer_id=dealer.id,
                 phone=from_number,

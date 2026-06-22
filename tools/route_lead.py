@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.adapters.intake import NormalizedLead
 from app.engine.lifecycle import transition
-from app.models import Channel, ConsentLog, Direction, Lead, LeadState, Message
+from app.models import Channel, ConsentLog, Direction, Lead, LeadEvent, LeadState, Message
 from tools.check_inventory import resolve_vehicle
 
 logger = logging.getLogger("speed-to-lead.route_lead")
@@ -26,6 +26,41 @@ logger = logging.getLogger("speed-to-lead.route_lead")
 
 def _exec(session: Session, stmt):
     return session.execute(stmt).scalars()
+
+
+def is_after_hours(dealer_config: dict, now: datetime | None = None) -> bool:
+    """True when an outbound first-touch should be deferred to the morning.
+
+    Deferral applies only when quiet hours are actually enforced (the global
+    QUIET_HOURS_DISABLED flag is off) AND we are currently inside the dealer's
+    quiet-hours window. Mirrors the exact check send_sms uses, so what we defer
+    here is exactly what send_sms would otherwise suppress.
+    """
+    from app.config import settings
+    from tools.send_sms import _is_quiet_hours
+    if settings.quiet_hours_disabled:
+        return False
+    return _is_quiet_hours(dealer_config, now=now)
+
+
+def queue_morning_followup(session: Session, lead: Lead, body: str, *, reason: str = "after_hours") -> None:
+    """Record an after-hours lead's first-touch text for delivery in the morning.
+
+    Instead of sending now (which quiet-hours would suppress and drop), we store
+    the intended message body on an append-only 'morning_queue' LeadEvent. The
+    morning sweep in app.scheduler picks it up once the dealer is back in
+    business hours and sends it, then writes a 'morning_sent' event so it is
+    never sent twice. No real SMS leaves the building at night.
+    """
+    session.add(LeadEvent(
+        lead_id=lead.id,
+        dealer_id=lead.dealer_id,
+        type="morning_queue",
+        payload={"reason": reason, "body": body},
+        synced=False,
+    ))
+    session.commit()
+    logger.info("Lead#%s queued for morning first-touch (reason=%s)", lead.id, reason)
 
 
 def _build_ai_followup_context(lead_data: NormalizedLead, vehicle=None, dealer_config: dict = None) -> str:
@@ -257,16 +292,23 @@ def ingest_lead(
     whatsapp_sender = channels.get("whatsapp_sender") or getattr(dealer, "whatsapp_sender", "") or ""
     sms_number = channels.get("sms_number") or getattr(dealer, "sms_number", "") or ""
 
-    # send_sms records the Message row itself (correct channel + provider SID),
-    # so we must NOT call _record_outbound_message here — doing so would create a
-    # duplicate row tagged channel=whatsapp with no SID.
-    _send_to_customer(
-        session, lead, auto_text,
-        channel="sms",
-        whatsapp_sender=whatsapp_sender, sms_number=sms_number,
-        dealer_slug=dealer.slug, dealer_config=dealer_config,
-        fake_twilio=fake_twilio, now=now,
-    )
+    # After-hours: do NOT text now (quiet hours would drop it silently). Generate
+    # the personalized first-touch and queue it for a morning send instead, so the
+    # customer wakes up to a real reply rather than nothing. Active conversations
+    # (customer replies) still go through at night via force_send elsewhere.
+    after_hours = is_after_hours(dealer_config, now=now) and bool(lead.phone)
+
+    if not after_hours:
+        # send_sms records the Message row itself (correct channel + provider SID),
+        # so we must NOT call _record_outbound_message here — doing so would create a
+        # duplicate row tagged channel=whatsapp with no SID.
+        _send_to_customer(
+            session, lead, auto_text,
+            channel="sms",
+            whatsapp_sender=whatsapp_sender, sms_number=sms_number,
+            dealer_slug=dealer.slug, dealer_config=dealer_config,
+            fake_twilio=fake_twilio, now=now,
+        )
 
     # 6. AI proactive follow-up — engage the customer immediately with personalized context
     ai_context = _build_ai_followup_context(lead_data, vehicle, dealer_config)
@@ -281,17 +323,22 @@ def ingest_lead(
         )
         ai_followup_text = result.get("text", "")
         if ai_followup_text:
-            # Send the AI's personalized follow-up
-            # send_sms records the Message row itself — no _record_outbound_message
-            # here, or we'd duplicate the row with the wrong channel and no SID.
-            _send_to_customer(
-                session, lead, ai_followup_text,
-                channel="sms",
-                whatsapp_sender=whatsapp_sender, sms_number=sms_number,
-                dealer_slug=dealer.slug, dealer_config=dealer_config,
-                fake_twilio=fake_twilio, now=now,
-            )
-            logger.info("AI proactive follow-up sent for lead#%s", lead.id)
+            if after_hours:
+                # Defer the first-touch to the morning sweep (no night-time send).
+                queue_morning_followup(session, lead, ai_followup_text, reason="after_hours")
+                logger.info("AI proactive follow-up QUEUED for morning for lead#%s", lead.id)
+            else:
+                # Send the AI's personalized follow-up
+                # send_sms records the Message row itself — no _record_outbound_message
+                # here, or we'd duplicate the row with the wrong channel and no SID.
+                _send_to_customer(
+                    session, lead, ai_followup_text,
+                    channel="sms",
+                    whatsapp_sender=whatsapp_sender, sms_number=sms_number,
+                    dealer_slug=dealer.slug, dealer_config=dealer_config,
+                    fake_twilio=fake_twilio, now=now,
+                )
+                logger.info("AI proactive follow-up sent for lead#%s", lead.id)
         ai_followup_success = True
     except Exception:
         logger.exception("AI proactive follow-up failed for lead#%s — deleting lead to avoid partial state", lead.id)

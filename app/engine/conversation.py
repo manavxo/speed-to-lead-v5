@@ -480,7 +480,7 @@ def build_system_prompt(dealer_config: dict, vehicle_context: str | None = None)
         prompt_parts.append(f"  Phone: {dealer_phone}")
         prompt_parts.append(f"  Phone (for connecting customers): {dealer_phone}")
     if hours_text:
-        prompt_parts.append(f"  Business Hours (for reference when suggesting times — NOT a booking restriction):\n{hours_text}")
+        prompt_parts.append(f"  Business Hours (appointments can ONLY be booked inside these hours — the booking tool enforces this):\n{hours_text}")
     prompt_parts.append("")
 
     # Guardrails
