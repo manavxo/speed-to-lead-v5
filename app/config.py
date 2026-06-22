@@ -128,6 +128,11 @@ class Channels(BaseModel):
     lead_email_inbox: Optional[str] = Field(None, description="Inbox that 3rd-party lead emails forward to")
     facebook_page_id: Optional[str] = None
     web_form_token: Optional[str] = Field(None, description="Identifies the dealer at /webhook/form/{token}")
+    email_from_address: Optional[str] = Field(None, description="Outbound email From address — the dealer's own domain email, e.g. sales@premierautogroup.com")
+    email_from_name: Optional[str] = Field(None, description="Display name for outbound emails, e.g. 'Premier Auto Group'")
+    voice_number: Optional[str] = Field(None, description="Twilio number for voice/missed-call. Defaults to sms_number if unset.")
+    call_detection: str = Field("always_on", description="Missed-call detection mode: always_on | time_based | voicemail_notify")
+    ring_timeout_sec: int = Field(25, description="Seconds before Twilio considers a call unanswered. Suggested 20-30s.")
 
 
 class SalesRep(BaseModel):
