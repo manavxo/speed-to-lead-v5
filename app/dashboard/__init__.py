@@ -1978,3 +1978,121 @@ async def add_team_member(
     finally:
         session.close()
 
+
+# ── Inventory upload ──────────────────────────────────────────────────────────
+
+from fastapi import UploadFile, File
+
+
+@router.post("/inventory/upload")
+async def upload_inventory(
+    request: Request,
+    file: UploadFile = File(...),
+    _auth: dict = Depends(require_auth),
+):
+    """Upload inventory from CSV or XLSX. Upserts into Vehicle table with row-level errors."""
+    import csv
+    import io
+
+    session = _get_session()
+    try:
+        cookie_value = request.cookies.get("session")
+        current_dealer = get_dealer_from_auth(session, cookie_value) if cookie_value else None
+        if not current_dealer:
+            return HTMLResponse("Unauthorized", status_code=401)
+
+        content = await file.read()
+        filename = file.filename or ""
+        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+
+        rows: list[dict] = []
+        errors: list[str] = []
+
+        if ext == "xlsx":
+            try:
+                from openpyxl import load_workbook
+            except ImportError:
+                return HTMLResponse("XLSX support requires openpyxl", status_code=500)
+            wb = load_workbook(io.BytesIO(content), read_only=True)
+            ws = wb.active
+            headers = [str(cell.value).strip() if cell.value else "" for cell in next(ws.iter_rows(min_row=1, max_row=1))]
+            header_map = {h.lower(): i for i, h in enumerate(headers) if h}
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                row_dict = {h: row[i] for h, i in header_map.items() if i < len(row)}
+                rows.append(row_dict)
+            wb.close()
+        elif ext == "csv":
+            reader = csv.DictReader(io.StringIO(content.decode("utf-8-sig")))
+            rows = list(reader)
+        else:
+            return HTMLResponse("Unsupported file type. Upload .csv or .xlsx.", status_code=400)
+
+        if not rows:
+            return HTMLResponse("Empty file.", status_code=400)
+
+        upserted = 0
+        for row_idx, row in enumerate(rows, start=2):
+            try:
+                stock_no = str(row.get("stock_no", row.get("stock #", ""))).strip()
+                year = int(float(str(row.get("year", 0))))
+                make = str(row.get("make", "")).strip()
+                model = str(row.get("model", "")).strip()
+                trim = str(row.get("trim", "")).strip()
+                body = str(row.get("body", row.get("body_style", ""))).strip()
+                price_str = str(row.get("price", "0")).replace("$", "").replace(",", "")
+                price = int(float(price_str)) if price_str else 0
+                mileage_str = str(row.get("mileage", row.get("miles", "0"))).replace(",", "")
+                mileage = int(float(mileage_str)) if mileage_str else 0
+
+                if not stock_no or not year or not make or not model:
+                    errors.append(f"Row {row_idx}: missing required field")
+                    continue
+
+                vehicle = session.execute(
+                    select(Vehicle).where(
+                        Vehicle.dealer_id == current_dealer.id,
+                        Vehicle.stock_no == stock_no,
+                    )
+                ).scalars().first()
+
+                raw_specs = {
+                    "engine": str(row.get("engine", "")) or None,
+                    "transmission": str(row.get("transmission", "")) or None,
+                    "drivetrain": str(row.get("drivetrain", "")) or None,
+                    "exterior_color": str(row.get("exterior_color", row.get("color", ""))) or None,
+                    "interior": str(row.get("interior", "")) or None,
+                }
+
+                if vehicle:
+                    vehicle.year = year; vehicle.make = make; vehicle.model = model
+                    vehicle.trim = trim or vehicle.trim; vehicle.body = body or vehicle.body
+                    vehicle.price = price; vehicle.mileage = mileage
+                    vehicle.raw = raw_specs; vehicle.status = "available"
+                else:
+                    vehicle = Vehicle(
+                        dealer_id=current_dealer.id, stock_no=stock_no,
+                        year=year, make=make, model=model, trim=trim or None,
+                        body=body or None, price=price, mileage=mileage,
+                        raw=raw_specs, status="available",
+                    )
+                    session.add(vehicle)
+                upserted += 1
+            except (ValueError, TypeError) as e:
+                errors.append(f"Row {row_idx}: {e}")
+                continue
+
+        if upserted > 0:
+            session.commit()
+
+        msg = f'<div class="toast success">{upserted} vehicles uploaded.</div>'
+        if errors:
+            preview = "; ".join(errors[:5])
+            msg += f'<div class="toast warning">{len(errors)} errors: {preview}{"..." if len(errors)>5 else ""}</div>'
+        return HTMLResponse(msg, status_code=200)
+
+    except Exception as e:
+        logger.exception("Inventory upload failed")
+        return HTMLResponse(f"Upload error: {e}", status_code=500)
+    finally:
+        session.close()
+
