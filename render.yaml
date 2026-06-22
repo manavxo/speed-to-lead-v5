@@ -32,6 +32,8 @@ services:
         value: "false"
       - key: TELEGRAM_BOT_TOKEN
         sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
       - key: SECRET_KEY
         generateValue: true
       - key: CSRF_SECRET
