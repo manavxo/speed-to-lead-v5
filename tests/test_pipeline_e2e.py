@@ -341,7 +341,8 @@ def test_round_robin_distribution(e2e_session, dealer):
         lead = ingest_lead(e2e_session, dealer, lead_data, fake_twilio=fake_twilio, now=now)
         # Book appointment — this triggers rep assignment via round-robin
         from datetime import timedelta
-        appt_time = datetime.now(timezone.utc) + timedelta(days=1, hours=i)
+        # Use future business-hours time (Fri June 26 2026, 10 AM - 1 PM PDT)
+        appt_time = datetime(2026, 6, 26, 17 + i, 0, tzinfo=timezone.utc)
         book_appointment(e2e_session, lead, appt_time, notes=f"Test drive {i}",
                          dealer_config=dealer.config)
         reps.append(lead.assigned_rep)
