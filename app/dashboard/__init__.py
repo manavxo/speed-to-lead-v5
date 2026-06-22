@@ -2041,7 +2041,9 @@ async def upload_inventory(
             wb.close()
         elif ext == "csv":
             reader = csv.DictReader(io.StringIO(content.decode("utf-8-sig")))
-            rows = list(reader)
+            # Lowercase headers so "Year"/"Make"/"Model" (the normal export casing)
+            # match the lowercase row.get() lookups below — same as the XLSX path.
+            rows = [{(k or "").strip().lower(): v for k, v in r.items()} for r in reader]
         else:
             return HTMLResponse("Unsupported file type. Upload .csv or .xlsx.", status_code=400)
 

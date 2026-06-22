@@ -101,8 +101,18 @@ def build_message(
     if not template:
         return f"[{template_key}] {kwargs}"
 
+    # Telegram renders these with parse_mode=HTML, and the template's own <b> tags
+    # are intentional — but interpolated values (customer name, vehicle, reply text)
+    # are untrusted. Escape them so a name like "Smith & Sons" or "<test>" doesn't
+    # make Telegram reject the whole message and drop the rep's notification.
+    import html
+    safe_kwargs = {
+        k: (html.escape(str(v), quote=False) if isinstance(v, str) else v)
+        for k, v in kwargs.items()
+    }
+
     try:
-        return template["body"].format(**kwargs)
+        return template["body"].format(**safe_kwargs)
     except KeyError as e:
         return template["body"] + f"  (missing: {e})"
 

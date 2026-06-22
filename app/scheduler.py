@@ -555,7 +555,7 @@ def _run_morning_followup_session(session, now: datetime | None = None) -> None:
     Takes a session (and optional fixed `now`) for testability.
     """
     from app.models import Dealer, Lead, LeadEvent, LeadState
-    from app.engine.conversation import is_business_hours
+    from tools.send_sms import _is_quiet_hours
     from sqlalchemy import select
 
     if now is None:
@@ -565,8 +565,13 @@ def _run_morning_followup_session(session, now: datetime | None = None) -> None:
 
     for dealer in dealers:
         config = dealer.config or {}
-        if not is_business_hours(config, now):
-            continue  # still closed — leave the queue alone
+        # Release the queue as soon as quiet hours END (e.g. 08:00), NOT when the
+        # showroom opens. Keying off business hours would strand a Saturday-night
+        # lead all through a closed Sunday until it ages past the 24h cutoff and is
+        # lost. Quiet-hours-end always fires within ~11h of queueing, so the lead
+        # is sent first thing in the morning even on a day the lot is closed.
+        if _is_quiet_hours(config, now):
+            continue  # still quiet hours — leave the queue alone
 
         queued = session.execute(
             select(LeadEvent).where(

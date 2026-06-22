@@ -344,7 +344,11 @@ def ingest_lead(
         logger.exception("AI proactive follow-up failed for lead#%s — deleting lead to avoid partial state", lead.id)
         # Delete the lead and all related data to avoid a half-baked AUTO_REPLIED lead
         from sqlalchemy import delete as sa_delete
+        # Delete children before the Lead or Postgres FK constraints reject the
+        # Lead delete (and mask the original error). The AUTO_REPLIED transition
+        # above already wrote a LeadEvent, so it must be cleared too.
         session.execute(sa_delete(Message).where(Message.lead_id == lead.id))
+        session.execute(sa_delete(LeadEvent).where(LeadEvent.lead_id == lead.id))
         session.execute(sa_delete(ConsentLog).where(ConsentLog.lead_id == lead.id))
         session.execute(sa_delete(Lead).where(Lead.id == lead.id))
         session.commit()
@@ -364,6 +368,33 @@ def ingest_lead(
 # ---------------------------------------------------------------------------
 # Email-only lead with no phone number
 # ---------------------------------------------------------------------------
+
+def _email_has_opted_out(session: Session, dealer_id: int, email: str) -> bool:
+    """True if this email address has an active opt-out (CASL).
+
+    Email opt-outs are logged in ConsentLog with the email stored in the `phone`
+    column (the audit table is keyed on a single contact field). A later
+    're_granted' entry clears it.
+    """
+    if not email:
+        return False
+    opt_out = _exec(session,
+        select(ConsentLog).where(
+            ConsentLog.phone == email,
+            ConsentLog.action == "opted_out",
+        ).order_by(ConsentLog.created_at.desc())
+    ).first()
+    if not opt_out:
+        return False
+    regrant = _exec(session,
+        select(ConsentLog).where(
+            ConsentLog.phone == email,
+            ConsentLog.action == "re_granted",
+            ConsentLog.created_at > opt_out.created_at,
+        )
+    ).first()
+    return regrant is None
+
 
 def _dedup_by_email(session: Session, dealer_id: int, email: str) -> Lead | None:
     """Check for existing lead with same email + dealer, excluding terminal states."""
@@ -461,6 +492,11 @@ def ingest_lead_email_no_phone(
 
     if not lead_data.email:
         logger.warning("ingest_lead_email_no_phone: no email address — cannot process")
+        return None
+
+    # CASL: never re-engage an email that has opted out.
+    if _email_has_opted_out(session, dealer.id, lead_data.email):
+        logger.info("Skipping email lead for %s — previously opted out", lead_data.email)
         return None
 
     # 1. Dedup by email

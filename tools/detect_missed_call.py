@@ -59,6 +59,7 @@ def handle_missed_call(
     call_status: str,
     call_duration: int = 0,
     sms_sender=None,  # Injectable for testing: sms_sender(to, from_, body) -> sid
+    now=None,         # Optional fixed timestamp for deterministic after-hours tests
 ) -> MissedCallResult:
     """Handle a missed call by creating a lead and sending SMS follow-up.
 
@@ -115,6 +116,16 @@ def handle_missed_call(
     session.add(lead)
     session.flush()  # Get lead.id
 
+    # A missed inbound call is implied consent to text back (CASL/TCPA: the
+    # customer contacted the dealer). Log it so the text-back — especially the
+    # after-hours one that goes through send_sms(lead=...) in the morning sweep —
+    # isn't suppressed by the no-consent guard.
+    try:
+        from tools.send_sms import _log_consent
+        _log_consent(session, lead, source="missed_call_inbound")
+    except Exception:
+        logger.exception("Failed to log implied consent for missed-call lead#%s", lead.id)
+
     # Build text-back message
     dealer_config = dealer.config or {}
     dealer_name = dealer_config.get("dealer", {}).get("name", "us")
@@ -131,7 +142,7 @@ def handle_missed_call(
     # drop it silently). Queue the text-back for the morning sweep instead so the
     # caller still gets a follow-up first thing — just not at 2am.
     from tools.route_lead import is_after_hours, queue_morning_followup
-    if is_after_hours(dealer_config):
+    if is_after_hours(dealer_config, now=now):
         lead.state = LeadState.AUTO_REPLIED
         queue_morning_followup(session, lead, text_body, reason="missed_call_after_hours")
         session.commit()
