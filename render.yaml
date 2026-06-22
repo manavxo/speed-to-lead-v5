@@ -28,6 +28,8 @@ services:
         value: "https://speed-to-lead-v5.onrender.com"
       - key: OPENROUTER_API_KEY
         sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
       - key: SECRET_KEY
         generateValue: true
       - key: CSRF_SECRET
