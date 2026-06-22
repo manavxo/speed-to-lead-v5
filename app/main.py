@@ -1028,3 +1028,185 @@ async def webhook_messenger(request: Request) -> dict:
 async def webhook_messenger_verify(request: Request) -> Response:
     """Facebook webhook verification endpoint."""
     return PlainTextResponse(request.query_params.get("hub.challenge", ""))
+
+
+# ── Telegram inbound webhook ─────────────────────────────────────────────────
+
+@app.post("/webhook/telegram")
+async def webhook_telegram(request: Request) -> dict:
+    """Handle inbound Telegram updates: /start deep links + inline button callbacks.
+
+    - /start <dealer_slug>__<rep_name>  → captures chat_id, saves to dealer config.
+    - Callback queries (claim:<lead_id> / pass:<lead_id>) → handles claim/pass.
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        return {"error": "invalid json"}
+
+    message = payload.get("message") or {}
+    callback = payload.get("callback_query") or {}
+    callback_data = callback.get("data", "")
+    from_user = (message.get("from") or callback.get("from") or {})
+    chat = message.get("chat") or (callback.get("message") or {}).get("chat") or {}
+    chat_id = str(chat.get("id", ""))
+    text = (message.get("text") or "").strip()
+    entities = message.get("entities") or []
+
+    logger.info("Telegram webhook: chat_id=%s text=%r callback=%r", chat_id, text[:100], callback_data)
+
+    # ── /start deep link: capture chat_id ─────────────────────────────────
+    if text.startswith("/start ") or any(
+        e.get("type") == "bot_command" and "start" in text
+        for e in entities
+    ):
+        _handle_telegram_start(text, chat_id)
+        return {"ok": True, "action": "start_captured", "chat_id": chat_id}
+
+    # ── Inline button callback ────────────────────────────────────────────
+    if callback_data:
+        return _handle_telegram_callback(callback_data, chat_id, from_user, callback)
+
+    # Unrecognized message — echo help text
+    return {"ok": True, "action": "unknown"}
+
+
+@app.get("/webhook/telegram")
+async def webhook_telegram_verify(request: Request) -> Response:
+    """Telegram webhook verification (for setWebhook via GET)."""
+    return PlainTextResponse("ok")
+
+
+def _handle_telegram_start(text: str, chat_id: str) -> None:
+    """Parse /start <dealer>__<rep> and save chat_id to the rep's config."""
+    parts = text.split(maxsplit=1)
+    if len(parts) < 2:
+        return
+    token = parts[1]
+    if "__" not in token:
+        return
+    dealer_slug, rep_name = token.split("__", 1)
+
+    session = _get_session()
+    try:
+        dealer = _exec(session, select(Dealer).where(Dealer.slug == dealer_slug)).first()
+        if not dealer:
+            logger.warning("Telegram start: dealer %s not found", dealer_slug)
+            return
+
+        config = dealer.config or {}
+        sales_team = config.get("sales_team", [])
+        updated = False
+        for r in sales_team:
+            if r.get("name") == rep_name:
+                r["telegram_chat_id"] = chat_id
+                updated = True
+                logger.info("Telegram: saved chat_id=%s for rep=%s dealer=%s", chat_id, rep_name, dealer_slug)
+                break
+
+        if updated:
+            import json as _json
+            dealer.config = _json.loads(_json.dumps(config))
+            session.commit()
+
+            # Send confirmation via Telegram
+            from app.transports.telegram import TelegramTransport
+            transport = TelegramTransport()
+            transport.send(
+                to=chat_id,
+                body=f"✅ Welcome {rep_name}! You're now connected to {dealer.name}. "
+                     f"You'll receive lead notifications here.",
+            )
+    finally:
+        session.close()
+
+
+def _handle_telegram_callback(
+    callback_data: str,
+    chat_id: str,
+    from_user: dict,
+    callback: dict,
+) -> dict:
+    """Handle inline button callbacks: claim:<lead_id> or pass:<lead_id>."""
+    if ":" not in callback_data:
+        return {"ok": False, "error": "unknown callback"}
+
+    action, lead_id_str = callback_data.split(":", 1)
+    try:
+        lead_id = int(lead_id_str)
+    except ValueError:
+        return {"ok": False, "error": "invalid lead_id"}
+
+    session = _get_session()
+    try:
+        lead = session.get(Lead, lead_id)
+        if not lead:
+            return {"ok": False, "error": "lead not found"}
+
+        dealer = session.get(Dealer, lead.dealer_id)
+        dealer_config = dealer.config if dealer else {}
+        sales_team = dealer_config.get("sales_team", [])
+        from_user_name = from_user.get("username", "") or from_user.get("first_name", "")
+
+        # Find rep by telegram_chat_id
+        rep_config = next(
+            (r for r in sales_team if str(r.get("telegram_chat_id", "")) == chat_id),
+            None,
+        )
+        if not rep_config:
+            return {"ok": False, "error": "rep not recognized — did you run /start?"}
+
+        rep_name = rep_config.get("name", "Unknown")
+
+        if action == "claim":
+            from app.engine.router import handle_claim
+            handle_claim(session, lead, rep_name)
+            session.commit()
+
+            # Answer the callback query
+            _answer_telegram_callback(callback.get("id", ""), f"Lead #{lead_id} claimed by {rep_name}")
+
+            # Send confirmation
+            from app.transports.telegram import TelegramTransport
+            from app.engine.message_templates import build_message, fill_vehicle_line
+            transport = TelegramTransport()
+            body = build_message(
+                "CLAIM_CONFIRM",
+                rep_name=rep_name,
+                customer_name=lead.name or "A customer",
+                vehicle_line=fill_vehicle_line(lead.vehicle_ref),
+                phone=lead.phone or "N/A",
+            )
+            transport.send(to=chat_id, body=body)
+            return {"ok": True, "action": "claimed", "lead_id": lead_id}
+
+        elif action == "pass":
+            from app.engine.router import handle_pass
+            handle_pass(
+                session, lead, dealer, sales_team, rep_name,
+                sms_number=dealer_config.get("channels", {}).get("sms_number"),
+            )
+            session.commit()
+
+            _answer_telegram_callback(callback.get("id", ""), f"Lead #{lead_id} passed")
+            return {"ok": True, "action": "passed", "lead_id": lead_id}
+
+        return {"ok": False, "error": f"unknown action: {action}"}
+
+    finally:
+        session.close()
+
+
+def _answer_telegram_callback(callback_id: str, text: str) -> None:
+    """Answer a Telegram callback query so the button stops spinning."""
+    if not callback_id:
+        return
+    bot_token = settings.telegram_bot_token
+    if not bot_token:
+        return
+    import httpx
+    url = f"https://api.telegram.org/bot{bot_token}/answerCallbackQuery"
+    try:
+        httpx.post(url, json={"callback_query_id": callback_id, "text": text}, timeout=5.0)
+    except Exception:
+        logger.exception("Failed to answer Telegram callback")

@@ -183,50 +183,43 @@ def _is_placeholder_phone(phone: str) -> bool:
 def _build_body(message_type: str, payload: dict, rep_name: str) -> str:
     """Map (message_type, payload, rep_name) to a human-readable body.
 
-    Each dealer-facing event type has its own short template. Keep these
-    terse — the rep is reading this on a phone, between other things.
+    Uses the centralized message_templates module for consistent formatting.
+    Falls back to plain text if the template doesn't exist.
     """
+    from app.engine.message_templates import build_message, fill_vehicle_line
+
     customer = payload.get("customer_name", "A customer")
     vehicle = payload.get("vehicle", "")
+
+    kwargs = {
+        "rep_name": rep_name,
+        "customer_name": customer,
+        "vehicle_line": fill_vehicle_line(vehicle),
+        "phone": payload.get("phone", ""),
+        "reason": payload.get("reason", ""),
+        "message_preview": payload.get("message_preview", ""),
+    }
+
+    template_key = message_type.upper()
+    if template_key in ("CLAIM", "COVER_ME", "HANDOFF_RECEIVED", "CLAIM_CONFIRM",
+                         "ESCALATION", "NEW_LEAD", "DAILY_DIGEST"):
+        return build_message(template_key, **kwargs)
+
+    # Legacy fallbacks for types not yet migrated to the template module
     vehicle_str = f" re: {vehicle}" if vehicle else ""
 
-    if message_type == "claim":
-        return (
-            f"Hey {rep_name} — new lead: {customer}{vehicle_str}. "
-            f"Reply 1 to claim, 2 to pass."
-        )
     if message_type == "appointment_set":
         when = payload.get("scheduled_for", "TBD")
         return (
             f"{rep_name} — appointment booked with {customer}{vehicle_str} for {when}. "
             f"Calendar invite incoming."
         )
-    if message_type == "escalation":
-        reason = payload.get("reason", "no reason given")
-        return (
-            f"{rep_name} — {customer}{vehicle_str} needs attention. "
-            f"Reason: {reason}. Please review."
-        )
     if message_type == "missed_call":
         return (
             f"{rep_name} — missed call from {customer}. "
             f"AI already texted them a follow-up."
         )
-    if message_type == "cover_me":
-        return (
-            f"🆘 COVER REQUEST — {rep_name}\n"
-            f"{customer}{vehicle_str} has been reassigned to you.\n"
-            f"Please take over this lead."
-        )
-    if message_type == "handoff_received":
-        return (
-            f"📨 HANDED TO YOU — {rep_name}\n"
-            f"{customer}{vehicle_str} has been sent your way.\n"
-            f"Claim it or pass to the next rep."
-        )
     if message_type == "sale":
-        # State machine SOLD notification. Rep needs to know fast — they're
-        # tracking the commission. Keep it punchy: just the close + customer.
         return f"{rep_name} — sold: {customer}{vehicle_str}. Congrats 🎉"
     if message_type == "email_reply":
         reply_text = payload.get("reply_text", "")
@@ -238,7 +231,6 @@ def _build_body(message_type: str, payload: dict, rep_name: str) -> str:
             f"💬 Their reply:\n"
             f"{reply_text}\n"
         )
-    # Fallback: generic
     return f"{rep_name} — update on {customer}{vehicle_str}."
 
 
@@ -381,7 +373,14 @@ def notify_rep(
                 error=f"rep {rep_name!r} has no telegram_chat_id; cannot notify via Telegram",
             )
         transport = TelegramTransport()
-        result = transport.send(to=chat_id, body=body)
+
+        # Attach inline claim/pass keyboard for claimable lead types
+        keyboard_kwargs = {}
+        if message_type in ("claim", "cover_me", "handoff_received", "escalation"):
+            from app.engine.message_templates import build_inline_keyboard
+            keyboard_kwargs["inline_keyboard"] = build_inline_keyboard(lead.id)
+
+        result = transport.send(to=chat_id, body=body, **keyboard_kwargs)
         if result.success:
             _log_rep_message(session, lead, Channel.WHATSAPP, body, result.message_id or "")
         return NotificationResult(
