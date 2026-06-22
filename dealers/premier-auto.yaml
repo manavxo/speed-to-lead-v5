@@ -24,6 +24,8 @@ channels:
   whatsapp_sender: "+17787623122"
   lead_email_inbox: "leads+premier@yourdomain.com"
   web_form_token: "premier-auto-group-token"
+  email_from_address: "sales@premierautogroup.com"
+  email_from_name: "Premier Auto Group"
 
 manager_pin: "1234"            # PIN for manager login (rep picks their name from dropdown + enters PIN)
 sales_team:

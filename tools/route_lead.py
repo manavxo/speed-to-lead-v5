@@ -358,6 +358,7 @@ def _send_email_followup(lead: Lead, dealer_config: dict) -> str | None:
         to=lead.email,
         subject=subject,
         body_text=body,
+        dealer_config=dealer_config,
     )
 
     if result.success:
