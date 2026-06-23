@@ -213,6 +213,10 @@ class DealerConfig(BaseModel):
     """Root per-dealer config. One file = one live tenant."""
     dealer: Dealer
     channels: Channels = Field(default_factory=Channels)
+    # PIN for manager login (rep picks "Manager" from the dropdown + enters this).
+    # Without this field the YAML's manager_pin was dropped on load, so managers
+    # could not sign in to the dashboard at all.
+    manager_pin: str = ""
     sales_team: list[SalesRep] = Field(default_factory=list)
     routing: Routing = Field(default_factory=Routing)
     ai: AIConfig = Field(default_factory=AIConfig)

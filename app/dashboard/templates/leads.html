@@ -241,63 +241,7 @@
 
 <!-- Lead Cards -->
 <div id="leads-list">
-    {% for lead in leads %}
-    <div class="lead-card" onclick="window.location.href='/dashboard/leads/{{ lead.id }}'">
-        {% set health = lead_health.get(lead.id, 'dead') %}
-        <div class="lead-health-indicator" style="background: {{ 'var(--success)' if health == 'hot' else 'var(--warning)' if health == 'warm' else 'var(--error)' if health == 'cold' else 'var(--text-muted)' }};"></div>
-        
-        <div class="lead-info">
-            <div class="lead-name">
-                {{ lead.name or 'Unnamed' }}
-                {% if lead.pass_count and lead.pass_count > 0 %}
-                <span style="font-size: 11px; color: var(--text-muted); font-weight: 400;">(passed {{ lead.pass_count }}x)</span>
-                {% endif %}
-            </div>
-            <div class="lead-details">
-                {% if lead.source.value == 'sms' %}
-                <span class="source-icon source-sms">S</span>
-                {% elif lead.source.value == 'whatsapp' %}
-                <span class="source-icon source-whatsapp">W</span>
-                {% elif lead.source.value == 'email' %}
-                <span class="source-icon source-email">E</span>
-                {% elif lead.source.value == 'webform' %}
-                <span class="source-icon source-webform">F</span>
-                {% endif %}
-                
-                {% if lead.phone %}
-                <span>{{ lead.phone }}</span>
-                {% elif lead.email %}
-                <span>{{ lead.email[:30] }}</span>
-                {% endif %}
-                
-                {% if lead.vehicle_ref %}
-                <span>&middot; {{ lead.vehicle_ref }}</span>
-                {% endif %}
-                
-                {% if lead.assigned_rep %}
-                <span>&middot; {{ lead.assigned_rep }}</span>
-                {% endif %}
-            </div>
-        </div>
-        
-        <div class="lead-right">
-            <span class="badge badge-{{ lead.state.value|lower if lead.state else 'new' }}">
-                {{ lead.state.value|upper if lead.state else 'NEW' }}
-            </span>
-            <span class="lead-time">
-                {% if lead.created_at %}
-                {{ lead.created_at|local_time('%b %d, %Y %I:%M %p') }}
-                {% endif %}
-            </span>
-        </div>
-    </div>
-    {% else %}
-    <div style="text-align: center; color: var(--text-muted); padding: 60px 20px;">
-        <div style="font-size: 40px; margin-bottom: 12px; opacity: 0.3;">&empty;</div>
-        <div style="font-size: 14px;">No leads found</div>
-        <div style="font-size: 12px; margin-top: 4px;">Try adjusting your filters</div>
-    </div>
-    {% endfor %}
+    {% include 'leads_partial.html' %}
 </div>
 
 <!-- New Lead Modal -->
@@ -312,7 +256,7 @@
                 </svg>
             </button>
         </div>
-        <form hx-post="/dashboard/leads/new" hx-swap="none" hx-on::after-request="if(event.detail.successful){ document.getElementById('new-lead-modal').classList.remove('show'); htmx.trigger('#leads-list', 'reload-leads'); }">
+        <form hx-post="/dashboard/leads/new" hx-swap="none">
             <div class="modal-body">
                 <div class="form-group">
                     <label class="form-label">Full Name</label>
@@ -337,6 +281,8 @@
 
 <script>
     document.body.addEventListener('reload-leads', function() {
+        var modal = document.getElementById('new-lead-modal');
+        if (modal) modal.classList.remove('show');
         htmx.ajax('GET', '/dashboard/leads/partial', {target: '#leads-list', swap: 'innerHTML'});
     });
 </script>

@@ -870,7 +870,9 @@ async def logout():
 @router.get("/")
 async def dashboard_index(request: Request, _auth: None = Depends(require_auth)):
     """Redirect to leads list."""
-    return RedirectResponse(url="/dashboard/leads")
+    # 303 (see other) forces a GET. The default 307 preserves the method, so the
+    # login POST propagated through here to /dashboard/leads → 405 Method Not Allowed.
+    return RedirectResponse(url="/dashboard/leads", status_code=303)
 
 
 @router.post("/leads/new")
@@ -903,16 +905,21 @@ async def create_lead(
 
         lead = ingest_lead(session, current_dealer, lead_data)
 
-        # If a rep created this lead, assign it to them
+        # If a rep created this lead, assign it to them.
         rep_name = _auth.get("rep_name", "")
         role = _auth.get("role", "rep")
         if role == "rep" and rep_name:
             lead.assigned_rep = rep_name
-            session.commit()
+        # Always persist: a manager-created lead has no rep branch to commit it,
+        # so without this the new lead is dropped when the session closes.
+        session.commit()
 
         response = HTMLResponse("", status_code=200)
         response.headers["X-Toast-Message"] = "Lead created successfully"
         response.headers["X-Toast-Type"] = "success"
+        # Server-driven refresh: htmx fires the reload-leads event (closes the
+        # modal + reloads the list). More reliable than inline hx-on on the form.
+        response.headers["HX-Trigger"] = "reload-leads"
         return response
     except Exception:
         logger.exception("Failed to create lead")
