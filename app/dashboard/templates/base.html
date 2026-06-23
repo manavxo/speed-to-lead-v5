@@ -863,7 +863,11 @@
             flex-direction: column;
             align-items: center;
             gap: 3px;
-            padding: 8px 12px;
+            /* Share the bar width evenly so all items (incl. a manager's 6) fit
+               on a phone — fixed padding pushed Logout off-screen. */
+            flex: 1 1 0;
+            min-width: 0;
+            padding: 8px 2px;
             border-radius: var(--radius-sm);
             color: var(--text-muted);
             font-size: 10px;
@@ -879,6 +883,14 @@
         .mobile-nav-item svg {
             width: 20px;
             height: 20px;
+            flex-shrink: 0;
+        }
+
+        .mobile-nav-item span {
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         
         /* ===== RESPONSIVE ===== */

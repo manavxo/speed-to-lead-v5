@@ -52,6 +52,11 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Playwright e2e artifacts (generated; not source)
+tests/e2e/test-results/
+tests/e2e/playwright-report/
+tests/e2e/pw_*.log
+
 # Build artifacts
 dist/
 build/

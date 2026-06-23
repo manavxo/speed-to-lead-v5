@@ -1,62 +1,57 @@
 {% for lead in leads %}
-<tr hx-get="/dashboard/leads/{{ lead.id }}" hx-target="#lead-detail-panel" hx-swap="innerHTML" hx-trigger="click"
-    style="cursor: pointer;"
-    data-created-at="{{ lead.created_at.isoformat() if lead.created_at else '' }}"
-    data-lead-state="{{ lead.state.value if lead.state else 'NEW' }}">
-    <td data-label="Name">
-        <span style="font-weight: 500;">{{ lead.name or '—' }}</span>
-    </td>
-    <td data-label="Phone" style="color: var(--text-secondary);">
-        <span>{{ lead.phone or '—' }}</span>
-        {% if lead.phone %}
-        <a href="tel:{{ lead.phone }}" onclick="event.stopPropagation()" title="Call" style="margin-left: 6px; color: var(--accent); text-decoration: none; font-size: 12px;">📞</a>
-        {% endif %}
-    </td>
-    <td data-label="Source">
-        <span style="color: var(--text-secondary);">{{ lead.source.value if lead.source else '—' }}</span>
-    </td>
-    <td data-label="Vehicle">
-        <span style="color: var(--text-secondary);">{{ lead.vehicle_ref or '—' }}</span>
-    </td>
-    <td data-label="Status">
+<div class="lead-card" onclick="window.location.href='/dashboard/leads/{{ lead.id }}'">
+    {% set health = lead_health.get(lead.id, 'dead') %}
+    <div class="lead-health-indicator" style="background: {{ 'var(--success)' if health == 'hot' else 'var(--warning)' if health == 'warm' else 'var(--error)' if health == 'cold' else 'var(--text-muted)' }};"></div>
+
+    <div class="lead-info">
+        <div class="lead-name">
+            {{ lead.name or 'Unnamed' }}
+            {% if lead.pass_count and lead.pass_count > 0 %}
+            <span style="font-size: 11px; color: var(--text-muted); font-weight: 400;">(passed {{ lead.pass_count }}x)</span>
+            {% endif %}
+        </div>
+        <div class="lead-details">
+            {% if lead.source.value == 'sms' %}
+            <span class="source-icon source-sms">S</span>
+            {% elif lead.source.value == 'whatsapp' %}
+            <span class="source-icon source-whatsapp">W</span>
+            {% elif lead.source.value == 'email' %}
+            <span class="source-icon source-email">E</span>
+            {% elif lead.source.value == 'webform' %}
+            <span class="source-icon source-webform">F</span>
+            {% endif %}
+
+            {% if lead.phone %}
+            <span>{{ lead.phone }}</span>
+            {% elif lead.email %}
+            <span>{{ lead.email[:30] }}</span>
+            {% endif %}
+
+            {% if lead.vehicle_ref %}
+            <span>&middot; {{ lead.vehicle_ref }}</span>
+            {% endif %}
+
+            {% if lead.assigned_rep %}
+            <span class="lead-rep">&middot; {{ lead.assigned_rep }}</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="lead-right">
         <span class="badge badge-{{ lead.state.value|lower if lead.state else 'new' }}">
-            {{ lead.state.value if lead.state else 'NEW' }}
+            {{ lead.state.value|upper if lead.state else 'NEW' }}
         </span>
-    </td>
-    <td data-label="Health">
-        {% set h = lead_health.get(lead.id, 'dead') %}
-        {% if h == 'hot' %}
-        <span class="badge" style="background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3);">
-            🟢 Hot
+        <span class="lead-time">
+            {% if lead.created_at %}
+            {{ lead.created_at|local_time('%b %d, %Y %I:%M %p') }}
+            {% endif %}
         </span>
-        {% elif h == 'warm' %}
-        <span class="badge" style="background: rgba(234, 179, 8, 0.15); color: #eab308; border: 1px solid rgba(234, 179, 8, 0.3);">
-            🟡 Warm
-        </span>
-        {% elif h == 'cold' %}
-        <span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);">
-            🔴 Cold
-        </span>
-        {% else %}
-        <span class="badge" style="background: rgba(107, 114, 128, 0.15); color: #6b7280; border: 1px solid rgba(107, 114, 128, 0.3);">
-            ⚫ Dead
-        </span>
-        {% endif %}
-    </td>
-    <td data-label="Rep" style="color: var(--text-secondary);">{{ lead.assigned_rep or '—' }}</td>
-    <td data-label="Response Time" class="response-timer-cell" style="font-size: 12px; font-weight: 600;">
-        {% if lead.created_at %}
-        <span class="response-timer" data-created="{{ lead.created_at.isoformat() }}">calculating...</span>
-        {% else %}
-        <span style="color: var(--text-muted);">—</span>
-        {% endif %}
-    </td>
-</tr>
+    </div>
+</div>
+{% else %}
+<div style="text-align: center; color: var(--text-muted); padding: 60px 20px;">
+    <div style="font-size: 40px; margin-bottom: 12px; opacity: 0.3;">&empty;</div>
+    <div style="font-size: 14px;">No leads found</div>
+    <div style="font-size: 12px; margin-top: 4px;">Try adjusting your filters</div>
+</div>
 {% endfor %}
-{% if not leads %}
-<tr>
-    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 40px;">
-        No leads found.
-    </td>
-</tr>
-{% endif %}

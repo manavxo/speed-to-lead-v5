@@ -49,6 +49,7 @@ def seed():
             if ld["state"] == LeadState.APPT_SET:
                 appt = Appointment(
                     lead_id=lead.id,
+                    dealer_id=dealer.id,
                     scheduled_for=now + timedelta(days=2),
                     status="set",
                 )
