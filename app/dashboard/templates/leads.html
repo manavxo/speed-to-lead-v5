@@ -1,10 +1,10 @@
-﻿{% extends 'base.html' %}
+{% extends 'base.html' %}
 
 {% block title %}Leads — Speed to Lead{% endblock %}
 {% block page_title %}Lead Pipeline{% endblock %}
 
 {% block top_actions %}
-<button class="btn btn-primary" onclick="window.location.href='/dashboard/leads?filter=new'">
+<button class="btn btn-primary" onclick="document.getElementById('new-lead-modal').classList.add('show')">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <line x1="12" y1="5" x2="12" y2="19"></line>
         <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -299,4 +299,45 @@
     </div>
     {% endfor %}
 </div>
+
+<!-- New Lead Modal -->
+<div class="modal-overlay" id="new-lead-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">Add New Lead</h3>
+            <button class="modal-close" onclick="document.getElementById('new-lead-modal').classList.remove('show')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+        <form hx-post="/dashboard/leads/new" hx-swap="none" hx-on::after-request="if(event.detail.successful){ document.getElementById('new-lead-modal').classList.remove('show'); htmx.trigger('#leads-list', 'reload-leads'); }">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" class="input" name="name" placeholder="e.g. John Smith" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Phone Number</label>
+                    <input type="tel" class="input" name="phone" placeholder="(555) 000-0000" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Vehicle Interest</label>
+                    <input type="text" class="input" name="vehicle_ref" placeholder="e.g. 2024 Toyota Camry">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('new-lead-modal').classList.remove('show')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add Lead</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.body.addEventListener('reload-leads', function() {
+        htmx.ajax('GET', '/dashboard/leads/partial', {target: '#leads-list', swap: 'innerHTML'});
+    });
+</script>
 {% endblock %}

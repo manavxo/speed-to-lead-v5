@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 import logging
+logger = logging.getLogger("speed-to-lead.dashboard")
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -651,7 +652,7 @@ def _check_lead_access(lead: Lead, auth: dict) -> bool:
     """Return True if the authenticated user can read/modify this lead.
 
     Managers can access all leads in their dealer.
-    Reps can only access their own leads or unassigned leads.
+    Reps can only access their own assigned leads.
     """
     role = auth.get("role", "rep")
     if role == "manager":
@@ -659,7 +660,18 @@ def _check_lead_access(lead: Lead, auth: dict) -> bool:
     rep_name = auth.get("rep_name", "")
     if not rep_name:
         return False
-    return lead.assigned_rep == rep_name or lead.assigned_rep is None
+    return lead.assigned_rep == rep_name
+
+
+def _base_context(auth: dict) -> dict:
+    """Return shared template context vars (user_role, user_name, user_initials)."""
+    role = auth.get("role", "rep")
+    rep_name = auth.get("rep_name", "")
+    return {
+        "user_role": role.title(),
+        "user_name": rep_name or role.title(),
+        "user_initials": (rep_name[:2].upper() if rep_name else (role[0].upper() if role else "U")),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -861,6 +873,57 @@ async def dashboard_index(request: Request, _auth: None = Depends(require_auth))
     return RedirectResponse(url="/dashboard/leads")
 
 
+@router.post("/leads/new")
+async def create_lead(
+    request: Request,
+    name: str = Form(...),
+    phone: str = Form(...),
+    vehicle_ref: str = Form(""),
+    _auth: dict = Depends(require_auth),
+):
+    """Create a new lead manually (dashboard form)."""
+    from app.adapters.intake import NormalizedLead
+    from app.models import Channel
+    from tools.route_lead import ingest_lead
+
+    session = _get_session()
+    try:
+        cookie_value = request.cookies.get("session")
+        current_dealer = get_dealer_from_auth(session, cookie_value) if cookie_value else None
+        if not current_dealer:
+            return HTMLResponse("Unauthorized", status_code=401)
+
+        lead_data = NormalizedLead(
+            source=Channel.WEBFORM,
+            name=name,
+            phone=phone,
+            vehicle_ref=vehicle_ref or None,
+            consent=True,
+        )
+
+        lead = ingest_lead(session, current_dealer, lead_data)
+
+        # If a rep created this lead, assign it to them
+        rep_name = _auth.get("rep_name", "")
+        role = _auth.get("role", "rep")
+        if role == "rep" and rep_name:
+            lead.assigned_rep = rep_name
+            session.commit()
+
+        response = HTMLResponse("", status_code=200)
+        response.headers["X-Toast-Message"] = "Lead created successfully"
+        response.headers["X-Toast-Type"] = "success"
+        return response
+    except Exception:
+        logger.exception("Failed to create lead")
+        response = HTMLResponse("", status_code=200)
+        response.headers["X-Toast-Message"] = "Failed to create lead"
+        response.headers["X-Toast-Type"] = "error"
+        return response
+    finally:
+        session.close()
+
+
 @router.get("/leads")
 async def leads_list(request: Request, _auth: None = Depends(require_auth)):
     """Lead pipeline overview with stats and attention items."""
@@ -878,7 +941,7 @@ async def leads_list(request: Request, _auth: None = Depends(require_auth)):
             query = (
                 select(Lead)
                 .where(Lead.dealer_id == dealer_id)
-                .where((Lead.assigned_rep == rep_name) | (Lead.assigned_rep.is_(None)))
+                .where(Lead.assigned_rep == rep_name)
                 .order_by(Lead.created_at.desc())
                 .limit(100)
             )
@@ -936,9 +999,7 @@ async def leads_list(request: Request, _auth: None = Depends(require_auth)):
             "avg_response_display": response_metrics["avg_response_display"],
             "avg_response_seconds": response_metrics["avg_response_seconds"],
             "stale_leads": stale_leads,
-            "user_role": role.title(),
-            "user_name": rep_name or role.title(),
-            "user_initials": (rep_name[:2].upper() if rep_name else (role[0].upper() if role else "U")),
+            **_base_context(_auth),
         })
     except Exception:
         logging.exception("Error in leads_list route")
@@ -964,7 +1025,10 @@ async def leads_partial(
             return HTMLResponse("", status_code=401)
 
         dealer_id = current_dealer.id
+        role, rep_name = get_auth_role(cookie_value)
         query = select(Lead).where(Lead.dealer_id == dealer_id)
+        if role == "rep" and rep_name:
+            query = query.where(Lead.assigned_rep == rep_name)
 
         # Status filter
         if status:
@@ -1038,9 +1102,9 @@ async def lead_detail(request: Request, lead_id: int, _auth: None = Depends(requ
         if lead.dealer_id != current_dealer.id:
             return HTMLResponse("<h1>Lead not found</h1>", status_code=404)
         
-        # Rep URL guard: rep can only access their own leads
+        # Rep URL guard: rep can only access their own assigned leads
         role, rep_name = get_auth_role(cookie_value)
-        if role == "rep" and rep_name and lead.assigned_rep and lead.assigned_rep != rep_name:
+        if role == "rep" and (not rep_name or lead.assigned_rep != rep_name):
             return HTMLResponse("<h1>Lead not found</h1>", status_code=404)
 
         messages = session.execute(
@@ -1097,6 +1161,10 @@ async def lead_detail(request: Request, lead_id: int, _auth: None = Depends(requ
         dealer_config = current_dealer.config or {}
         sales_team = dealer_config.get("sales_team", [])
 
+        # Compute allowed next states for the status dropdown
+        from app.engine.lifecycle import TRANSITIONS
+        allowed_states = sorted(s.value for s in TRANSITIONS.get(lead.state, set()))
+
         return templates.TemplateResponse(request=request, name="lead_detail.html", context={
             "request": request,
             "active_page": "leads",
@@ -1108,6 +1176,9 @@ async def lead_detail(request: Request, lead_id: int, _auth: None = Depends(requ
             "dealer": current_dealer,
             "dealer_name": current_dealer.name,
             "sales_team": sales_team,
+            "allowed_states": allowed_states,
+            "current_state": lead.state.value if lead.state else "NEW",
+            **_base_context(_auth),
         })
     finally:
         session.close()
@@ -1124,18 +1195,28 @@ async def stats_page(request: Request, days: int = 30, _auth: None = Depends(req
             return RedirectResponse("/dashboard/login", status_code=303)
         dealer_id = current_dealer.id
 
+        # Rep-scoped stats: reps only see their own leads
+        rep_name = _auth.get("rep_name", "")
+        role = _auth.get("role", "rep")
+
         # Date-range filter: default last 30 days, adjustable via ?days= query param
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
         leads_q = select(Lead).where(Lead.created_at >= cutoff, Lead.dealer_id == dealer_id)
+        if role == "rep" and rep_name:
+            leads_q = leads_q.where(Lead.assigned_rep == rep_name)
         leads_q = leads_q.order_by(Lead.created_at.desc())
         leads = session.execute(leads_q).scalars().all()
 
         msg_q = select(Message).join(Lead).where(Lead.created_at >= cutoff, Lead.dealer_id == dealer_id)
+        if role == "rep" and rep_name:
+            msg_q = msg_q.where(Lead.assigned_rep == rep_name)
         msg_q = msg_q.order_by(Message.created_at.desc())
         messages = session.execute(msg_q).scalars().all()
 
         appt_q = select(Appointment).join(Lead).where(Lead.created_at >= cutoff, Lead.dealer_id == dealer_id)
+        if role == "rep" and rep_name:
+            appt_q = appt_q.where(Lead.assigned_rep == rep_name)
         appt_q = appt_q.order_by(Appointment.scheduled_for.desc())
         appointments = session.execute(appt_q).scalars().all()
 
@@ -1193,6 +1274,7 @@ async def stats_page(request: Request, days: int = 30, _auth: None = Depends(req
             "conversion_funnel": conversion_funnel,
             "dealer": current_dealer,
             "dealer_name": current_dealer.name,
+            **_base_context(_auth),
         })
     finally:
         session.close()
@@ -1203,8 +1285,10 @@ async def stats_page(request: Request, days: int = 30, _auth: None = Depends(req
 # ---------------------------------------------------------------------------
 
 @router.get("/team")
-async def team_page(request: Request, days: int = 30, _auth: None = Depends(require_auth)):
+async def team_page(request: Request, days: int = 30, _auth: dict = Depends(require_auth)):
     """Team management page with rep performance leaderboard."""
+    if _auth.get("role") != "manager":
+        return RedirectResponse("/dashboard/leads", status_code=303)
     session = _get_session()
     try:
         cookie_value = request.cookies.get("session")
@@ -1231,13 +1315,19 @@ async def team_page(request: Request, days: int = 30, _auth: None = Depends(requ
         for rep_cfg in configured_reps:
             name = rep_cfg.get("name", "")
             if name and name not in existing_names:
+                # Must match the row schema get_rep_performance emits, or the
+                # team template (row.lost, row.conversion_pct, …) raises Undefined.
                 rep_performance.append({
                     "rep": name,
-                    "total": 0,
-                    "claimed": 0,
+                    "assigned": 0,
+                    "engaged": 0,
+                    "appt_set": 0,
                     "sold": 0,
-                    "conversion": 0,
-                    "avg_response_min": 0,
+                    "lost": 0,
+                    "conversion_pct": 0,
+                    "leads_today": 0,
+                    "avg_response_display": "--",
+                    "avg_response_seconds": 0,
                 })
 
         # Active rep count (configured reps + any rep with leads)
@@ -1265,6 +1355,7 @@ async def team_page(request: Request, days: int = 30, _auth: None = Depends(requ
             "total_leads": total_assigned,
             "dealer": current_dealer,
             "dealer_name": current_dealer.name,
+            **_base_context(_auth),
         })
     finally:
         session.close()
@@ -1284,6 +1375,7 @@ async def appointments_page(request: Request, status: str = None, _auth: None = 
         if not current_dealer:
             return RedirectResponse("/dashboard/login", status_code=303)
         dealer_id = current_dealer.id
+        role, rep_name = get_auth_role(cookie_value)
 
         now = datetime.now(timezone.utc)
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -1293,6 +1385,8 @@ async def appointments_page(request: Request, status: str = None, _auth: None = 
 
         # Build query
         stmt = select(Appointment).join(Lead, Appointment.lead_id == Lead.id).where(Lead.dealer_id == dealer_id)
+        if role == "rep" and rep_name:
+            stmt = stmt.where(Lead.assigned_rep == rep_name)
         if status:
             stmt = stmt.where(Appointment.status == status)
         stmt = stmt.order_by(Appointment.scheduled_for.desc())
@@ -1307,6 +1401,8 @@ async def appointments_page(request: Request, status: str = None, _auth: None = 
 
         # Stats
         appt_query = select(Appointment).join(Lead, Appointment.lead_id == Lead.id).where(Lead.dealer_id == dealer_id)
+        if role == "rep" and rep_name:
+            appt_query = appt_query.where(Lead.assigned_rep == rep_name)
         all_appts = session.execute(appt_query).scalars().all()
 
         today_count = sum(
@@ -1335,6 +1431,7 @@ async def appointments_page(request: Request, status: str = None, _auth: None = 
             "filter_status": status,
             "dealer": current_dealer,
             "dealer_name": current_dealer.name,
+            **_base_context(_auth),
         })
     finally:
         session.close()
@@ -1345,8 +1442,10 @@ async def appointments_page(request: Request, status: str = None, _auth: None = 
 # ---------------------------------------------------------------------------
 
 @router.get("/settings")
-async def settings_page(request: Request, _auth: None = Depends(require_auth)):
+async def settings_page(request: Request, _auth: dict = Depends(require_auth)):
     """Settings page — shows dealer config from the current dealer."""
+    if _auth.get("role") != "manager":
+        return RedirectResponse("/dashboard/leads", status_code=303)
     session = _get_session()
     try:
         cookie_value = request.cookies.get("session")
@@ -1412,6 +1511,7 @@ async def settings_page(request: Request, _auth: None = Depends(require_auth)):
             "digest_enabled": digest_enabled,
             "digest_time": digest_time,
             "dealer": dealer,
+            **_base_context(_auth),
         })
     finally:
         session.close()
@@ -1427,6 +1527,9 @@ async def save_channel_settings(
     _auth: dict = Depends(require_auth),
 ):
     """Save channel settings (digest toggle + time)."""
+    if _auth.get("role") != "manager":
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=403)
     from fastapi.responses import JSONResponse
     session = _get_session()
     try:
@@ -1458,6 +1561,9 @@ async def save_business_settings(
     _auth: dict = Depends(require_auth),
 ):
     """Save business info settings (name, phone, address, website, hours)."""
+    if _auth.get("role") != "manager":
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=403)
     from fastapi.responses import JSONResponse
     session = _get_session()
     try:
@@ -1508,6 +1614,9 @@ async def save_ai_settings(
     _auth: dict = Depends(require_auth),
 ):
     """Save AI personality settings (persona, engagement mode, guardrails)."""
+    if _auth.get("role") != "manager":
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=403)
     from fastapi.responses import JSONResponse
     session = _get_session()
     try:
@@ -1545,6 +1654,9 @@ async def save_compliance_settings(
     _auth: dict = Depends(require_auth),
 ):
     """Save compliance settings (quiet hours, consent text, opt-out keywords)."""
+    if _auth.get("role") != "manager":
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=403)
     from fastapi.responses import JSONResponse
     session = _get_session()
     try:
@@ -1612,24 +1724,25 @@ async def reassign_lead(
         sales_team = dealer_config.get("sales_team", [])
         new_rep_config = next((r for r in sales_team if r.get("name") == rep), None)
         if new_rep_config:
-            from tools.notify_rep import notify_rep
-            notify_rep(
-                session=session,
-                rep_config=new_rep_config,
-                lead=lead,
-                message_type="cover_me",
-                payload={
-                    "customer_name": lead.name or "A customer",
-                    "vehicle": lead.vehicle_ref or "",
-                },
-                dealer_config=dealer_config,
-            )
+            try:
+                from tools.notify_rep import notify_rep
+                notify_rep(
+                    session=session,
+                    rep_config=new_rep_config,
+                    lead=lead,
+                    message_type="cover_me",
+                    payload={
+                        "customer_name": lead.name or "A customer",
+                        "vehicle": lead.vehicle_ref or "",
+                    },
+                    dealer_config=dealer_config,
+                )
+            except Exception:
+                logger.exception("Failed to notify rep %s about reassignment", rep)
 
-        response = HTMLResponse(
-            f'<div class="toast success">Lead reassigned to {rep}</div>',
-            status_code=200,
-        )
-        response.headers["HX-Trigger"] = "showToast"
+        response = HTMLResponse("", status_code=200)
+        response.headers["X-Toast-Message"] = f"Lead reassigned to {rep}"
+        response.headers["X-Toast-Type"] = "success"
         return response
     finally:
         session.close()
@@ -1665,8 +1778,11 @@ async def update_lead_status(
         try:
             from app.engine.lifecycle import transition
             transition(session, lead, target_state, reason="dashboard_status_change")
-        except ValueError as e:
-            return HTMLResponse(str(e), status_code=400)
+        except ValueError:
+            response = HTMLResponse(f"Can't move a {lead.state.value} lead to {status}", status_code=200)
+            response.headers["X-Toast-Message"] = f"Can't move a {lead.state.value} lead to {status}"
+            response.headers["X-Toast-Type"] = "error"
+            return response
 
         event = LeadEvent(
             lead_id=lead.id,
@@ -1677,11 +1793,9 @@ async def update_lead_status(
         session.add(event)
         session.commit()
 
-        response = HTMLResponse(
-            f'<div class="toast success">Status updated to {status}</div>',
-            status_code=200,
-        )
-        response.headers["HX-Trigger"] = "showToast"
+        response = HTMLResponse("", status_code=200)
+        response.headers["X-Toast-Message"] = f"Status updated to {status}"
+        response.headers["X-Toast-Type"] = "success"
         return response
     finally:
         session.close()
@@ -1741,11 +1855,9 @@ async def send_lead_message(
         except Exception:
             logging.exception("Failed to send SMS for lead %s", lead_id)
 
-        response = HTMLResponse(
-            '<div class="toast success">Message sent</div>',
-            status_code=200,
-        )
-        response.headers["HX-Trigger"] = "showToast"
+        response = HTMLResponse("", status_code=200)
+        response.headers["X-Toast-Message"] = "Message sent"
+        response.headers["X-Toast-Type"] = "success"
         return response
     finally:
         session.close()
@@ -1803,11 +1915,9 @@ async def schedule_lead_followup(
         session.add(event)
         session.commit()
 
-        response = HTMLResponse(
-            f'<div class="toast success">Follow-up scheduled</div>',
-            status_code=200,
-        )
-        response.headers["HX-Trigger"] = "showToast"
+        response = HTMLResponse("", status_code=200)
+        response.headers["X-Toast-Message"] = "Follow-up scheduled"
+        response.headers["X-Toast-Type"] = "success"
         return response
     finally:
         session.close()
@@ -1847,11 +1957,9 @@ async def log_lead_activity(
         lead.updated_at = datetime.now(timezone.utc)
         session.commit()
 
-        response = HTMLResponse(
-            f'<div class="toast success">Activity logged: {note}</div>',
-            status_code=200,
-        )
-        response.headers["HX-Trigger"] = "showToast"
+        response = HTMLResponse("", status_code=200)
+        response.headers["X-Toast-Message"] = "Activity logged"
+        response.headers["X-Toast-Type"] = "success"
         return response
     finally:
         session.close()
@@ -1893,8 +2001,10 @@ async def mark_lead_sold(
         session.add(event)
         session.commit()
 
-        response = RedirectResponse("/dashboard/leads", status_code=303)
-        response.headers["HX-Trigger"] = "showToast"
+        response = HTMLResponse("", status_code=200)
+        response.headers["HX-Redirect"] = "/dashboard/leads"
+        response.headers["X-Toast-Message"] = "Lead marked as sold!"
+        response.headers["X-Toast-Type"] = "success"
         return response
     finally:
         session.close()
@@ -1940,8 +2050,10 @@ async def mark_lead_lost(
         session.add(event)
         session.commit()
 
-        response = RedirectResponse("/dashboard/leads", status_code=303)
-        response.headers["HX-Trigger"] = "showToast"
+        response = HTMLResponse("", status_code=200)
+        response.headers["HX-Redirect"] = "/dashboard/leads"
+        response.headers["X-Toast-Message"] = "Lead marked as lost"
+        response.headers["X-Toast-Type"] = "warning"
         return response
     finally:
         session.close()

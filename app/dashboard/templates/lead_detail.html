@@ -227,10 +227,9 @@
                 <div class="form-group">
                     <label class="form-label">Status</label>
                     <select class="select" name="status" hx-post="/dashboard/leads/{{ lead.id }}/status" hx-trigger="change" hx-include="this">
-                        {% for state_option in ['NEW', 'AUTO_REPLIED', 'ASSIGNED', 'CLAIMED', 'ENGAGED', 'APPT_SET', 'SHOWED', 'SOLD', 'LOST', 'OPTED_OUT'] %}
-                        <option value="{{ state_option }}" {{ 'selected' if lead.state and lead.state.value == state_option }}>
-                            {{ state_option }}
-                        </option>
+                        <option value="{{ current_state }}" selected disabled>{{ current_state }}</option>
+                        {% for opt in allowed_states %}
+                        <option value="{{ opt }}">{{ opt }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -252,7 +251,7 @@
                 <div class="form-group">
                     <label class="form-label">Schedule Follow-up</label>
                     <input type="datetime-local" class="input" name="follow_up">
-                    <button class="btn btn-secondary btn-sm" style="width: 100%; margin-top: 8px;" hx-post="/dashboard/leads/{{ lead.id }}/follow-up" hx-include="previous [name='follow_up']" onclick="showToast('Follow-up scheduled', 'success')">
+                    <button class="btn btn-secondary btn-sm" style="width: 100%; margin-top: 8px;" hx-post="/dashboard/leads/{{ lead.id }}/follow-up" hx-include="previous [name='follow_up']">
                         Set Reminder
                     </button>
                 </div>
@@ -262,29 +261,23 @@
                     <label class="form-label">Quick Log Activity</label>
                     <div style="display: flex; flex-wrap: wrap; gap: 6px;">
                         <button class="btn btn-ghost btn-sm" style="font-size: 11px; padding: 4px 10px;"
-                                hx-post="/dashboard/leads/{{ lead.id }}/activity" hx-vals='{"note": "Called — no answer"}'
-                                hx-on::after-request="showToast('Activity logged', 'success')">📞 No Answer</button>
+                                hx-post="/dashboard/leads/{{ lead.id }}/activity" hx-vals='{"note": "Called — no answer"}'>📞 No Answer</button>
                         <button class="btn btn-ghost btn-sm" style="font-size: 11px; padding: 4px 10px;"
-                                hx-post="/dashboard/leads/{{ lead.id }}/activity" hx-vals='{"note": "Left voicemail"}'
-                                hx-on::after-request="showToast('Activity logged', 'success')">🎙️ Voicemail</button>
+                                hx-post="/dashboard/leads/{{ lead.id }}/activity" hx-vals='{"note": "Left voicemail"}'>🎙️ Voicemail</button>
                         <button class="btn btn-ghost btn-sm" style="font-size: 11px; padding: 4px 10px;"
-                                hx-post="/dashboard/leads/{{ lead.id }}/activity" hx-vals='{"note": "Sent text message"}'
-                                hx-on::after-request="showToast('Activity logged', 'success')">💬 Texted</button>
+                                hx-post="/dashboard/leads/{{ lead.id }}/activity" hx-vals='{"note": "Sent text message"}'>💬 Texted</button>
                         <button class="btn btn-ghost btn-sm" style="font-size: 11px; padding: 4px 10px;"
-                                hx-post="/dashboard/leads/{{ lead.id }}/activity" hx-vals='{"note": "Spoke with lead"}'
-                                hx-on::after-request="showToast('Activity logged', 'success')">🗣️ Spoke</button>
+                                hx-post="/dashboard/leads/{{ lead.id }}/activity" hx-vals='{"note": "Spoke with lead"}'>🗣️ Spoke</button>
                         <button class="btn btn-ghost btn-sm" style="font-size: 11px; padding: 4px 10px;"
-                                hx-post="/dashboard/leads/{{ lead.id }}/activity" hx-vals='{"note": "Appointment confirmed"}'
-                                hx-on::after-request="showToast('Activity logged', 'success')">✅ Confirmed</button>
+                                hx-post="/dashboard/leads/{{ lead.id }}/activity" hx-vals='{"note": "Appointment confirmed"}'>✅ Confirmed</button>
                         <button class="btn btn-ghost btn-sm" style="font-size: 11px; padding: 4px 10px;"
-                                hx-post="/dashboard/leads/{{ lead.id }}/activity" hx-vals='{"note": "Made offer / pricing discussed"}'
-                                hx-on::after-request="showToast('Activity logged', 'success')">💰 Offer</button>
+                                hx-post="/dashboard/leads/{{ lead.id }}/activity" hx-vals='{"note": "Made offer / pricing discussed"}'>💰 Offer</button>
                     </div>
                 </div>
 
                 <div style="border-top: 1px solid var(--border); padding-top: 16px;">
                     <div style="display: flex; flex-direction: column; gap: 8px;">
-                        <button class="btn btn-primary" style="width: 100%;" hx-post="/dashboard/leads/{{ lead.id }}/mark-sold" onclick="showToast('Lead marked as sold!', 'success')">
+                        <button class="btn btn-primary" style="width: 100%;" hx-post="/dashboard/leads/{{ lead.id }}/mark-sold">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <polyline points="20 6 9 17 4 12"></polyline>
                             </svg>
@@ -302,7 +295,7 @@
                                 <option value="Other">Other</option>
                             </select>
                         </div>
-                        <button class="btn btn-danger" style="width: 100%;" hx-post="/dashboard/leads/{{ lead.id }}/mark-lost" hx-include="#loss-reason" hx-confirm="Mark this lead as lost?" onclick="showToast('Lead marked as lost', 'warning')">
+                        <button class="btn btn-danger" style="width: 100%;" hx-post="/dashboard/leads/{{ lead.id }}/mark-lost" hx-include="#loss-reason" hx-confirm="Mark this lead as lost?">
                             Mark as Lost
                         </button>
                     </div>
