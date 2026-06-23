@@ -1,3 +1,6 @@
+# NOTE: the LIVE database is speed-to-leadv5-db (correct schema + data), wired
+# via the manually-set DATABASE_URL in the web service below. The entry here is
+# the original DB — now suspended with an outdated schema — kept for reference.
 databases:
   - name: speed-to-lead-db
     plan: free
@@ -12,10 +15,11 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
+      # Live database is set manually in the Render dashboard to the
+      # speed-to-leadv5-db INTERNAL connection string. Kept as sync:false so a
+      # blueprint sync never reverts it to the old (outdated-schema) DB.
       - key: DATABASE_URL
-        fromDatabase:
-          name: speed-to-lead-db
-          property: connectionString
+        sync: false
       - key: TWILIO_ACCOUNT_SID
         sync: false
       - key: TWILIO_AUTH_TOKEN
