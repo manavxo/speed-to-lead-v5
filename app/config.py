@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     openrouter_model: str = "deepseek/deepseek-v4-flash"
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
 
+    # Tool-calling model — used when the turn requires structured tool calls
+    # (booking, availability, inventory). GPT-4o-mini via OpenRouter is cheap +
+    # gold-standard reliable function calling. Swappable via env without code changes.
+    tool_model: str = "openai/gpt-4o-mini"
+
     # DeepSeek direct API — used when DEEPSEEK_API_KEY is set (cheaper than OpenRouter)
     deepseek_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com"
@@ -114,11 +119,12 @@ class Dealer(BaseModel):
     timezone: str = "America/Vancouver"
     hours: dict[str, str] = Field(
         default_factory=dict,
-        description='Per-day open hours, e.g. {"mon": "09:00-19:00"}. Drives the AI-autonomy switch.',
+        description='Per-day open hours, e.g. {"mon": "09:00-18:00"}. Drives the AI-autonomy switch.',
     )
     location_address: Optional[str] = None
     maps_url: Optional[str] = None
     main_phone: Optional[str] = None
+    website: Optional[str] = Field(None, description="Dealer website URL — shared with customers who ask")
 
 
 class Channels(BaseModel):

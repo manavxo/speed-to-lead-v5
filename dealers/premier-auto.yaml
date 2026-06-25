@@ -18,6 +18,7 @@ dealer:
   location_address: "4567 Kingsway, Burnaby, BC V5H 2B1"
   maps_url: "https://maps.google.com/?q=Premier+Auto+Group+Burnaby"
   main_phone: "+17787623122"
+  website: "https://www.premierautogroup.com"
 
 channels:
   sms_number: "+17787623122"

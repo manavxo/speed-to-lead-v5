@@ -1,7 +1,7 @@
 """AI conversation orchestration (the only place Claude/OpenRouter is called).
 
 Flow: load the relevant workflow SOP (workflows/*.md) + the dealer's AI config + the pinned
-vehicle context -> call OpenRouter with the tool definitions -> if the model requests a tool,
+vehicle context -> call the model with the tool definitions -> if the model requests a tool,
 execute the deterministic tool and loop -> return the assistant turn.
 
 Grounding rule: the model may only state facts returned by tools (e.g. check_inventory). It must
@@ -10,8 +10,9 @@ never invent a car/price. Tools are the only path to side effects.
 Autonomy is hybrid by time-of-day (see is_business_hours): business hours -> draft for rep
 approval; after hours -> send autonomously.
 
-TODO: Docs say Claude but the code uses OpenRouter/Gemini.  Leave it; the provider swap is a
-one-line config change when Anthropic creds are available.
+Model routing (F0): general conversation uses DeepSeek (cheap, good quality). Tool-critical
+turns (booking, availability, inventory) are routed to TOOL_MODEL via OpenRouter with forced
+tool_choice — GPT-4o-mini has gold-standard structured function calling.
 """
 
 from __future__ import annotations
@@ -38,7 +39,7 @@ _RETRYABLE_STATUS_CODES = {500, 502, 503, 504}
 # ---------------------------------------------------------------------------
 # Max conversation turns before escalating to human handoff
 # ---------------------------------------------------------------------------
-MAX_INBOUND_TURNS = 10
+MAX_INBOUND_TURNS = 20
 
 
 # ---------------------------------------------------------------------------
@@ -82,6 +83,79 @@ def _get_model_name() -> str:
     if _settings.deepseek_api_key:
         return "deepseek-v4-flash"
     return _settings.openrouter_model
+
+
+# ---------------------------------------------------------------------------
+# F0: Tool-model client — separate from the main client so tool-critical turns
+# always route through OpenRouter for reliable structured function calling.
+# ---------------------------------------------------------------------------
+_TOOL_MODEL_CLIENT = None
+
+
+def _get_tool_model_client():
+    """Lazy singleton client for the tool model (always via OpenRouter).
+
+    Returns None if OPENROUTER_API_KEY is not configured — callers must fall back
+    to the main client. Separate from _get_openai_client() so the conversation
+    client can be DeepSeek-direct while tool calls go through OpenRouter.
+    """
+    global _TOOL_MODEL_CLIENT
+    if _TOOL_MODEL_CLIENT is None:
+        from app.config import settings as _settings
+        if _settings.openrouter_api_key:
+            from openai import OpenAI
+            _TOOL_MODEL_CLIENT = OpenAI(
+                base_url=_settings.openrouter_base_url,
+                api_key=_settings.openrouter_api_key,
+            )
+        else:
+            _TOOL_MODEL_CLIENT = False  # Sentinel: no key configured
+    return _TOOL_MODEL_CLIENT if _TOOL_MODEL_CLIENT is not False else None
+
+
+# Booking/intent keywords that signal a turn needs structured tool calling.
+_TOOL_CRITICAL_PATTERNS = [
+    # Specific date/time mentions (strongest signal)
+    r'\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b',
+    r'\b(\d{1,2}(?::\d{2})?\s*(?:am|pm|o.?clock))\b',
+    r'\b(tomorrow|next\s+week|this\s+week|today)\b',
+    # Booking-related actions
+    r'\b(book|schedule|reservation|test\s+drive|appointment|lock\s+it\s+in|book\s+(?:it|me))\b',
+    # Availability: "when" + action word
+    r'\bwhen\s+(?:works|would|is|are|does|should|do|will|can)\b',
+    # Availability: "what" + available/times/slots
+    r'\bwhat.*\b(?:available|times?|slots?)\b',
+    # Availability: standalone availability/visit inquiries
+    r'\b(?:any\s+)?(?:availability|available|test\s+drive|appointment)\b',
+    # Availability: "can I come", "want to come", "stop by", "visit"
+    r'\b(?:come\s+in|stop\s+by|come\s+see|want\s+(?:to\s+)?(?:come|see|visit|test\s+drive))\b',
+    # Inventory/specs: "what" + car attribute or make
+    r'\bwhat.*\b(?:engine|specs?|transmission|drivetrain|horsepower|fuel\s+economy|color|features?|trim|range|mileage)\b',
+    r'\b(?:tell\s+me\s+about\s+the|show\s+me\s+(?:what|your|the))\b',
+    r'\b(?:do\s+you\s+have\s+(?:any\s+)?(?:honda|toyota|ford|chev|bmw|audi|kia|hyundai|mazda|nissan|subaru|mercedes|volkswagen|volvo|jeep|dodge|ram|gmc|buick|cadillac|lexus|infiniti|acura|porsche|tesla)s?\b)',
+    r'\b(?:what.*\s+(?:SUV|sedan|truck|cars?|vehicle|inventory|stock)s?\s+(?:do\s+you\s+have|are\s+there|in\s+stock))\b',
+    r'\b(?:what\s+(?:do\s+you|have\s+you|is|are)\s+(?:have|got|in\s+stock|available))\b',
+    r'\b(?:what.?s\s+in\s+(?:your\s+)?(?:inventory|stock))\b',
+    r'\bwhat\s+.*\s+(?:do\s+you\s+have|you\s+have|are\s+available|in\s+stock)\b',
+    # Booking confirmation: agreement words + short message context
+    r'\b(?:yes|yeah|ok|okay|let.?s\s+do\s+it|put\s+me\s+down|i.?ll\s+take\s+it|set\s+it\s+up)\b',
+]
+
+
+def _is_tool_critical_turn(text: str) -> bool:
+    """True if the customer message signals the turn needs structured tool calling.
+
+    Matches booking confirmations, time/date queries, availability checks,
+    inventory/spec questions. False for small talk, greetings, general questions.
+    """
+    if not text:
+        return False
+    lowered = text.lower()
+    import re as _re
+    for pattern in _TOOL_CRITICAL_PATTERNS:
+        if _re.search(pattern, lowered):
+            return True
+    return False
 
 
 def is_business_hours(dealer_config: dict, now: datetime | None = None) -> bool:
@@ -319,7 +393,8 @@ def build_system_prompt(dealer_config: dict, vehicle_context: str | None = None)
     dealer_address = dealer.get("location_address", "")
     dealer_hours = dealer.get("hours", {})
 
-    # Format hours as human-readable text
+    # Website (dealers may optionally configure this for customers who ask)
+    dealer_website = dealer.get("website", "")
     hours_text = ""
     if dealer_hours:
         day_names = {"mon": "Monday", "tue": "Tuesday", "wed": "Wednesday",
@@ -425,6 +500,16 @@ def build_system_prompt(dealer_config: dict, vehicle_context: str | None = None)
         "If a customer asks for a specific time NOT in the returned slots, politely",
         "offer the closest available alternative.",
         "",
+        "╔══════════════════════════════════════════════════════════╗",
+        "║  CRITICAL: NEVER say 'let me book', 'I'll lock it in',  ║",
+        "║  or 'appointment confirmed' WITHOUT calling the         ║",
+        "║  book_appointment tool FIRST. You MUST call the tool.   ║",
+        "║  Only claim it's booked AFTER the tool returns success. ║",
+        "║  Echo the EXACT confirmed date/time from the result.    ║",
+        "║  Do NOT loop — call the tool the FIRST time the         ║",
+        "║  customer agrees to a specific time.                    ║",
+        "╚══════════════════════════════════════════════════════════╝",
+        "",
         "When to book (don't wait for the perfect moment — any of these is enough):",
         "  - Customer says they want to see a vehicle in person",
         "  - Customer asks 'when can I come in?' or 'can I test drive it?'",
@@ -480,6 +565,8 @@ def build_system_prompt(dealer_config: dict, vehicle_context: str | None = None)
     if dealer_phone:
         prompt_parts.append(f"  Phone: {dealer_phone}")
         prompt_parts.append(f"  Phone (for connecting customers): {dealer_phone}")
+    if dealer_website:
+        prompt_parts.append(f"  Website: {dealer_website} — share this URL when a customer asks. Only share the configured URL, never invent one.")
     if hours_text:
         prompt_parts.append(f"  Business Hours (appointments can ONLY be booked inside these hours — the booking tool enforces this):\n{hours_text}")
     prompt_parts.append("")
@@ -545,7 +632,10 @@ def build_system_prompt(dealer_config: dict, vehicle_context: str | None = None)
         f"{business_facts or '(no specific business facts provided — defer ALL factual questions)'}",
         "",
         "CONVERSATION STYLE:",
-        "- Messages can be up to 1400 characters. A compliance footer (dealer name + opt-out instruction) will be automatically appended to your message, so leave room for it.",
+        "- Be concise — 1 to 3 short sentences per message. No walls of text.",
+        "- Use 1-2 relevant emojis tastefully (🚗 🚙 🔑 🏁 📅 ✅).",
+        "- Every message must end with a clear call-to-action driving toward the booking.",
+        "- Examples of good CTAs: 'Want me to lock in Thursday 2pm? 🚗', 'Ready to come see it this weekend?'",
         "- Format longer responses neatly: use line breaks between topics, bullet points (•) for vehicle lists,",
         "  and keep paragraphs short. Example:",
         "    Here are our SUVs under $35k:",
@@ -556,7 +646,7 @@ def build_system_prompt(dealer_config: dict, vehicle_context: str | None = None)
         "    • 2023 Mazda CX-5 GX — $31,200 (14,500 km)",
         "      Premium interior, smooth ride",
         "    ",
-        "    Which one catches your eye? I can set up a test drive for you this week!",
+        "    Which one catches your eye? I can set up a test drive for you this week! 🚙",
         "- Be warm and natural, like talking to a friend who works at a dealership.",
         "- Use the customer's name occasionally if you know it.",
         "- If the customer is vague or 'just browsing', use check_inventory to suggest 1-3 relevant vehicles.",
@@ -567,7 +657,7 @@ def build_system_prompt(dealer_config: dict, vehicle_context: str | None = None)
         "- Keep messages under 300 characters when possible for best delivery",
         "- NEVER use ALL CAPS for emphasis — use natural language",
         "- Avoid excessive punctuation (!!!, ???)",
-        "- NEVER include URLs in messages — the customer already has your contact info",
+        "- Share the dealership website URL when customers ask — only the configured one",
         "- Include your dealership name in your FIRST message to establish identity",
         "- Avoid spam trigger words: 'free', 'winner', 'congrats', 'act now', 'limited time'",
         "- Keep messages conversational and natural — you're a real person at a dealership",
@@ -743,31 +833,39 @@ def handle_turn(
         ).scalar() or 0
 
         if inbound_count >= MAX_INBOUND_TURNS and lead.state == LeadState.ENGAGED:
-            logger.warning(
-                "Lead %s hit max inbound turns (%d); handing off to human rep",
-                lead.id, inbound_count,
-            )
-            # Send handoff message with dealer name
-            dealer_name = dealer_config.get("dealer", {}).get("name", "our team")
-            handoff_text = (
-                f"Thanks for chatting with us! I've passed your information to {dealer_name}. "
-                f"A sales rep will follow up with you shortly to help with whatever you need."
-            )
-            # Transition to ASSIGNED for human follow-up
-            from app.engine.lifecycle import transition
-            transition(
-                session, lead, LeadState.ASSIGNED,
-                reason="max_turns_reached",
-                meta={"inbound_count": inbound_count},
-            )
+            # F3: don't cut off mid-booking — if the customer has active booking
+            # intent, let the conversation continue to close the appointment.
+            if _is_tool_critical_turn(inbound_text):
+                logger.info(
+                    "Lead %s hit max turns but has booking intent — bypassing handoff",
+                    lead.id,
+                )
+            else:
+                logger.warning(
+                    "Lead %s hit max inbound turns (%d); handing off to human rep",
+                    lead.id, inbound_count,
+                )
+                # Send handoff message with dealer name
+                dealer_name = dealer_config.get("dealer", {}).get("name", "our team")
+                handoff_text = (
+                    f"Thanks for chatting with us! I've passed your information to {dealer_name}. "
+                    f"A sales rep will follow up with you shortly to help with whatever you need."
+                )
+                # Transition to ASSIGNED for human follow-up
+                from app.engine.lifecycle import transition
+                transition(
+                    session, lead, LeadState.ASSIGNED,
+                    reason="max_turns_reached",
+                    meta={"inbound_count": inbound_count},
+                )
 
-            return {
-                "mode": "send",
-                "text": handoff_text,
-                "is_business_hours": is_business_hours(dealer_config, now),
-                "tools_used": [],
-                "max_turns_reached": True,
-            }
+                return {
+                    "mode": "send",
+                    "text": handoff_text,
+                    "is_business_hours": is_business_hours(dealer_config, now),
+                    "tools_used": [],
+                    "max_turns_reached": True,
+                }
 
     # ------------------------------------------------------------------
     # Normal conversation flow
@@ -992,9 +1090,30 @@ def _call_openrouter(
         return "Thank you for your interest! One of our team members will be in touch shortly."
 
     try:
-        # P0-03 APPLIED DURING MIGRATION: module-level lazy singleton — instantiates OpenAI client
-        # once per process (not per request) to avoid connection/memory leak under load.
-        client = _get_openai_client()
+        # F0: model router — detect tool-critical turns and route to a reliable
+        # function-calling model (GPT-4o-mini via OpenRouter) with forced tool_choice.
+        # General conversation stays with DeepSeek (cheap, good quality).
+        is_tool_critical = _is_tool_critical_turn(user_message) if user_message else False
+        tool_model_client = _get_tool_model_client()
+
+        if is_tool_critical and tool_model_client is not None:
+            active_client = tool_model_client
+            active_model = settings.tool_model
+            tool_choice: dict | str = "required"
+            logger.info(
+                "F0 router: tool-critical turn → model=%s tool_choice=required msg=%.60s",
+                active_model, user_message,
+            )
+        else:
+            active_client = _get_openai_client()
+            active_model = _get_model_name()
+            tool_choice = "auto"
+            if is_tool_critical:
+                logger.warning(
+                    "F0 router: tool-critical intent detected but OPENROUTER_API_KEY "
+                    "is not set — falling back to default model (DeepSeek). "
+                    "Set OPENROUTER_API_KEY to enable reliable tool calling."
+                )
 
         messages = [{"role": "system", "content": system_prompt}]
 
@@ -1035,11 +1154,11 @@ def _call_openrouter(
         messages.append({"role": "user", "content": user_message})
 
         response = _call_openrouter_with_retry(
-            client,
-            model=_get_model_name(),
+            active_client,
+            model=active_model,
             messages=messages,
             tools=TOOL_DEFINITIONS,
-            tool_choice="auto",
+            tool_choice=tool_choice,
             max_tokens=1024,
             temperature=0.7,
         )
@@ -1064,13 +1183,13 @@ def _call_openrouter(
                     "content": json.dumps(result),
                 })
 
-            # Send tool results back for final response
+            # Send tool results back for final response (same model, no tools)
             messages.append(choice.message.model_dump())
             messages.extend(tool_results)
 
             final_response = _call_openrouter_with_retry(
-                client,
-                model=_get_model_name(),
+                active_client,
+                model=active_model,
                 messages=messages,
                 max_tokens=1024,
                 temperature=0.7,
@@ -1108,14 +1227,19 @@ def _call_openrouter(
                     "role": "system",
                     "content": (
                         "Now write your reply to the customer as plain SMS text using ONLY "
-                        "the tool results above. Do NOT output any tool-call syntax, XML tags, "
-                        "function calls, or special tokens."
+                        "the tool results above. Answer any specific question they asked "
+                        "(engine specs, price, availability, etc.) directly from the results. "
+                        "Be specific and factual. If the tool returned no results, say so. "
+                        "Do NOT output any tool-call syntax, XML tags, "
+                        "function calls, or special tokens. "
+                        "Do NOT ask 'what's most important to you' — the customer asked a "
+                        "specific question. Answer it."
                     ),
                 })
-                # Re-call WITHOUT tools to force a natural-language answer.
+                # Re-call WITHOUT tools to force a natural-language answer (same model)
                 final_response = _call_openrouter_with_retry(
-                    client,
-                    model=_get_model_name(),
+                    active_client,
+                    model=active_model,
                     messages=messages,
                     max_tokens=1024,
                     temperature=0.7,

@@ -153,15 +153,25 @@ def _process_and_send_sync(
 
     reply_text = result.get("text", "Thanks for your message!")
 
-    # Append CASL compliance footer
-    bg_dealer_name = bg_dealer_config.get("dealer", {}).get("name", "")
-    footer = bg_dealer_config.get("compliance", {}).get(
-        "consent_text", "Reply STOP to opt out."
-    )
-    if bg_dealer_name and bg_dealer_name not in reply_text:
-        reply_text = f"{reply_text}\n\n— {bg_dealer_name}. {footer}"
-    elif footer not in reply_text:
-        reply_text = f"{reply_text}\n\n{footer}"
+    # Append CASL compliance footer ONCE per customer (first outbound message only)
+    from sqlalchemy import select as sa_select, func
+    outbound_count = session.execute(
+        sa_select(func.count()).select_from(Message).where(
+            Message.lead_id == lead_id,
+            Message.direction == Direction.OUTBOUND,
+            Message.recipient_role == "customer",
+        )
+    ).scalar() or 0
+
+    if outbound_count == 0:
+        bg_dealer_name = bg_dealer_config.get("dealer", {}).get("name", "")
+        footer = bg_dealer_config.get("compliance", {}).get(
+            "consent_text", "Reply STOP to opt out."
+        )
+        if bg_dealer_name and bg_dealer_name not in reply_text:
+            reply_text = f"{reply_text}\n\n— {bg_dealer_name}. {footer}"
+        elif footer not in reply_text:
+            reply_text = f"{reply_text}\n\n{footer}"
 
     # Send via send_sms chokepoint (enforces compliance, logs message)
     from tools.send_sms import send_sms
