@@ -302,6 +302,9 @@
         <button class="settings-tab" onclick="switchTab('compliance')" data-tab="compliance">
             Compliance
         </button>
+        <button class="settings-tab" onclick="switchTab('inventory')" data-tab="inventory">
+            Inventory
+        </button>
     </div>
     
     <!-- Business Info Tab -->
@@ -628,6 +631,43 @@
             <button class="btn btn-primary" hx-post="/dashboard/settings/compliance" hx-target="this" hx-swap="outerHTML" hx-include="closest form">
                 Save Compliance Settings
             </button>
+        </div>
+    </div>
+
+    <!-- Inventory Tab -->
+    <div class="tab-content" id="tab-inventory">
+        <div class="settings-section">
+            <div class="section-title">Inventory Upload</div>
+            <div class="section-description">
+                Upload your current stock as a CSV or XLSX. The AI can only talk about
+                vehicles that live here — so the richer the specs, the better it sells.
+                Existing stock numbers are updated; new ones are added.
+            </div>
+
+            <form id="inventory-upload-form"
+                  hx-post="/dashboard/inventory/upload"
+                  hx-target="#inventory-upload-result"
+                  hx-swap="innerHTML"
+                  hx-encoding="multipart/form-data">
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" for="inventory-file">Inventory file (.csv or .xlsx)</label>
+                    <input type="file" id="inventory-file" name="file"
+                           accept=".csv,.xlsx" required
+                           style="display:block; margin-top:8px; color: var(--text-secondary);">
+                </div>
+                <button type="submit" class="btn btn-primary" id="inventory-upload-btn">
+                    Upload Inventory
+                </button>
+            </form>
+
+            <div id="inventory-upload-result" style="margin-top: 16px;"></div>
+
+            <div class="section-description" style="margin-top: 20px;">
+                <strong>Columns:</strong> stock_no, year, make, model, trim, body, price, mileage,
+                engine, transmission, drivetrain, horsepower, fuel_economy, exterior_color,
+                interior_color, features (separate multiple with <code>|</code>), vin, image_url.
+                Only stock_no, year, make and model are required.
+            </div>
         </div>
     </div>
 </div>

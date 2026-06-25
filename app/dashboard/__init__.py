@@ -2238,24 +2238,60 @@ async def upload_inventory(
                     )
                 ).scalars().first()
 
+                def _clean(*keys):
+                    """First non-empty value among the given column names."""
+                    for k in keys:
+                        v = row.get(k)
+                        if v is not None and str(v).strip():
+                            return str(v).strip()
+                    return None
+
+                # Features may be a pipe/semicolon/comma-separated string in the file.
+                features_raw = _clean("features")
+                features = []
+                if features_raw:
+                    for sep in ("|", ";"):
+                        if sep in features_raw:
+                            features = [f.strip() for f in features_raw.split(sep) if f.strip()]
+                            break
+                    else:
+                        features = [f.strip() for f in features_raw.split(",") if f.strip()]
+
+                # Capture the full spec set check_inventory surfaces to customers
+                # (engine, transmission, drivetrain, horsepower, fuel_economy,
+                # exterior/interior color, range, features). The AI may ONLY state
+                # facts that live here, so the richer this is, the better it sells.
                 raw_specs = {
-                    "engine": str(row.get("engine", "")) or None,
-                    "transmission": str(row.get("transmission", "")) or None,
-                    "drivetrain": str(row.get("drivetrain", "")) or None,
-                    "exterior_color": str(row.get("exterior_color", row.get("color", ""))) or None,
-                    "interior": str(row.get("interior", "")) or None,
+                    "engine": _clean("engine"),
+                    "transmission": _clean("transmission"),
+                    "drivetrain": _clean("drivetrain"),
+                    "horsepower": _clean("horsepower", "hp"),
+                    "torque": _clean("torque"),
+                    "fuel_economy": _clean("fuel_economy", "fuel economy", "mpg", "l/100km"),
+                    "range": _clean("range"),
+                    "exterior_color": _clean("exterior_color", "color"),
+                    "interior": _clean("interior", "interior_color"),
+                    "features": features,
                 }
+                vin = _clean("vin")
+                url = _clean("url", "vehicle_url")
+                photo = _clean("image_url", "image", "photo")
+                photos = [photo] if photo else []
 
                 if vehicle:
                     vehicle.year = year; vehicle.make = make; vehicle.model = model
                     vehicle.trim = trim or vehicle.trim; vehicle.body = body or vehicle.body
                     vehicle.price = price; vehicle.mileage = mileage
                     vehicle.raw = raw_specs; vehicle.status = "available"
+                    if vin: vehicle.vin = vin
+                    if url: vehicle.url = url
+                    if photos: vehicle.photos = photos
                 else:
                     vehicle = Vehicle(
                         dealer_id=current_dealer.id, stock_no=stock_no,
                         year=year, make=make, model=model, trim=trim or None,
                         body=body or None, price=price, mileage=mileage,
+                        vin=vin, url=url, photos=photos,
                         raw=raw_specs, status="available",
                     )
                     session.add(vehicle)
