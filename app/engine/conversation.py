@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -856,6 +857,118 @@ def _call_openrouter_with_retry(client, **kwargs):
     raise last_exc
 
 
+# ---------------------------------------------------------------------------
+# Leaked tool-call recovery (DeepSeek/proxy sometimes emits the tool call as
+# raw text in message.content instead of the structured tool_calls field).
+# Without this, the customer receives raw markup like:
+#   "Let me check! <｜｜Dsml｜｜tool_calls><｜｜Dsml｜｜invoke name="check_inventory">..."
+# ---------------------------------------------------------------------------
+
+# Known tool names — used to detect a leaked call referencing a real tool.
+_KNOWN_TOOL_NAMES = {t["function"]["name"] for t in TOOL_DEFINITIONS}
+
+# Markers that indicate the model dumped tool-call syntax into the text body.
+# Covers the antml-style invoke/parameter format and DeepSeek's native special
+# tokens (rendered variously as ｜｜Dsml｜｜, <｜tool▁calls▁begin｜>, <|tool…|>, etc.).
+_TOOLCALL_MARKERS = (
+    "tool_calls", "tool▁calls", "tool_call", "tool▁call",
+    "invoke name=", "<｜", "<|tool", "｜｜Dsml", "function<｜", "function<|",
+)
+
+
+def _looks_like_leaked_toolcall(content: str) -> bool:
+    """True if `content` appears to contain tool-call syntax that leaked into text."""
+    if not content:
+        return False
+    return any(m in content for m in _TOOLCALL_MARKERS)
+
+
+def _parse_leaked_tool_calls(content: str) -> list[tuple[str, dict]]:
+    """Best-effort parse of tool calls the model emitted as text.
+
+    Returns a list of (tool_name, args_dict). Empty list if nothing parseable.
+    Handles two common leak formats:
+      1. antml-style: invoke name="X" + parameter name="Y" ...>VALUE</...parameter>
+      2. DeepSeek-native: a known tool name followed by a JSON arguments object.
+    """
+    calls: list[tuple[str, dict]] = []
+
+    # Format 1: invoke/parameter tags (what was observed reaching the customer).
+    for m in re.finditer(r'invoke\s+name="([^"]+)"(.*?)</[^>]*?invoke>', content, re.S):
+        name = m.group(1).strip()
+        body = m.group(2)
+        args: dict = {}
+        for p in re.finditer(r'parameter\s+name="([^"]+)"[^>]*>(.*?)</[^>]*?parameter>', body, re.S):
+            args[p.group(1).strip()] = p.group(2).strip()
+        if name:
+            calls.append((name, args))
+
+    # An unclosed invoke tag (truncated output) — still recover the tool name.
+    if not calls:
+        for m in re.finditer(r'invoke\s+name="([^"]+)"', content):
+            name = m.group(1).strip()
+            args = {}
+            for p in re.finditer(r'parameter\s+name="([^"]+)"[^>]*>([^<]*)', content[m.end():]):
+                args[p.group(1).strip()] = p.group(2).strip()
+            if name:
+                calls.append((name, args))
+
+    # Format 2: a known tool name near a JSON object (DeepSeek native dump).
+    if not calls:
+        for name in _KNOWN_TOOL_NAMES:
+            idx = content.find(name)
+            if idx == -1:
+                continue
+            jmatch = re.search(r"\{.*?\}", content[idx:], re.S)
+            args = {}
+            if jmatch:
+                try:
+                    parsed = json.loads(jmatch.group(0))
+                    if isinstance(parsed, dict):
+                        args = parsed
+                except (json.JSONDecodeError, TypeError):
+                    args = {}
+            calls.append((name, args))
+            break
+
+    return calls
+
+
+def _strip_tool_markup(text: str | None) -> str:
+    """Remove any leaked tool-call markup so a customer never sees raw syntax.
+
+    Cuts the message at the first tool-call marker (keeping any natural prose
+    before it) and scrubs stray special tokens / antml tags from the remainder.
+    """
+    if not text:
+        return ""
+    cut = len(text)
+    for marker in _TOOLCALL_MARKERS:
+        i = text.find(marker)
+        if i != -1:
+            cut = min(cut, i)
+    # Pull back to the start of the tag that opens the marker (e.g. "<｜｜Dsml…").
+    open_lt = text.rfind("<", 0, cut)
+    if open_lt != -1 and cut - open_lt < 30:
+        cut = open_lt
+    cleaned = text[:cut]
+    cleaned = re.sub(r"</?(?:invoke|parameter|function|tool_call[s]?)[^>]*>", "", cleaned, flags=re.I)
+    cleaned = re.sub(r"<[／/]?｜[^>]*?>", "", cleaned)
+    return cleaned.strip()
+
+
+_TOOLCALL_FALLBACK = "Thanks! Let me pull that up for you — what's most important to you in your next vehicle?"
+
+
+def _sanitize_reply(text: str | None) -> str:
+    """Final safety net for any text sent to a customer: never leak tool markup."""
+    if _looks_like_leaked_toolcall(text or ""):
+        cleaned = _strip_tool_markup(text)
+        # If stripping left nothing meaningful, use a safe, non-fabricated fallback.
+        return cleaned if len(cleaned) >= 15 else _TOOLCALL_FALLBACK
+    return (text or "").strip() or "Thank you for your message!"
+
+
 def _call_openrouter(
     system_prompt: str,
     user_message: str,
@@ -932,6 +1045,8 @@ def _call_openrouter(
         )
 
         choice = response.choices[0]
+        content = choice.message.content or ""
+
         if choice.message.tool_calls:
             # Model requested tool calls — execute them with real tools
             tool_results = []
@@ -960,9 +1075,54 @@ def _call_openrouter(
                 max_tokens=1024,
                 temperature=0.7,
             )
-            return final_response.choices[0].message.content or "Thank you!"
+            return _sanitize_reply(final_response.choices[0].message.content)
 
-        return choice.message.content or "Thank you for your message!"
+        # Recovery: the provider sometimes emits the tool call as raw text in
+        # `content` instead of the structured tool_calls field. Detect, execute,
+        # and re-prompt for a clean answer so the customer never sees markup.
+        if _looks_like_leaked_toolcall(content):
+            leaked = _parse_leaked_tool_calls(content)
+            if leaked:
+                logger.warning(
+                    "Recovered %d leaked tool call(s) from text content: %s",
+                    len(leaked), [n for n, _ in leaked],
+                )
+                # Keep any natural prose the model wrote before the leaked block.
+                messages.append({
+                    "role": "assistant",
+                    "content": _strip_tool_markup(content) or "Let me check that for you.",
+                })
+                for name, args in leaked:
+                    result = _execute_tool_call(
+                        name, json.dumps(args),
+                        session=session, lead=lead, dealer_id=dealer_id,
+                        dealer_config=dealer_config,
+                    )
+                    if tools_used is not None:
+                        tools_used.append(name)
+                    messages.append({
+                        "role": "system",
+                        "content": f"Result of {name}({json.dumps(args)}): {json.dumps(result)}",
+                    })
+                messages.append({
+                    "role": "system",
+                    "content": (
+                        "Now write your reply to the customer as plain SMS text using ONLY "
+                        "the tool results above. Do NOT output any tool-call syntax, XML tags, "
+                        "function calls, or special tokens."
+                    ),
+                })
+                # Re-call WITHOUT tools to force a natural-language answer.
+                final_response = _call_openrouter_with_retry(
+                    client,
+                    model=_get_model_name(),
+                    messages=messages,
+                    max_tokens=1024,
+                    temperature=0.7,
+                )
+                return _sanitize_reply(final_response.choices[0].message.content)
+
+        return _sanitize_reply(content)
 
     except Exception:
         logger.exception("OpenRouter call failed after retries")
