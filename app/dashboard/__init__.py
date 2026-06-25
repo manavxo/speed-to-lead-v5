@@ -874,8 +874,18 @@ async def api_sales_team(dealer_slug: str = ""):
             return {"sales_team": [], "show_manager_option": False}
 
         config = dealer.config or {}
+        # SECURITY: this endpoint is UNAUTHENTICATED (the login page calls it
+        # before the user has a session). NEVER return the raw rep dicts — they
+        # contain `pin` (the login credential), `phone`, and `telegram_chat_id`.
+        # Returning those would be a full auth bypass. Expose only the names the
+        # dropdown needs, and only for active reps.
+        names = [
+            rep.get("name")
+            for rep in config.get("sales_team", [])
+            if rep.get("name")
+        ]
         return {
-            "sales_team": config.get("sales_team", []),
+            "sales_team": [{"name": n} for n in names],
             "show_manager_option": bool(config.get("manager_pin")),
         }
     finally:

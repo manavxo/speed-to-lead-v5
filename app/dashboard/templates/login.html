@@ -266,15 +266,22 @@
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 var team = data.sales_team || [];
-                var html = '<option value="">Select your name...</option>';
-                team.forEach(function(rep) {
-                    html += '<option value="' + rep.name + '">' + rep.name + '</option>';
-                });
-                if (data.show_manager_option) {
-                    html += '<option value="" disabled style="color: var(--text-muted); font-size: 11px;">----------</option>';
-                    html += '<option value="Manager">Manager</option>';
+                // Build options via the DOM (textContent), not string concat,
+                // so a rep name can never inject HTML/script into the page.
+                repSelect.innerHTML = '';
+                function addOption(value, label, disabled) {
+                    var opt = document.createElement('option');
+                    opt.value = value;
+                    opt.textContent = label;
+                    if (disabled) opt.disabled = true;
+                    repSelect.appendChild(opt);
                 }
-                repSelect.innerHTML = html;
+                addOption('', 'Select your name...', false);
+                team.forEach(function(rep) { addOption(rep.name, rep.name, false); });
+                if (data.show_manager_option) {
+                    addOption('', '----------', true);
+                    addOption('Manager', 'Manager', false);
+                }
             })
             .catch(function() {
                 repSelect.innerHTML = '<option value="">Select your name...</option><option value="Manager">Manager</option>';
