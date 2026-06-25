@@ -2,13 +2,37 @@
 
 Returns ONLY valid booking slots based on:
 - Dealer business hours (from dealer config)
-- Existing appointments per rep (no double-booking)
+- Existing appointments per dealer (dealer_wide mode, no double-booking)
 
 The AI may ONLY offer slots this tool returns. If empty, the AI must
 say no slots are available and escalate to a human.
 
 This is the same grounding contract as check_inventory: the tool is the
 sole source of truth. The model MUST NOT invent slots.
+
+─── PER-REP SCHEDULING FUTURE PATH ───
+
+To enable per-rep scheduling instead of dealer-wide:
+1. Add rep-level hours to dealer YAML (sales_team[*].hours dict, same format
+   as dealer.hours).
+2. Add rep-level appointment capacity (e.g. sales_team[*].max_appts_per_slot).
+3. Switch `dealer_config.scheduling_mode` to "per_rep".
+4. In check_availability(), when mode=="per_rep":
+   - Compute available slots per active rep (intersection of rep hours +
+     dealer hours).
+   - Deduplicate — each slot appears once, tagged with all available reps.
+   - The AI offers both a time AND a rep choice to the customer.
+5. In book_appointment(), when mode=="per_rep":
+   - Accept a `rep_name` parameter alongside date_time.
+   - Validate that rep is available at that time.
+   - Create the Appointment row pinned to that rep.
+6. Tests to add:
+   - test_check_availability_per_rep → slots tagged with rep names
+   - test_book_appointment_per_rep → rep capacity enforced
+   - test_per_rep_hours_fallback → rep without hours falls back to dealer hours
+
+The `rep_name` field on each slot dict (currently None in dealer_wide mode) is
+the carrier for this future path. See NOTES/PER_REP_SCHEDULING.md for full details.
 """
 
 from __future__ import annotations
@@ -87,6 +111,14 @@ def check_availability(
 
     hours = dealer_config.get("dealer", {}).get("hours", {})
     tz_name = dealer_config.get("dealer", {}).get("timezone", "America/Vancouver")
+    scheduling_mode = dealer_config.get("scheduling_mode", "dealer_wide")
+
+    if scheduling_mode == "per_rep":
+        raise NotImplementedError(
+            "per_rep scheduling is not yet built. "
+            "See NOTES/PER_REP_SCHEDULING.md and the docstring in tools/check_availability.py "
+            "for exactly what to change to enable it."
+        )
 
     try:
         from zoneinfo import ZoneInfo
@@ -146,6 +178,7 @@ def check_availability(
                     "date": check_date.strftime("%A, %B %d"),
                     "time": f"{slot_h:02d}:{slot_m:02d}",
                     "iso": slot_dt.isoformat(),
+                    "rep_name": None,  # per-rep scheduling seam — populated when mode=="per_rep"
                 })
 
             if len(slots) >= 20:

@@ -54,11 +54,13 @@ def on_claim_timeout(
 
     for action in escalation_actions:
         if action == "reassign":
-            from app.engine.router import assign_lead
-            assign_lead(
-                session, lead, dealer, sales_team,
-                fake_twilio=fake_twilio,
-                sms_number=sms_number,
+            # F9: reassign via assign_lead which transitions ESCALATED → ASSIGNED,
+            # creating a clock-reset loop. Instead, keep the lead ESCALATED and
+            # let the manager reassign manually. Skip reassign here to stop the cycle.
+            logger.info(
+                "Lead#%s escalated — skipping reassign to stop timeout loop. "
+                "Lead stays ESCALATED for manager review.",
+                lead_id,
             )
         elif action == "notify_manager":
             manager_phone = dealer_config.get("routing", {}).get("manager_phone")

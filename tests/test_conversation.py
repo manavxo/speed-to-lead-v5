@@ -528,3 +528,158 @@ def _make_lead(session, dealer: Dealer, name: str) -> Lead:
         source=Channel.SMS,
         state=LeadState.ENGAGED,
     )
+
+
+# =========================================================================
+# F0 — Model router: tool-critical intent detection + model routing
+# =========================================================================
+
+TOOL_CRITICAL_MESSAGES = [
+    # Booking confirmations
+    "yes, book it for Thursday at 2pm",
+    "yeah sure, let's do Thursday",
+    "okay, lock it in",
+    "sounds great, schedule me for Monday",
+    "sounds good — book me for tomorrow",
+    "put me down for Wednesday 10am",
+    "yes please, I'll take the 3pm slot",
+    # Specific dates/times
+    "Can I come in on Monday?",
+    "how about next Saturday morning?",
+    "is 2pm available on Thursday?",
+    "I can do tomorrow around 3pm",
+    # Availability inquiries
+    "when can I come in for a test drive?",
+    "what times are available this week?",
+    "do you have any slots on Friday?",
+    "what's available for test drives?",
+    "any availability for a visit?",
+    "I want to come see the car — when works?",
+    # Inventory / spec questions
+    "what engine does the Kona have?",
+    "tell me about the Honda Civic",
+    "what do you have in stock?",
+    "what's in your inventory?",
+    "what SUVs do you have?",
+    "do you have any BMWs?",
+    "show me what you've got under 30k",
+    # Booking-qualified
+    "can you book me a test drive?",
+    "I'd like to schedule an appointment",
+    "let's set something up for this week",
+    "can you set up a test drive for me?",
+]
+
+NON_TOOL_MESSAGES = [
+    "Hi there!",
+    "thanks",
+    "I'm just looking",
+    "what's your name?",
+    "cool, thanks for the info",
+    "that sounds good, I'll think about it",
+    "not right now, maybe later",
+    "can you tell me more?",
+    "how does this work?",
+    "what's the process?",
+    "I'm not sure yet",
+    "that's interesting",
+    "thanks but I'm going to shop around",
+]
+
+
+def test_f0_is_tool_critical_positive():
+    """All booking/inventory intent messages should be detected as tool-critical."""
+    from app.engine.conversation import _is_tool_critical_turn
+    for msg in TOOL_CRITICAL_MESSAGES:
+        assert _is_tool_critical_turn(msg), f"Expected tool-critical: {msg!r}"
+
+
+def test_f0_is_tool_critical_negative():
+    """Small talk and non-intent messages should NOT be tool-critical."""
+    from app.engine.conversation import _is_tool_critical_turn
+    for msg in NON_TOOL_MESSAGES:
+        assert not _is_tool_critical_turn(msg), f"Expected NOT tool-critical: {msg!r}"
+
+
+def test_f0_is_tool_critical_empty():
+    """Empty/None input should be safe."""
+    from app.engine.conversation import _is_tool_critical_turn
+    assert not _is_tool_critical_turn("")
+    assert not _is_tool_critical_turn(None)
+
+
+def test_f0_router_selects_tool_model_for_booking_intent(db_session, monkeypatch):
+    """When a tool-critical message is sent, _call_openrouter routes to TOOL_MODEL."""
+    from app.engine import conversation as conv
+    from app.config import settings
+
+    # Capture the model passed to the API
+    captured_model = []
+    captured_tool_choice = []
+
+    def fake_create(timeout=None, **kwargs):
+        captured_model.append(kwargs.get("model"))
+        captured_tool_choice.append(kwargs.get("tool_choice"))
+        raise RuntimeError("stop after capturing params")
+
+    monkeypatch.setattr(conv, "_call_openrouter_with_retry", fake_create)
+
+    dealer = _make_dealer(db_session, "f0-router-tool")
+    lead = _make_lead(db_session, dealer, "f0-customer")
+    db_session.add(lead)
+    db_session.commit()
+    db_session.refresh(lead)
+
+    try:
+        conv._call_openrouter(
+            system_prompt="You are a car dealer.",
+            user_message="yes, book me for Thursday at 2pm",
+            session=db_session, lead=lead,
+            dealer_id=dealer.id, dealer_config=DEMO_CONFIG,
+        )
+    except RuntimeError:
+        pass  # Expected — we raised to stop after capturing
+
+    assert len(captured_model) > 0, "Model router did not call the API"
+    assert captured_model[0] == settings.tool_model, (
+        f"Expected TOOL_MODEL ({settings.tool_model}), got {captured_model[0]}"
+    )
+    assert captured_tool_choice[0] == "required", (
+        f"Expected tool_choice='required', got {captured_tool_choice[0]!r}"
+    )
+
+
+def test_f0_router_uses_default_model_for_small_talk(db_session, monkeypatch):
+    """Small talk messages should use the default DeepSeek model."""
+    from app.engine import conversation as conv
+
+    captured_model = []
+    captured_tool_choice = []
+
+    def fake_create(timeout=None, **kwargs):
+        captured_model.append(kwargs.get("model"))
+        captured_tool_choice.append(kwargs.get("tool_choice"))
+        raise RuntimeError("stop after capturing params")
+
+    monkeypatch.setattr(conv, "_call_openrouter_with_retry", fake_create)
+
+    dealer = _make_dealer(db_session, "f0-router-default")
+    lead = _make_lead(db_session, dealer, "f0-customer2")
+    db_session.add(lead)
+    db_session.commit()
+    db_session.refresh(lead)
+
+    try:
+        conv._call_openrouter(
+            system_prompt="You are a car dealer.",
+            user_message="Hi there, just browsing!",
+            session=db_session, lead=lead,
+            dealer_id=dealer.id, dealer_config=DEMO_CONFIG,
+        )
+    except RuntimeError:
+        pass
+
+    assert len(captured_model) > 0, "Model router did not call the API"
+    assert captured_tool_choice[0] == "auto", (
+        f"Expected tool_choice='auto' for small talk, got {captured_tool_choice[0]!r}"
+    )

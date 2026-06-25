@@ -160,15 +160,7 @@ def _handle_followup_session(session, lead_id: int, dealer_slug: str, minutes: i
         logger.exception("Follow-up AI generation failed for lead %s", lead_id)
         text = "Just checking in — let us know if you have any questions!"
 
-    # Append CASL compliance footer
-    dealer_name = dealer_config.get('dealer', {}).get('name', '')
-    footer = dealer_config.get('compliance', {}).get('consent_text', 'Reply STOP to opt out.')
-    if dealer_name and dealer_name not in text:
-        text = f"{text}\n\n— {dealer_name}. {footer}"
-    elif footer not in text:
-        text = f"{text}\n\n{footer}"
-
-    # Store the follow-up message in the Message table
+    # Store the follow-up message in the Message table (no footer — first msg already has it)
     outbound_msg = Message(
         lead_id=lead.id,
         direction=Direction.OUTBOUND,

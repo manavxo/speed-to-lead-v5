@@ -855,9 +855,39 @@ async def login_submit(
     return response
 
 
+@router.get("/api/sales-team")
+async def api_sales_team(dealer_slug: str = ""):
+    """Return the sales team as JSON for the login page's dynamic rep dropdown.
+
+    Called by JS on dealer_slug change/blur to populate the rep selector
+    without a full page reload. Returns {sales_team: [...], show_manager_option: bool}.
+    """
+    if not dealer_slug:
+        return {"sales_team": [], "show_manager_option": False}
+
+    session = _get_session()
+    try:
+        dealer = session.execute(
+            select(Dealer).where(Dealer.slug == dealer_slug)
+        ).scalars().first()
+        if not dealer:
+            return {"sales_team": [], "show_manager_option": False}
+
+        config = dealer.config or {}
+        return {
+            "sales_team": config.get("sales_team", []),
+            "show_manager_option": bool(config.get("manager_pin")),
+        }
+    finally:
+        session.close()
+
+
 @router.get("/logout")
-async def logout():
-    response = RedirectResponse("/dashboard/login", status_code=303)
+async def logout(dealer_slug: str = ""):
+    redirect_url = "/dashboard/login"
+    if dealer_slug:
+        redirect_url = f"/dashboard/login?dealer_slug={dealer_slug}"
+    response = RedirectResponse(redirect_url, status_code=303)
     response.delete_cookie("session")
     return response
 
@@ -1115,7 +1145,11 @@ async def lead_detail(request: Request, lead_id: int, _auth: None = Depends(requ
             return HTMLResponse("<h1>Lead not found</h1>", status_code=404)
 
         messages = session.execute(
-            select(Message).where(Message.lead_id == lead_id).order_by(Message.created_at.asc())
+            select(Message).where(
+                Message.lead_id == lead_id,
+                # F4: exclude internal rep notifications from customer thread
+                (Message.recipient_role == "customer") | (Message.recipient_role == None),
+            ).order_by(Message.created_at.asc())
         ).scalars().all()
 
         events = session.execute(

@@ -251,5 +251,45 @@
             Speed to Lead v5 &middot; Built for Canadian dealerships
         </div>
     </div>
+
+    <script>
+    var slugInput = document.getElementById('dealer_slug');
+    var repSelect = document.getElementById('rep_name');
+
+    function updateReps() {
+        var slug = slugInput.value.trim();
+        if (!slug) {
+            repSelect.innerHTML = '<option value="">Select your name...</option><option value="Manager">Manager</option>';
+            return;
+        }
+        fetch('/dashboard/api/sales-team?dealer_slug=' + encodeURIComponent(slug))
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var team = data.sales_team || [];
+                var html = '<option value="">Select your name...</option>';
+                team.forEach(function(rep) {
+                    html += '<option value="' + rep.name + '">' + rep.name + '</option>';
+                });
+                if (data.show_manager_option) {
+                    html += '<option value="" disabled style="color: var(--text-muted); font-size: 11px;">----------</option>';
+                    html += '<option value="Manager">Manager</option>';
+                }
+                repSelect.innerHTML = html;
+            })
+            .catch(function() {
+                repSelect.innerHTML = '<option value="">Select your name...</option><option value="Manager">Manager</option>';
+            });
+    }
+
+    slugInput.addEventListener('blur', updateReps);
+    slugInput.addEventListener('input', function() {
+        // Debounce — clear previous timer
+        if (slugInput._debounce) clearTimeout(slugInput._debounce);
+        slugInput._debounce = setTimeout(updateReps, 400);
+    });
+
+    // Populate immediately if dealer_slug is pre-filled (from query param)
+    if (slugInput.value.trim()) updateReps();
+    </script>
 </body>
 </html>
