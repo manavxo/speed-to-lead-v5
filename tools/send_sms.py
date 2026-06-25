@@ -54,8 +54,11 @@ def _sanitize_message(body: str, dealer_name: str = "", is_first_message: bool =
     # Only convert words that are 3+ chars and ALL uppercase
     def _replace_caps(match):
         word = match.group(0)
-        # Don't convert common acronyms
-        acronyms = {'SMS', 'URL', 'VIN', 'SUV', 'AWD', 'FWD', 'RWD', 'ABS', 'GPS', 'USB', 'LED', 'AEB'}
+        # Don't convert common acronyms, or the legally-required opt-out keywords
+        # (carriers/CASL expect "STOP" in caps; title-casing it to "Stop" mangles
+        # the compliance footer).
+        acronyms = {'SMS', 'URL', 'VIN', 'SUV', 'AWD', 'FWD', 'RWD', 'ABS', 'GPS', 'USB', 'LED', 'AEB',
+                    'STOP', 'STOPALL', 'UNSUBSCRIBE', 'ARRET', 'HELP', 'YES'}
         if word in acronyms:
             return word
         return word.title()
