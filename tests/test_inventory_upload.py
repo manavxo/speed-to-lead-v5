@@ -78,6 +78,32 @@ def test_manager_upload_csv_lands_full_specs_and_ai_can_find_it(tmp_path):
         session.close()
 
 
+def test_search_matches_multiword_query(tmp_path):
+    """The AI often passes a natural phrase ('2023 Toyota RAV4 XLE'); search must
+    resolve it to the car even though make/model/trim/year are separate columns."""
+    client = _client(tmp_path)
+    files = {"file": ("inventory.csv", io.BytesIO(CSV.encode("utf-8")), "text/csv")}
+    r = client.post("/dashboard/inventory/upload", files=files, cookies=_manager_cookie())
+    assert r.status_code == 200, r.text
+
+    import app.db as db
+    from sqlalchemy import select
+    from app.models import Dealer
+    from tools.check_inventory import search
+
+    session = db.get_session_factory()()
+    try:
+        dealer = session.execute(select(Dealer).where(Dealer.slug == "premier-auto")).scalars().first()
+        for q in ["2023 Toyota RAV4 XLE", "Toyota RAV4 XLE", "RAV4 XLE", "2023 RAV4", "rav4"]:
+            hits = search(session, dealer.id, query=q, limit=5)
+            assert any(v.stock_no == "PAG011" for v in hits), f"query {q!r} failed to find the RAV4"
+        # make + multiword query together (how the AI is prompted to call it)
+        hits = search(session, dealer.id, make="Toyota", query="RAV4 XLE", limit=5)
+        assert any(v.stock_no == "PAG011" for v in hits), "make+query combo failed"
+    finally:
+        session.close()
+
+
 def test_upload_requires_manager_auth(tmp_path):
     client = _client(tmp_path)
     files = {"file": ("inventory.csv", io.BytesIO(CSV.encode("utf-8")), "text/csv")}

@@ -101,15 +101,25 @@ def search(
         stmt = stmt.where(Vehicle.make.ilike(f"%{make}%"))
 
     if query:
-        pattern = f"%{query}%"
-        stmt = stmt.where(
-            or_(
-                Vehicle.make.ilike(pattern),
-                Vehicle.model.ilike(pattern),
-                Vehicle.trim.ilike(pattern),
-                Vehicle.body.ilike(pattern),
-            )
-        )
+        # Match PER WORD, not the whole string. The model often passes a natural
+        # phrase like "2023 Toyota RAV4 XLE", but make/model/trim/year live in
+        # separate columns — so a single "%2023 Toyota RAV4 XLE%" LIKE matches
+        # nothing. Split into tokens and require each token to hit some field
+        # (year matched numerically). This makes "Toyota RAV4 XLE", "RAV4 XLE",
+        # and "2023 RAV4" all resolve to the right car.
+        import re as _re
+        tokens = [t for t in _re.split(r"\s+", query.strip()) if t]
+        for tok in tokens:
+            pat = f"%{tok}%"
+            conds = [
+                Vehicle.make.ilike(pat),
+                Vehicle.model.ilike(pat),
+                Vehicle.trim.ilike(pat),
+                Vehicle.body.ilike(pat),
+            ]
+            if tok.isdigit():
+                conds.append(Vehicle.year == int(tok))
+            stmt = stmt.where(or_(*conds))
 
     stmt = stmt.limit(limit)
     return list(_exec(session, stmt).all())
