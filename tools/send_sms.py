@@ -168,8 +168,16 @@ def _log_message(
     body: str,
     provider_sid: str | None = None,
     ai_generated: bool = False,
+    recipient_role: str | None = None,
 ) -> None:
-    """Persist a Message row."""
+    """Persist a Message row.
+
+    recipient_role tags who the message is FOR ("customer" for lead-facing SMS,
+    "rep" for rep-facing WhatsApp). The dashboard uses it to keep internal
+    notifications out of the customer thread, and main.py uses it to append the
+    CASL footer only once (on the first customer-facing message). Leaving it
+    NULL breaks both — always pass it from the send path.
+    """
     from app.models import Message, Direction, Channel
     msg = Message(
         lead_id=lead_id,
@@ -178,6 +186,7 @@ def _log_message(
         body=body,
         provider_sid=provider_sid,
         ai_generated=ai_generated,
+        recipient_role=recipient_role,
     )
     session.add(msg)
     try:
@@ -278,7 +287,8 @@ def send_sms(
         logger.info("SMS to %s suppressed: opted_out", to)
         if lead:
             _log_message(session, lead.id, "outbound", "sms", body,
-                         provider_sid=f"SUPPRESSED_OPTOUT_{uuid.uuid4().hex[:12]}", ai_generated=True)
+                         provider_sid=f"SUPPRESSED_OPTOUT_{uuid.uuid4().hex[:12]}", ai_generated=True,
+                         recipient_role="customer")
         return None
 
     # Check consent — block if lead exists but has no consent record
@@ -286,7 +296,8 @@ def send_sms(
         logger.warning("SMS to %s suppressed: no consent for lead#%s", to, lead.id)
         try:
             _log_message(session, lead.id, "outbound", "sms", body,
-                         provider_sid=f"SUPPRESSED_NO_CONSENT_{uuid.uuid4().hex[:12]}", ai_generated=True)
+                         provider_sid=f"SUPPRESSED_NO_CONSENT_{uuid.uuid4().hex[:12]}", ai_generated=True,
+                         recipient_role="customer")
         except Exception:
             logger.exception("Failed to log suppressed (no consent) message for lead#%s", lead.id)
         return None
@@ -297,7 +308,8 @@ def send_sms(
         if lead:
             try:
                 _log_message(session, lead.id, "outbound", "sms", body,
-                             provider_sid=f"SUPPRESSED_QUIET_{uuid.uuid4().hex[:12]}", ai_generated=True)
+                             provider_sid=f"SUPPRESSED_QUIET_{uuid.uuid4().hex[:12]}", ai_generated=True,
+                             recipient_role="customer")
             except Exception:
                 logger.exception("Failed to log suppressed (quiet hours) message for lead#%s", lead.id)
         return None
@@ -319,7 +331,7 @@ def send_sms(
         if lead:
             logger.info("DRY-RUN: about to _log_message for lead#%s", lead.id)
             _log_message(session, lead.id, "outbound", "sms", tagged_body,
-                         provider_sid=sid, ai_generated=True)
+                         provider_sid=sid, ai_generated=True, recipient_role="customer")
             logger.info("DRY-RUN: _log_message returned for lead#%s", lead.id)
         return sid
 
@@ -339,7 +351,7 @@ def send_sms(
     # Log the message
     if lead:
         _log_message(session, lead.id, "outbound", "sms", tagged_body,
-                     provider_sid=sid, ai_generated=True)
+                     provider_sid=sid, ai_generated=True, recipient_role="customer")
 
     return sid
 
@@ -385,7 +397,7 @@ def send_whatsapp(
         )
         if lead and session:
             _log_message(session, lead.id, "outbound", "whatsapp", tagged_body,
-                         provider_sid=sid, ai_generated=False)
+                         provider_sid=sid, ai_generated=False, recipient_role="rep")
         return sid
 
     try:
@@ -416,6 +428,6 @@ def send_whatsapp(
     # Log the message
     if lead and session:
         _log_message(session, lead.id, "outbound", "whatsapp", tagged_body,
-                     provider_sid=sid, ai_generated=False)
+                     provider_sid=sid, ai_generated=False, recipient_role="rep")
 
     return sid
