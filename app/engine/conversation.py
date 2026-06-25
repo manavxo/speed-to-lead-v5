@@ -426,6 +426,8 @@ def build_system_prompt(dealer_config: dict, vehicle_context: str | None = None)
         "",
         f"You are a {persona} at {dealer_name}.",
         f"When greeting a new customer, introduce yourself as being from {dealer_name}.",
+        "NEVER use '[Your Name]' as your name — you don't have a name. Just say you're from the dealership.",
+        "NEVER address a customer as 'Number', 'Test Lead', or any placeholder — if you don't know their name, just say 'Hi there!' or 'Hello!'.",
         f"Your primary goal is to {goal} — get the customer to commit to a specific time to visit.",
         "",
         "When a customer says a relative date like 'Monday' or 'next Saturday', use the current",
