@@ -1547,6 +1547,17 @@ async def settings_page(request: Request, _auth: dict = Depends(require_auth)):
         digest_enabled = routing.get("digest_enabled", False)
         digest_time = routing.get("digest_time", "08:00")
 
+        # Current inventory for this dealer (so the manager can see/verify what
+        # the AI's check_inventory will actually search).
+        inv_rows = session.execute(
+            select(Vehicle).where(Vehicle.dealer_id == dealer.id)
+            .order_by(Vehicle.make, Vehicle.model)
+        ).scalars().all()
+        inventory = [{
+            "stock_no": v.stock_no, "year": v.year, "make": v.make, "model": v.model,
+            "trim": v.trim, "body": v.body, "price": v.price, "status": v.status,
+        } for v in inv_rows]
+
         return templates.TemplateResponse(request=request, name="settings.html", context={
             "request": request,
             "active_page": "settings",
@@ -1562,6 +1573,8 @@ async def settings_page(request: Request, _auth: dict = Depends(require_auth)):
             "digest_enabled": digest_enabled,
             "digest_time": digest_time,
             "dealer": dealer,
+            "inventory": inventory,
+            "inventory_count": len(inventory),
             **_base_context(_auth),
         })
     finally:

@@ -662,6 +662,48 @@
 
             <div id="inventory-upload-result" style="margin-top: 16px;"></div>
 
+            <div style="margin-top: 28px;">
+                <div class="section-title" style="font-size: 15px;">
+                    Current Inventory ({{ inventory_count }})
+                </div>
+                {% if inventory %}
+                <div style="overflow-x:auto; margin-top:10px;">
+                    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                        <thead>
+                            <tr style="text-align:left; color:var(--text-secondary); border-bottom:1px solid var(--border);">
+                                <th style="padding:6px 8px;">Stock #</th>
+                                <th style="padding:6px 8px;">Year</th>
+                                <th style="padding:6px 8px;">Make</th>
+                                <th style="padding:6px 8px;">Model</th>
+                                <th style="padding:6px 8px;">Trim</th>
+                                <th style="padding:6px 8px;">Body</th>
+                                <th style="padding:6px 8px;">Price</th>
+                                <th style="padding:6px 8px;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for v in inventory %}
+                            <tr style="border-bottom:1px solid var(--border);">
+                                <td style="padding:6px 8px;">{{ v.stock_no }}</td>
+                                <td style="padding:6px 8px;">{{ v.year }}</td>
+                                <td style="padding:6px 8px;">{{ v.make }}</td>
+                                <td style="padding:6px 8px;">{{ v.model }}</td>
+                                <td style="padding:6px 8px;">{{ v.trim or '' }}</td>
+                                <td style="padding:6px 8px;">{{ v.body or '' }}</td>
+                                <td style="padding:6px 8px;">{% if v.price %}${{ "{:,.0f}".format(v.price) }}{% else %}—{% endif %}</td>
+                                <td style="padding:6px 8px;">{{ v.status }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="section-description" style="margin-top:10px;">
+                    No vehicles loaded yet. Upload a file above to populate inventory.
+                </div>
+                {% endif %}
+            </div>
+
             <div class="section-description" style="margin-top: 20px;">
                 <strong>Columns:</strong> stock_no, year, make, model, trim, body, price, mileage,
                 engine, transmission, drivetrain, horsepower, fuel_economy, exterior_color,
