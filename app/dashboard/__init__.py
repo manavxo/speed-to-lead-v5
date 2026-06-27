@@ -2353,3 +2353,36 @@ async def upload_inventory(
     finally:
         session.close()
 
+
+@router.post("/inventory/{stock_no}/status")
+async def set_inventory_status(
+    request: Request,
+    stock_no: str,
+    status: str = Form(...),
+    _auth: dict = Depends(require_auth),
+):
+    """Manager sets a single vehicle's status (available | sold | removed)."""
+    if _auth.get("role") != "manager":
+        return HTMLResponse("Unauthorized", status_code=403)
+    if status not in ("available", "sold", "removed"):
+        return HTMLResponse("Invalid status", status_code=400)
+    session = _get_session()
+    try:
+        cookie_value = request.cookies.get("session")
+        current_dealer = get_dealer_from_auth(session, cookie_value) if cookie_value else None
+        if not current_dealer:
+            return HTMLResponse("Unauthorized", status_code=401)
+        vehicle = session.execute(
+            select(Vehicle).where(
+                Vehicle.dealer_id == current_dealer.id,
+                Vehicle.stock_no == stock_no,
+            )
+        ).scalars().first()
+        if not vehicle:
+            return HTMLResponse("Not found", status_code=404)
+        vehicle.status = status
+        session.commit()
+        return HTMLResponse(f'<div class="toast success">{stock_no} set to {status}.</div>', status_code=200)
+    finally:
+        session.close()
+

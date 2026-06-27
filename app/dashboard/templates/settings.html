@@ -682,7 +682,7 @@
                                 <th style="padding:6px 8px;">Trim</th>
                                 <th style="padding:6px 8px;">Body</th>
                                 <th style="padding:6px 8px;">Price</th>
-                                <th style="padding:6px 8px;">Status</th>
+                                <th style="padding:6px 8px;">Status / Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -695,7 +695,26 @@
                                 <td style="padding:6px 8px;">{{ v.trim or '' }}</td>
                                 <td style="padding:6px 8px;">{{ v.body or '' }}</td>
                                 <td style="padding:6px 8px;">{% if v.price %}${{ "{:,.0f}".format(v.price) }}{% else %}—{% endif %}</td>
-                                <td style="padding:6px 8px;">{{ v.status }}</td>
+                                <td style="padding:6px 8px;">
+                                    <span style="margin-right:8px;">{{ v.status }}</span>
+                                    {% if v.status == 'available' %}
+                                    <button class="btn btn-secondary"
+                                            hx-post="/dashboard/inventory/{{ v.stock_no }}/status"
+                                            hx-vals='{"status":"sold"}'
+                                            hx-target="#inventory-upload-result" hx-swap="innerHTML"
+                                            hx-on::after-request="setTimeout(function(){location.reload();},600)">
+                                        Mark sold
+                                    </button>
+                                    {% else %}
+                                    <button class="btn btn-secondary"
+                                            hx-post="/dashboard/inventory/{{ v.stock_no }}/status"
+                                            hx-vals='{"status":"available"}'
+                                            hx-target="#inventory-upload-result" hx-swap="innerHTML"
+                                            hx-on::after-request="setTimeout(function(){location.reload();},600)">
+                                        Relist
+                                    </button>
+                                    {% endif %}
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
