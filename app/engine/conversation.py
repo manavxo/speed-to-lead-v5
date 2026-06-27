@@ -378,8 +378,17 @@ def load_workflow(name: str) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def build_system_prompt(dealer_config: dict, vehicle_context: str | None = None) -> str:
-    """Assemble the system prompt from the dealer config + workflow SOPs + vehicle context."""
+def build_system_prompt(
+    dealer_config: dict,
+    vehicle_context: str | None = None,
+    *,
+    is_continuing: bool = False,
+) -> str:
+    """Assemble the system prompt from the dealer config + workflow SOPs + vehicle context.
+
+    is_continuing: True when the AI has already messaged this lead before, so the prompt
+    suppresses re-introductions/re-greetings mid-conversation.
+    """
     ai_config = dealer_config.get("ai", {})
     persona = ai_config.get("persona", "friendly, concise, no-pressure local sales rep")
     goal = ai_config.get("goal", "book_appointment")
@@ -425,7 +434,14 @@ def build_system_prompt(dealer_config: dict, vehicle_context: str | None = None)
         today_line,
         "",
         f"You are a {persona} at {dealer_name}.",
-        f"When greeting a new customer, introduce yourself as being from {dealer_name}.",
+        (
+            "This is an ONGOING conversation — you have already greeted this customer earlier. "
+            "Do NOT introduce yourself again, do NOT repeat a welcome or restate the dealership "
+            "name as if it's your first message. Just answer their latest message directly and "
+            "keep moving toward the booking."
+            if is_continuing
+            else f"When greeting a new customer, introduce yourself as being from {dealer_name}."
+        ),
         "NEVER use '[Your Name]' as your name — you don't have a name. Just say you're from the dealership.",
         "NEVER address a customer as 'Number', 'Test Lead', or any placeholder — if you don't know their name, just say 'Hi there!' or 'Hello!'.",
         f"Your primary goal is to {goal} — get the customer to commit to a specific time to visit.",
@@ -894,7 +910,21 @@ def handle_turn(
             f"Mileage: {mileage_str}"
         )
 
-    system_prompt = build_system_prompt(dealer_config, vehicle_context)
+    # Has the AI already messaged this lead? If so, suppress re-greeting.
+    is_continuing = False
+    if session is not None and lead is not None:
+        from sqlalchemy import func, select
+        from app.models import Direction, Message
+
+        prior_outbound = session.execute(
+            select(func.count()).where(
+                Message.lead_id == lead.id,
+                Message.direction == Direction.OUTBOUND,
+            )
+        ).scalar() or 0
+        is_continuing = prior_outbound > 0
+
+    system_prompt = build_system_prompt(dealer_config, vehicle_context, is_continuing=is_continuing)
 
     tools_used: list[str] = []
 
