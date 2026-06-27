@@ -2293,11 +2293,15 @@ async def upload_inventory(
                 photo = _clean("image_url", "image", "photo")
                 photos = [photo] if photo else []
 
+                status_val = str(row.get("status", "")).strip().lower()
+                if status_val not in ("available", "sold", "removed"):
+                    status_val = "available"
+
                 if vehicle:
                     vehicle.year = year; vehicle.make = make; vehicle.model = model
                     vehicle.trim = trim or vehicle.trim; vehicle.body = body or vehicle.body
                     vehicle.price = price; vehicle.mileage = mileage
-                    vehicle.raw = raw_specs; vehicle.status = "available"
+                    vehicle.raw = raw_specs; vehicle.status = status_val
                     if vin: vehicle.vin = vin
                     if url: vehicle.url = url
                     if photos: vehicle.photos = photos
@@ -2307,7 +2311,7 @@ async def upload_inventory(
                         year=year, make=make, model=model, trim=trim or None,
                         body=body or None, price=price, mileage=mileage,
                         vin=vin, url=url, photos=photos,
-                        raw=raw_specs, status="available",
+                        raw=raw_specs, status=status_val,
                     )
                     session.add(vehicle)
                 upserted += 1
