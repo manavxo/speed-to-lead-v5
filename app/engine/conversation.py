@@ -1077,6 +1077,31 @@ def _sanitize_reply(text: str | None) -> str:
     return (text or "").strip() or "Thank you for your message!"
 
 
+# Max tool-execution hops in a single turn before we force a text reply.
+# Allows chaining (check_availability -> book_appointment) without runaway.
+_MAX_TOOL_HOPS = 4
+
+# Phrases that assert a COMPLETED booking (used by the anti-hallucination guard).
+# Kept tight to avoid matching booking OFFERS/CTAs ("want me to lock in 2pm?").
+_BOOKING_CLAIM_MARKERS = (
+    "all set",
+    "you're booked", "you are booked", "youre booked",
+    "i've booked", "ive booked", "i have booked", "we've booked", "weve booked",
+    "booked you", "booked your", "got you booked",
+    "appointment is confirmed", "appointment confirmed",
+    "you're confirmed", "you are confirmed", "youre confirmed",
+    "your appointment is set", "appointment is set",
+)
+
+
+def _claims_booking(text: str | None) -> bool:
+    """True if `text` asserts an appointment is already booked/confirmed."""
+    if not text:
+        return False
+    lowered = text.lower()
+    return any(m in lowered for m in _BOOKING_CLAIM_MARKERS)
+
+
 def _call_openrouter(
     system_prompt: str,
     user_message: str,
@@ -1176,8 +1201,16 @@ def _call_openrouter(
         choice = response.choices[0]
         content = choice.message.content or ""
 
-        if choice.message.tool_calls:
-            # Model requested tool calls — execute them with real tools
+        # ------------------------------------------------------------------
+        # Tool loop. Execute requested tools and feed the results back so the
+        # model can CHAIN tools within a single turn (e.g. check_availability
+        # then book_appointment). Tools stay available on EVERY hop, so the
+        # model can always reach book_appointment instead of being forced to
+        # "finalize" with no tools and hallucinate a confirmation it never
+        # made (the Lead #34 / D4–D8 failure). Bounded by _MAX_TOOL_HOPS.
+        # ------------------------------------------------------------------
+        hops = 0
+        while choice.message.tool_calls:
             tool_results = []
             for tc in choice.message.tool_calls:
                 result = _execute_tool_call(
@@ -1193,23 +1226,88 @@ def _call_openrouter(
                     "content": json.dumps(result),
                 })
 
-            # Send tool results back for final response (same model, no tools)
             messages.append(choice.message.model_dump())
             messages.extend(tool_results)
+            hops += 1
 
-            final_response = _call_openrouter_with_retry(
+            # Safety cap: on the final hop drop tools to force a text reply so
+            # we can never loop forever.
+            force_text = hops >= _MAX_TOOL_HOPS
+            tool_kwargs = {} if force_text else {
+                "tools": TOOL_DEFINITIONS,
+                "tool_choice": "auto",
+            }
+            response = _call_openrouter_with_retry(
                 active_client,
                 model=active_model,
                 messages=messages,
                 max_tokens=1024,
                 temperature=0.7,
+                **tool_kwargs,
             )
-            return _sanitize_reply(final_response.choices[0].message.content)
+            choice = response.choices[0]
+            content = choice.message.content or ""
+            if force_text:
+                break
+
+        # ------------------------------------------------------------------
+        # Anti-hallucination guard (D8). If the reply claims the appointment
+        # is booked/confirmed but book_appointment never ran, the model is
+        # papering over a missing booking. Only fires on a booking-intent turn
+        # (is_tool_critical). Force the actual booking once, then re-finalize
+        # from the REAL tool result so the customer is told the truth.
+        # ------------------------------------------------------------------
+        if (
+            is_tool_critical
+            and session is not None and lead is not None
+            and _claims_booking(content)
+            and "book_appointment" not in (tools_used or [])
+        ):
+            logger.warning(
+                "Booking-claim guard tripped: reply claims booked but "
+                "book_appointment was never called (tools_used=%s). Forcing the booking.",
+                tools_used,
+            )
+            forced = _call_openrouter_with_retry(
+                active_client,
+                model=active_model,
+                messages=messages,
+                tools=TOOL_DEFINITIONS,
+                tool_choice={"type": "function", "function": {"name": "book_appointment"}},
+                max_tokens=1024,
+                temperature=0.7,
+            )
+            fchoice = forced.choices[0]
+            if fchoice.message.tool_calls:
+                tool_results = []
+                for tc in fchoice.message.tool_calls:
+                    result = _execute_tool_call(
+                        tc.function.name, tc.function.arguments,
+                        session=session, lead=lead, dealer_id=dealer_id,
+                        dealer_config=dealer_config,
+                    )
+                    if tools_used is not None:
+                        tools_used.append(tc.function.name)
+                    tool_results.append({
+                        "tool_call_id": tc.id,
+                        "role": "tool",
+                        "content": json.dumps(result),
+                    })
+                messages.append(fchoice.message.model_dump())
+                messages.extend(tool_results)
+                final_response = _call_openrouter_with_retry(
+                    active_client,
+                    model=active_model,
+                    messages=messages,
+                    max_tokens=1024,
+                    temperature=0.7,
+                )
+                content = final_response.choices[0].message.content or content
 
         # Recovery: the provider sometimes emits the tool call as raw text in
         # `content` instead of the structured tool_calls field. Detect, execute,
         # and re-prompt for a clean answer so the customer never sees markup.
-        if _looks_like_leaked_toolcall(content):
+        if not choice.message.tool_calls and _looks_like_leaked_toolcall(content):
             leaked = _parse_leaked_tool_calls(content)
             if leaked:
                 logger.warning(
@@ -1254,7 +1352,7 @@ def _call_openrouter(
                     max_tokens=1024,
                     temperature=0.7,
                 )
-                return _sanitize_reply(final_response.choices[0].message.content)
+                content = final_response.choices[0].message.content
 
         return _sanitize_reply(content)
 
