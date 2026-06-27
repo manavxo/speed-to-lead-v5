@@ -655,6 +655,10 @@
                            accept=".csv,.xlsx" required
                            style="display:block; margin-top:8px; color: var(--text-secondary);">
                 </div>
+                <label style="display:flex; align-items:center; gap:8px; margin:0 0 14px;">
+                    <input type="checkbox" name="full_sync" value="on">
+                    This is my full current inventory — mark anything not in this file as removed
+                </label>
                 <button type="submit" class="btn btn-primary" id="inventory-upload-btn">
                     Upload Inventory
                 </button>

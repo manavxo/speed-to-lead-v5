@@ -2178,6 +2178,7 @@ from fastapi import UploadFile, File
 async def upload_inventory(
     request: Request,
     file: UploadFile = File(...),
+    full_sync: str = Form(""),
     _auth: dict = Depends(require_auth),
 ):
     """Upload inventory from CSV or XLSX. Upserts into Vehicle table with row-level errors."""
@@ -2227,6 +2228,7 @@ async def upload_inventory(
             return HTMLResponse("Empty file.", status_code=400)
 
         upserted = 0
+        uploaded_stock_nos = set()     # I1: track which stock_nos were in THIS file
         for row_idx, row in enumerate(rows, start=2):
             try:
                 stock_no = str(row.get("stock_no", row.get("stock #", ""))).strip()
@@ -2309,6 +2311,7 @@ async def upload_inventory(
                     )
                     session.add(vehicle)
                 upserted += 1
+                uploaded_stock_nos.add(stock_no)
             except (ValueError, TypeError) as e:
                 errors.append(f"Row {row_idx}: {e}")
                 continue
@@ -2316,7 +2319,25 @@ async def upload_inventory(
         if upserted > 0:
             session.commit()
 
-        msg = f'<div class="toast success">{upserted} vehicles uploaded.</div>'
+        removed = 0
+        if full_sync == "on" and uploaded_stock_nos:
+            from sqlalchemy import update as sa_update
+            res = session.execute(
+                sa_update(Vehicle)
+                .where(
+                    Vehicle.dealer_id == current_dealer.id,
+                    Vehicle.status != "removed",
+                    Vehicle.stock_no.notin_(uploaded_stock_nos),
+                )
+                .values(status="removed")
+            )
+            removed = res.rowcount or 0
+            session.commit()
+
+        msg = f'<div class="toast success">{upserted} vehicles uploaded.'
+        if full_sync == "on":
+            msg += f' {removed} removed (not in file).'
+        msg += '</div>'
         if errors:
             preview = "; ".join(errors[:5])
             msg += f'<div class="toast warning">{len(errors)} errors: {preview}{"..." if len(errors)>5 else ""}</div>'
