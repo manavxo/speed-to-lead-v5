@@ -13,10 +13,28 @@ from __future__ import annotations
 from enum import Enum
 from pathlib import Path
 from typing import Optional
+import re
 
 import yaml
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# --------------------------------------------------------------------------------------
+# E.164 phone validator — guards against masked/corrupted dealer phone numbers
+# --------------------------------------------------------------------------------------
+_E164_PATTERN = re.compile(r"^\+\d{10,15}$")
+
+
+def _validate_e164(v: str | None) -> str | None:
+    """Validate optional phone is E.164 when present (+<digits>, 10-15 digits)."""
+    if v is None or v == "":
+        return v
+    if not _E164_PATTERN.match(v):
+        raise ValueError(
+            f"Phone number {v!r} does not match E.164 format (+ followed by 10-15 digits). "
+            "Expected example: +17787623122"
+        )
+    return v
 
 
 # --------------------------------------------------------------------------------------
@@ -126,6 +144,11 @@ class Dealer(BaseModel):
     main_phone: Optional[str] = None
     website: Optional[str] = Field(None, description="Dealer website URL — shared with customers who ask")
 
+    @field_validator("main_phone")
+    @classmethod
+    def _check_main_phone(cls, v: str | None) -> str | None:
+        return _validate_e164(v)
+
 
 class Channels(BaseModel):
     """AXIS 3 — channels the dealer uses to generate leads."""
@@ -139,6 +162,11 @@ class Channels(BaseModel):
     voice_number: Optional[str] = Field(None, description="Twilio number for voice/missed-call. Defaults to sms_number if unset.")
     call_detection: str = Field("always_on", description="Missed-call detection mode: always_on | time_based | voicemail_notify")
     ring_timeout_sec: int = Field(25, description="Seconds before Twilio considers a call unanswered. Suggested 20-30s.")
+
+    @field_validator("sms_number", "whatsapp_sender", "voice_number")
+    @classmethod
+    def _check_channel_phone(cls, v: str | None) -> str | None:
+        return _validate_e164(v)
 
 
 class SalesRep(BaseModel):
@@ -157,6 +185,11 @@ class SalesRep(BaseModel):
         None, description="Telegram chat_id for telegram notify_backend"
     )
 
+    @field_validator("phone")
+    @classmethod
+    def _check_phone(cls, v: str) -> str:
+        return _validate_e164(v)
+
 
 class Routing(BaseModel):
     strategy: RoutingStrategy = RoutingStrategy.ROUND_ROBIN
@@ -165,6 +198,11 @@ class Routing(BaseModel):
     manager_phone: Optional[str] = None
     digest_enabled: bool = False
     digest_time: str = "08:00"
+
+    @field_validator("manager_phone")
+    @classmethod
+    def _check_manager_phone(cls, v: str | None) -> str | None:
+        return _validate_e164(v)
 
 
 class AIConfig(BaseModel):
