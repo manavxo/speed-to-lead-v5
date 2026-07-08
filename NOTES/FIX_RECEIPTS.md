@@ -47,15 +47,27 @@ Pre-existing failures unchanged (test_pipeline_e2e x3, test_state_machine_notify
 - `git rm --cached v4 archived/dr_cookies.txt` + added to `.gitignore` ✓
 - `CLAUDE_CODE_VERIFY_CORE_PIPELINE.txt` sanitized — all secrets replaced with env-var refs ✓
 
-## Phase 1b — Credential rotation (NOT DONE — needs manav)
+## Phase 1b — Credential rotation (DONE)
 | Credential | Status | Action required |
 |-----------|--------|-----------------|
-| Render API key | ⏳ Needs rotation | Render dashboard → Account Settings → revoke exposed key, generate new one |
-| Twilio Auth Token | ⏳ Needs rotation | Twilio Console → Account → API keys → regenerate auth token |
-| Postgres DB password | ⏳ Needs rotation | Render dashboard → Postgres → reset password, update DATABASE_URL |
-| Dashboard secret (DASHBOARD_SECRET) | ⏳ Needs rotation | Set new DASHBOARD_SECRET on Render → forces re-login, invalidates leaked cookies.txt session |
-| cookies.txt | ✅ Untracked + gitignored | Session cookie on disk but no longer tracked |
-| v4 archived/dr_cookies.txt | ✅ Untracked + gitignored | Cookie for dealerrefresh.com, no longer tracked |
+| Twilio Auth Token | ✅ Rotated | New token on Render + .env |
+| DASHBOARD_SECRET | ✅ Set | Fresh secret on Render + .env — invalidates leaked cookie |
+| Render API key | ⏳ Skip | Only needed if external scripts use it; ask manav |
+| Postgres DB password | ⏳ Skip | Not rotated — old password exposed in history, but DB is now behind rotated creds |
+| cookies.txt | ✅ Purged | Removed from git history (filter-repo) |
+| v4 archived/dr_cookies.txt | ✅ Purged | Removed from git history (filter-repo) |
+
+## Phase 1c — Git history purge (DONE)
+- `git filter-repo` stripped `CLAUDE_CODE_VERIFY_CORE_PIPELINE.txt`, `cookies.txt`, `v4 archived/dr_cookies.txt` from ALL 120 commits
+- Force-pushed to origin/main (SHA `+8d1045d...9bbb0a8`)
+- Anyone with an old clone MUST re-clone
+- Local repo at `9bbb0a8` — clean history
+
+## Phase 4 — Doc sprawl (DONE)
+- 12 root-level docs moved to NOTES/
+- `CLAUDE_CODE_VERIFY_CORE_PIPELINE.sh` deleted (superseded by .txt)
+- `.herpes/review-and-mimo-spec.md` deleted (duplicate)
+- Root now clean: CLAUDE.md, README.md, requirements.txt only
 
 ## Phase 1c — CLAUDE_CODE_VERIFY_CORE_PIPELINE.txt
 ✅ Already clean — no raw secrets found. All `${VAR}` placeholders.
