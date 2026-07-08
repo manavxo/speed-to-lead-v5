@@ -76,5 +76,9 @@ HTTP
 MIMO_CONTEXT_PASTE.txt
 MIMO_HANDOFF.md
 
+# Secrets: session cookies
+cookies.txt
+v4 archived/dr_cookies.txt
+
 # Alembic runtime artifacts (not migration files themselves)
 test_migration.db
