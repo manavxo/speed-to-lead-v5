@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Premier Auto Group | Used Cars Burnaby BC</title>
+<meta name="description" content="Premier Auto Group - Quality pre-owned vehicles in Burnaby, BC. Family-owned since 2005. Financing available.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0f;--bg2:#12121a;--bg3:#1a1a25;--gold:#d4a853;--gold-light:#e8c878;
+  --white:#ffffff;--gray:#a0a0b0;--gray-dark:#606070;--border:#2a2a38;
+  --success:#22c55e;--error:#ef4444;
+}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--white);line-height:1.6;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+img{max-width:100%;display:block}
+.container{max-width:1280px;margin:0 auto;padding:0 1.5rem}
+button{cursor:pointer;font-family:inherit;border:none}
+input,select,textarea{font-family:inherit}
+
+/* HEADER */
+.header{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(10,10,15,.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+.header-inner{display:flex;align-items:center;justify-content:space-between;height:70px}
+.logo{font-size:1.4rem;font-weight:800;letter-spacing:-.02em}
+.logo span{color:var(--gold)}
+.header-right{display:flex;align-items:center;gap:2rem}
+.header-phone{font-weight:600;font-size:.95rem;color:var(--gold)}
+.header-phone svg{vertical-align:middle;margin-right:6px}
+.nav{display:flex;gap:1.5rem}
+.nav a{font-size:.85rem;font-weight:500;color:var(--gray);transition:color .2s}
+.nav a:hover{color:var(--gold)}
+.hamburger{display:none;background:none;color:var(--white);font-size:1.5rem}
+.mobile-nav{display:none;position:fixed;top:70px;left:0;right:0;background:var(--bg2);border-bottom:1px solid var(--border);padding:1rem;z-index:99}
+.mobile-nav a{display:block;padding:.75rem 0;font-weight:500;color:var(--gray);border-bottom:1px solid var(--border)}
+.mobile-nav a:last-child{border:none}
+
+/* HERO */
+.hero{padding:140px 0 80px;background:linear-gradient(135deg,#0a0a0f 0%,#1a1025 50%,#0a0a0f 100%);position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-50%;right:-20%;width:600px;height:600px;background:radial-gradient(circle,rgba(212,168,83,.08),transparent 70%);pointer-events:none}
+.hero-content{text-align:center;max-width:800px;margin:0 auto}
+.hero h1{font-size:clamp(2.2rem,5vw,3.8rem);font-weight:800;letter-spacing:-.03em;line-height:1.1;margin-bottom:1rem}
+.hero h1 span{color:var(--gold)}
+.hero p{font-size:1.15rem;color:var(--gray);margin-bottom:2rem}
+.hero-cta{display:inline-flex;align-items:center;gap:.5rem;background:var(--gold);color:var(--bg);font-weight:700;font-size:1rem;padding:.9rem 2.2rem;border-radius:8px;transition:all .2s}
+.hero-cta:hover{background:var(--gold-light);transform:translateY(-2px);box-shadow:0 8px 24px rgba(212,168,83,.3)}
+.stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-top:3.5rem;padding:2rem;background:var(--bg2);border-radius:12px;border:1px solid var(--border)}
+.stat{text-align:center}
+.stat-num{font-size:1.8rem;font-weight:800;color:var(--gold)}
+.stat-label{font-size:.8rem;color:var(--gray);margin-top:.25rem}
+
+/* FILTER BAR */
+.section-title{text-align:center;margin-bottom:2.5rem}
+.section-title h2{font-size:clamp(1.8rem,3vw,2.4rem);font-weight:800;letter-spacing:-.02em}
+.section-title h2 span{color:var(--gold)}
+.section-title p{color:var(--gray);margin-top:.5rem}
+.inventory{padding:5rem 0;background:var(--bg)}
+.filter-bar{display:flex;flex-wrap:wrap;justify-content:center;gap:.6rem;margin-bottom:2.5rem}
+.filter-btn{background:var(--bg3);color:var(--gray);font-size:.85rem;font-weight:500;padding:.55rem 1.3rem;border-radius:6px;border:1px solid var(--border);transition:all .2s}
+.filter-btn:hover,.filter-btn.active{background:var(--gold);color:var(--bg);border-color:var(--gold)}
+
+/* VEHICLE GRID */
+.vehicle-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:1.5rem}
+.vehicle-card{background:var(--bg2);border-radius:12px;overflow:hidden;border:1px solid var(--border);transition:all .3s;cursor:pointer;opacity:0;transform:translateY(30px)}
+.vehicle-card.visible{opacity:1;transform:none}
+.vehicle-card:hover{border-color:var(--gold);transform:translateY(-4px);box-shadow:0 12px 40px rgba(0,0,0,.4)}
+.card-img{position:relative;height:200px;overflow:hidden;background:var(--bg3)}
+.card-img img{width:100%;height:100%;object-fit:cover;transition:transform .4s}
+.vehicle-card:hover .card-img img{transform:scale(1.05)}
+.badge{position:absolute;top:12px;left:12px;background:rgba(10,10,15,.85);color:var(--gold);font-size:.7rem;font-weight:600;padding:.3rem .7rem;border-radius:4px;backdrop-filter:blur(4px)}
+.card-body{padding:1.2rem}
+.card-title{font-size:1.05rem;font-weight:700;margin-bottom:.35rem;line-height:1.3}
+.card-subtitle{font-size:.8rem;color:var(--gray);margin-bottom:.8rem}
+.card-color{display:flex;align-items:center;gap:.5rem;font-size:.78rem;color:var(--gray-dark);margin-bottom:.8rem}
+.color-dot{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--border);flex-shrink:0}
+.card-specs{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem}
+.spec-tag{background:var(--bg3);font-size:.72rem;padding:.25rem .55rem;border-radius:4px;color:var(--gray)}
+.card-footer{display:flex;align-items:center;justify-content:space-between;padding-top:1rem;border-top:1px solid var(--border)}
+.card-price{font-size:1.3rem;font-weight:800;color:var(--gold)}
+.card-mileage{font-size:.8rem;color:var(--gray)}
+.no-results{text-align:center;padding:3rem;color:var(--gray);grid-column:1/-1}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;display:none;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(4px)}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg2);border-radius:16px;max-width:900px;width:100%;max-height:90vh;overflow-y:auto;border:1px solid var(--border);position:relative;animation:modalIn .3s ease}
+@keyframes modalIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:none}}
+.modal-close{position:absolute;top:16px;right:16px;width:36px;height:36px;background:rgba(10,10,15,.8);border:1px solid var(--border);border-radius:50%;color:var(--white);font-size:1.2rem;display:flex;align-items:center;justify-content:center;z-index:10;transition:all .2s}
+.modal-close:hover{background:var(--gold);color:var(--bg)}
+.modal-img{width:100%;height:300px;object-fit:cover}
+.modal-body{padding:2rem}
+.modal-title{font-size:1.6rem;font-weight:800;margin-bottom:.3rem}
+.modal-price{font-size:2rem;font-weight:800;color:var(--gold);margin-bottom:1.5rem}
+.spec-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-bottom:2rem}
+.spec-item{background:var(--bg3);padding:1rem;border-radius:8px;border:1px solid var(--border)}
+.spec-label{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--gray-dark);margin-bottom:.25rem;font-weight:600}
+.spec-value{font-size:.95rem;font-weight:600}
+.features-title{font-size:1.1rem;font-weight:700;margin-bottom:1rem}
+.features-list{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:2rem}
+.feature-tag{background:var(--bg3);border:1px solid var(--border);font-size:.8rem;padding:.4rem .9rem;border-radius:6px;color:var(--gray)}
+.modal-cta{display:block;width:100%;text-align:center;background:var(--gold);color:var(--bg);font-weight:700;font-size:1rem;padding:1rem;border-radius:8px;transition:all .2s}
+.modal-cta:hover{background:var(--gold-light);box-shadow:0 8px 24px rgba(212,168,83,.3)}
+
+/* ABOUT */
+.about{padding:5rem 0;background:var(--bg2)}
+.about-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:2rem}
+.about-card{padding:2rem;background:var(--bg);border-radius:12px;border:1px solid var(--border);transition:border-color .2s}
+.about-card:hover{border-color:var(--gold)}
+.about-icon{font-size:2rem;margin-bottom:1rem}
+.about-card h3{font-size:1.1rem;font-weight:700;margin-bottom:.5rem}
+.about-card p{font-size:.9rem;color:var(--gray);line-height:1.7}
+.about-note{text-align:center;margin-top:2.5rem;padding:1.5rem;background:rgba(212,168,83,.08);border:1px solid rgba(212,168,83,.2);border-radius:10px}
+.about-note p{color:var(--gold);font-weight:600;font-size:1rem}
+
+/* HOURS */
+.hours{padding:5rem 0;background:var(--bg)}
+.hours-table{max-width:500px;margin:0 auto;background:var(--bg2);border-radius:12px;border:1px solid var(--border);overflow:hidden}
+.hours-row{display:flex;justify-content:space-between;padding:1rem 1.5rem;border-bottom:1px solid var(--border)}
+.hours-row:last-child{border:none}
+.hours-row .day{font-weight:600}
+.hours-row .time{color:var(--gray)}
+.hours-row.today{background:rgba(212,168,83,.08)}
+.hours-row.today .day{color:var(--gold)}
+
+/* CONTACT */
+.contact{padding:5rem 0;background:var(--bg2)}
+.contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:3rem;align-items:start}
+.contact-info h3{font-size:1.3rem;font-weight:700;margin-bottom:1rem}
+.contact-detail{display:flex;gap:1rem;margin-bottom:1.5rem}
+.contact-detail-icon{width:44px;height:44px;background:var(--bg);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;border:1px solid var(--border)}
+.contact-detail-text h4{font-weight:600;font-size:.95rem;margin-bottom:.15rem}
+.contact-detail-text p{font-size:.85rem;color:var(--gray)}
+.form-card{background:var(--bg);padding:2rem;border-radius:12px;border:1px solid var(--border)}
+.form-card h3{font-size:1.2rem;font-weight:700;margin-bottom:1.5rem}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.form-group{margin-bottom:1rem}
+.form-group.full{grid-column:1/-1}
+.form-group label{display:block;font-size:.8rem;font-weight:600;margin-bottom:.4rem;color:var(--gray)}
+.form-group input,.form-group select,.form-group textarea{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:.75rem 1rem;color:var(--white);font-size:.9rem;transition:border-color .2s}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--gold)}
+.form-group textarea{min-height:100px;resize:vertical}
+.form-group select option{background:var(--bg2)}
+.checkbox-row{display:flex;align-items:flex-start;gap:.75rem;margin-bottom:1.5rem}
+.checkbox-row input[type="checkbox"]{width:18px;height:18px;margin-top:2px;accent-color:var(--gold)}
+.checkbox-row label{font-size:.82rem;color:var(--gray);line-height:1.5}
+.submit-btn{width:100%;background:var(--gold);color:var(--bg);font-weight:700;font-size:1rem;padding:1rem;border-radius:8px;transition:all .2s}
+.submit-btn:hover{background:var(--gold-light)}
+.form-msg{margin-top:1rem;padding:1rem;border-radius:8px;text-align:center;font-weight:600;font-size:.9rem;display:none}
+.form-msg.success{display:block;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:var(--success)}
+.form-msg.error{display:block;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--error)}
+
+/* FOOTER */
+.footer{padding:3rem 0;background:var(--bg);border-top:1px solid var(--border)}
+.footer-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:2rem;margin-bottom:2rem}
+.footer h4{font-size:.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--gold);margin-bottom:1rem}
+.footer p,.footer a{font-size:.85rem;color:var(--gray);line-height:1.8;display:block}
+.footer a:hover{color:var(--gold)}
+.footer-bottom{text-align:center;padding-top:2rem;border-top:1px solid var(--border);font-size:.8rem;color:var(--gray-dark)}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  .nav{display:none}
+  .hamburger{display:block}
+  .stats-bar{grid-template-columns:repeat(2,1fr)}
+  .contact-grid{grid-template-columns:1fr}
+  .form-row{grid-template-columns:1fr}
+  .spec-grid{grid-template-columns:1fr 1fr}
+  .modal-img{height:200px}
+  .modal-body{padding:1.5rem}
+}
+@media(max-width:480px){
+  .header-right{gap:1rem}
+  .header-phone{display:none}
+  .vehicle-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="container header-inner">
+    <a href="#" class="logo">Premier <span>Auto Group</span></a>
+    <div class="header-right">
+      <a href="tel:6045550199" class="header-phone">
+        <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M3.654 1.328a.678.678 0 0 0-1.015-.063L1.605 2.3c-.483.484-.661 1.169-.45 1.77a17.568 17.568 0 0 0 4.168 6.608 17.569 17.569 0 0 0 6.608 4.168c.601.211 1.286.033 1.77-.45l1.034-1.034a.678.678 0 0 0-.063-1.015l-2.307-1.794a.678.678 0 0 0-.58-.122l-2.19.547a1.745 1.745 0 0 1-1.657-.459L5.482 8.062a1.745 1.745 0 0 1-.46-1.657l.548-2.19a.678.678 0 0 0-.122-.58L3.654 1.328zM1.884.511a1.745 1.745 0 0 1 2.612.163L6.29 2.98c.329.423.445.974.315 1.494l-.547 2.19a.678.678 0 0 0 .178.643l2.457 2.457a.678.678 0 0 0 .644.178l2.189-.547a1.745 1.745 0 0 1 1.494.315l2.306 1.794c.829.645.905 1.87.163 2.611l-1.034 1.034c-.74.74-1.846 1.065-2.877.702a18.634 18.634 0 0 1-7.01-4.42 18.634 18.634 0 0 1-4.42-7.009c-.362-1.03-.037-2.137.703-2.877L1.885.511z"/></svg>
+        (778) 762-3122
+      </a>
+      <nav class="nav">
+        <a href="#inventory">Inventory</a>
+        <a href="#about">About</a>
+        <a href="#hours">Hours</a>
+        <a href="#contact">Contact</a>
+      </nav>
+      <button class="hamburger" onclick="toggleMobileNav()">☰</button>
+    </div>
+  </div>
+</header>
+<div class="mobile-nav" id="mobileNav">
+  <a href="#inventory" onclick="toggleMobileNav()">Inventory</a>
+  <a href="#about" onclick="toggleMobileNav()">About</a>
+  <a href="#hours" onclick="toggleMobileNav()">Hours</a>
+  <a href="#contact" onclick="toggleMobileNav()">Contact</a>
+</div>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="container hero-content">
+    <h1>Find Your <span>Perfect Car</span></h1>
+    <p>Serving Greater Vancouver Since 2005</p>
+    <a href="#inventory" class="hero-cta">Browse Inventory ↓</a>
+    <div class="stats-bar">
+      <div class="stat"><div class="stat-num">20+</div><div class="stat-label">Vehicles In Stock</div></div>
+      <div class="stat"><div class="stat-num">18+</div><div class="stat-label">Years in Business</div></div>
+      <div class="stat"><div class="stat-num">1,000+</div><div class="stat-label">Happy Customers</div></div>
+      <div class="stat"><div class="stat-num">4.8</div><div class="stat-label">Google Rating ★</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- INVENTORY -->
+<section class="inventory" id="inventory">
+  <div class="container">
+    <div class="section-title">
+      <h2>Our <span>Inventory</span></h2>
+      <p>Browse our hand-picked selection of quality pre-owned vehicles</p>
+    </div>
+    <div class="filter-bar" id="filterBar"></div>
+    <div class="vehicle-grid" id="vehicleGrid"></div>
+  </div>
+</section>
+
+<!-- ABOUT -->
+<section class="about" id="about">
+  <div class="container">
+    <div class="section-title">
+      <h2>Why <span>Premier Auto Group</span></h2>
+      <p>A family-owned dealership you can trust</p>
+    </div>
+    <div class="about-grid">
+      <div class="about-card">
+        <div class="about-icon">🏆</div>
+        <h3>Family-Owned Since 2005</h3>
+        <p>For over 18 years, we've been helping Greater Vancouver find reliable, quality pre-owned vehicles. Our reputation is built on trust, transparency, and genuine care for every customer.</p>
+      </div>
+      <div class="about-card">
+        <div class="about-icon">✅</div>
+        <h3>Certified Pre-Owned</h3>
+        <p>Every vehicle on our lot undergoes a comprehensive 120-point inspection. We stand behind every car we sell with a complimentary 3-month / 5,000 km powertrain warranty.</p>
+      </div>
+      <div class="about-card">
+        <div class="about-icon">💳</div>
+        <h3>Financing Available</h3>
+        <p>We work with major banks and credit unions to secure competitive rates for all credit situations. Pre-approval available — get approved in minutes, not days.</p>
+      </div>
+      <div class="about-card">
+        <div class="about-icon">🔄</div>
+        <h3>Trade-Ins Welcome</h3>
+        <p>Looking to upgrade? We offer fair market value for your trade-in. Get an instant online appraisal or visit us for an in-person evaluation — no obligation.</p>
+      </div>
+    </div>
+    <div class="about-note">
+      <p>⚡ Every inquiry gets a response within seconds — powered by our AI-assisted lead system</p>
+    </div>
+  </div>
+</section>
+
+<!-- HOURS -->
+<section class="hours" id="hours">
+  <div class="container">
+    <div class="section-title">
+      <h2>Business <span>Hours</span></h2>
+      <p>Visit us at 4567 Kingsway, Burnaby, BC V5H 2B1</p>
+    </div>
+    <div class="hours-table" id="hoursTable"></div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section class="contact" id="contact">
+  <div class="container">
+    <div class="section-title">
+      <h2>Get In <span>Touch</span></h2>
+      <p>Have a question? We'd love to hear from you</p>
+    </div>
+    <div class="contact-grid">
+      <div class="contact-info">
+        <h3>Contact Information</h3>
+        <div class="contact-detail">
+          <div class="contact-detail-icon">📍</div>
+          <div class="contact-detail-text">
+            <h4>Address</h4>
+            <p>4567 Kingsway, Burnaby, BC V5H 2B1</p>
+          </div>
+        </div>
+        <div class="contact-detail">
+          <div class="contact-detail-icon">📞</div>
+          <div class="contact-detail-text">
+            <h4>Phone</h4>
+            <p>(778) 762-3122</p>
+          </div>
+        </div>
+        <div class="contact-detail">
+          <div class="contact-detail-icon">✉️</div>
+          <div class="contact-detail-text">
+            <h4>Email</h4>
+            <p>info@premierautogroup.ca</p>
+          </div>
+        </div>
+        <div class="contact-detail">
+          <div class="contact-detail-icon">⏰</div>
+          <div class="contact-detail-text">
+            <h4>Hours</h4>
+            <p>Mon–Fri 9AM–7PM · Sat 10AM–5PM · Sun Closed</p>
+          </div>
+        </div>
+      </div>
+      <div class="form-card">
+        <h3>Send Us a Message</h3>
+        <form id="contactForm">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="full_name">Full Name *</label>
+              <input type="text" id="full_name" name="full_name" required placeholder="John Smith">
+            </div>
+            <div class="form-group">
+              <label for="phone">Phone *</label>
+              <input type="tel" id="phone" name="phone" required placeholder="(604) 555-0000">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" placeholder="john@example.com">
+          </div>
+          <div class="form-group">
+            <label for="vehicle_stock">Vehicle of Interest</label>
+            <select id="vehicle_stock" name="vehicle_stock">
+              <option value="">Select a vehicle...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="message">Message</label>
+            <textarea id="message" name="message" placeholder="I'm interested in..."></textarea>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="consent_sms" name="consent_sms">
+            <label for="consent_sms">I consent to receive SMS messages from Premier Auto Group regarding my inquiry. Message frequency varies. Reply STOP to opt out.</label>
+          </div>
+          <button type="submit" class="submit-btn">Send Message</button>
+          <div class="form-msg" id="formMsg"></div>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <h4>Premier Auto Group</h4>
+        <p>4567 Kingsway<br>Burnaby, BC V5H 2B1</p>
+      </div>
+      <div>
+        <h4>Contact</h4>
+        <a href="tel:6045550199">(778) 762-3122</a>
+        <a href="mailto:info@premierautogroup.ca">info@premierautogroup.ca</a>
+      </div>
+      <div>
+        <h4>Hours</h4>
+        <p>Mon–Fri: 9AM – 7PM</p>
+        <p>Saturday: 10AM – 5PM</p>
+        <p>Sunday: Closed</p>
+      </div>
+      <div>
+        <h4>Quick Links</h4>
+        <a href="#inventory">Inventory</a>
+        <a href="#about">About Us</a>
+        <a href="#contact">Contact</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      &copy; 2025 Premier Auto Group. All rights reserved. OMVIC Licensed Dealer.
+    </div>
+  </div>
+</footer>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" id="modal">
+    <button class="modal-close" id="modalClose">&times;</button>
+    <img class="modal-img" id="modalImg" src="" alt="">
+    <div class="modal-body">
+      <div class="modal-title" id="modalTitle"></div>
+      <div class="modal-price" id="modalPrice"></div>
+      <div class="spec-grid" id="specGrid"></div>
+      <div class="features-title">Features & Equipment</div>
+      <div class="features-list" id="featuresList"></div>
+      <a href="#contact" class="modal-cta" id="modalCta">Inquire About This Vehicle</a>
+    </div>
+  </div>
+</div>
+
+<script>
+const VEHICLES = [
+  {stockNo:"TDM001",year:2022,make:"Honda",model:"Civic",trim:"Sport",body:"Sedan",price:24900,mileage:24500,engine:"2.0L 4-cylinder",transmission:"CVT",drivetrain:"FWD",horsepower:158,torque:"138 lb-ft",fuelEconomy:"7.1 L/100km",range:null,exteriorColor:"Crystal Black Pearl",interiorColor:"Black cloth",features:["Honda Sensing Suite","Apple CarPlay","Android Auto","7\" Touchscreen Display","Lane Keep Assist","Adaptive Cruise Control","18\" Alloy Wheels","LED Headlights","Power Sunroof"],imageUrl:"https://picsum.photos/seed/TDM001/400/300"},
+  {stockNo:"TDM002",year:2021,make:"Ford",model:"Mustang",trim:"GT",body:"Coupe",price:35950,mileage:32000,engine:"5.0L V8",transmission:"10-speed automatic",drivetrain:"RWD",horsepower:460,torque:"420 lb-ft",fuelEconomy:"12.4 L/100km",range:null,exteriorColor:"Oxford White",interiorColor:"Ebony leather",features:["SYNC 3 Infotainment","8\" Touchscreen","Brembo Performance Brakes","Limited-Slip Differential","Launch Control","Selectable Drive Modes","Dual Exhaust System","Rear Spoiler"],imageUrl:"https://picsum.photos/seed/TDM002/400/300"},
+  {stockNo:"TDM003",year:2023,make:"Toyota",model:"RAV4",trim:"XLE",body:"SUV",price:34995,mileage:15800,engine:"2.5L 4-cylinder",transmission:"8-speed automatic",drivetrain:"AWD",horsepower:203,torque:"184 lb-ft",fuelEconomy:"8.0 L/100km",range:null,exteriorColor:"Magnetic Grey Metallic",interiorColor:"Black SofTex",features:["Toyota Safety Sense 2.5+","8\" Touchscreen","Blind Spot Monitor","Rear Cross-Traffic Alert","Dual-Zone Climate Control","Power Liftgate","17\" Alloy Wheels"],imageUrl:"https://picsum.photos/seed/TDM003/400/300"},
+  {stockNo:"TDM004",year:2020,make:"Hyundai",model:"Elantra",trim:"Preferred",body:"Sedan",price:16450,mileage:51000,engine:"2.0L 4-cylinder",transmission:"CVT",drivetrain:"FWD",horsepower:147,torque:"132 lb-ft",fuelEconomy:"7.3 L/100km",range:null,exteriorColor:"Phantom Black",interiorColor:"Black cloth",features:["8\" Touchscreen","Apple CarPlay","Android Auto","Forward Collision Avoidance","Lane Keep Assist","Heated Front Seats","Heated Steering Wheel","16\" Alloy Wheels"],imageUrl:"https://picsum.photos/seed/TDM004/400/300"},
+  {stockNo:"TDM005",year:2019,make:"Volkswagen",model:"Jetta",trim:"Comfortline",body:"Sedan",price:15990,mileage:68000,engine:"1.4L Turbo 4-cylinder",transmission:"8-speed automatic",drivetrain:"FWD",horsepower:147,torque:"184 lb-ft",fuelEconomy:"6.9 L/100km",range:null,exteriorColor:"Pure White",interiorColor:"Titan Black",features:["VW Digital Cockpit","6.5\" Touchscreen","App-Connect","Blind Spot Monitor","Heated Front Seats","Heated Steering Wheel","LED Headlights","16\" Alloy Wheels"],imageUrl:"https://picsum.photos/seed/TDM005/400/300"},
+  {stockNo:"TDM006",year:2022,make:"Toyota",model:"Camry",trim:"SE",body:"Sedan",price:27900,mileage:29000,engine:"2.5L 4-cylinder",transmission:"8-speed automatic",drivetrain:"FWD",horsepower:203,torque:"184 lb-ft",fuelEconomy:"7.1 L/100km",range:null,exteriorColor:"Celestial Silver Metallic",interiorColor:"Black SofTex",features:["Toyota Safety Sense 2.5+","9\" Touchscreen","Wireless Charging","Sport-Tuned Suspension","18\" Black Alloy Wheels","Dual Exhaust","LED Headlights"],imageUrl:"https://picsum.photos/seed/TDM006/400/300"},
+  {stockNo:"TDM007",year:2021,make:"Nissan",model:"Altima",trim:"SV",body:"Sedan",price:19850,mileage:42000,engine:"2.5L 4-cylinder",transmission:"CVT",drivetrain:"FWD",horsepower:188,torque:"180 lb-ft",fuelEconomy:"7.5 L/100km",range:null,exteriorColor:"Brilliant Silver Metallic",interiorColor:"Charcoal cloth",features:["Nissan Safety Shield 360","8\" Touchscreen","Apple CarPlay","Android Auto","Blind Spot Warning","Intelligent Cruise Control","Heated Front Seats","17\" Alloy Wheels"],imageUrl:"https://picsum.photos/seed/TDM007/400/300"},
+  {stockNo:"TDM008",year:2022,make:"Dodge",model:"Challenger",trim:"RT",body:"Coupe",price:39900,mileage:21000,engine:"5.7L HEMI V8",transmission:"8-speed automatic",drivetrain:"RWD",horsepower:375,torque:"410 lb-ft",fuelEconomy:"13.1 L/100km",range:null,exteriorColor:"Go Mango",interiorColor:"Black Nappa leather",features:["Uconnect 4C","8.4\" Touchscreen","Performance Suspension","Brembo Brakes","Launch Assist","Line Lock","20\" Satin Carbon Wheels"],imageUrl:"https://picsum.photos/seed/TDM008/400/300"},
+  {stockNo:"TDM009",year:2021,make:"Tesla",model:"Model 3",trim:"Standard Range Plus",body:"Sedan",price:31500,mileage:38000,engine:"Single Electric Motor",transmission:"Single-speed fixed",drivetrain:"RWD",horsepower:283,torque:"307 lb-ft",fuelEconomy:null,range:"423 km",exteriorColor:"Pearl White Multi-Coat",interiorColor:"Black vegan leather",features:["15\" Central Touchscreen","Autopilot","Over-the-Air Updates","Sentry Mode","Heated Front & Rear Seats","Panoramic Glass Roof","Wireless Phone Docking","18\" Aero Wheels"],imageUrl:"https://picsum.photos/seed/TDM009/400/300"},
+  {stockNo:"TDM010",year:2020,make:"Chevrolet",model:"Camaro",trim:"LT",body:"Coupe",price:28750,mileage:29000,engine:"3.6L V6",transmission:"8-speed automatic",drivetrain:"RWD",horsepower:335,torque:"284 lb-ft",fuelEconomy:"10.7 L/100km",range:null,exteriorColor:"Riverside Blue Metallic",interiorColor:"Jet Black cloth",features:["Infotainment 3","7\" Touchscreen","Apple CarPlay","Android Auto","Brembo Front Brakes","Limited-Slip Differential","Sport-Tuned Suspension","18\" Wheels"],imageUrl:"https://picsum.photos/seed/TDM010/400/300"},
+  {stockNo:"TDM011",year:2022,make:"BMW",model:"330i",trim:"xDrive",body:"Sedan",price:38500,mileage:26000,engine:"2.0L Turbo 4-cylinder",transmission:"8-speed Steptronic",drivetrain:"AWD",horsepower:255,torque:"295 lb-ft",fuelEconomy:"8.1 L/100km",range:null,exteriorColor:"Alpine White",interiorColor:"Black Vernasca leather",features:["BMW iDrive 7","10.25\" Touchscreen","Wireless Apple CarPlay","Harman Kardon Surround Sound","Gesture Control","Wireless Charging","M Sport Suspension","18\" M Alloy Wheels"],imageUrl:"https://picsum.photos/seed/TDM011/400/300"},
+  {stockNo:"TDM012",year:2023,make:"Honda",model:"CR-V",trim:"EX-L",body:"SUV",price:36200,mileage:12000,engine:"1.5L Turbo 4-cylinder",transmission:"CVT",drivetrain:"AWD",horsepower:190,torque:"179 lb-ft",fuelEconomy:"7.7 L/100km",range:null,exteriorColor:"Platinum White Pearl",interiorColor:"Black leather",features:["Honda Sensing Suite","9\" Touchscreen","Wireless Apple CarPlay","Wireless Android Auto","Wireless Charging","Bose 12-Speaker Audio","Power Tailgate","Heated Front & Rear Seats","18\" Alloy Wheels"],imageUrl:"https://picsum.photos/seed/TDM012/400/300"},
+  {stockNo:"TDM013",year:2021,make:"Land Rover",model:"Range Rover Evoque",trim:"S",body:"SUV",price:42900,mileage:35000,engine:"2.0L Turbo 4-cylinder",transmission:"9-speed automatic",drivetrain:"AWD",horsepower:246,torque:"269 lb-ft",fuelEconomy:"9.8 L/100km",range:null,exteriorColor:"Eiger Grey",interiorColor:"Ebony grained leather",features:["Pivi Pro Infotainment","10\" Touchscreen","Meridian Sound System","Terrain Response 2","ClearSight Rear View Mirror","3D Surround Camera","Heated Front Seats","20\" Alloy Wheels"],imageUrl:"https://picsum.photos/seed/TDM013/400/300"},
+  {stockNo:"TDM014",year:2022,make:"Mercedes-Benz",model:"C300",trim:"4MATIC",body:"Sedan",price:41500,mileage:22000,engine:"2.0L Turbo 4-cyl + Mild Hybrid",transmission:"9-speed 9G-TRONIC",drivetrain:"AWD",horsepower:255,torque:"295 lb-ft",fuelEconomy:"8.3 L/100km",range:null,exteriorColor:"Obsidian Black Metallic",interiorColor:"Black MB-Tex",features:["MBUX Infotainment","11.9\" Touchscreen","12.3\" Digital Cluster","Wireless CarPlay & Android Auto","Burmester 3D Surround Sound","Heated Front Seats","64-Color Ambient Lighting","18\" AMG Wheels"],imageUrl:"https://picsum.photos/seed/TDM014/400/300"},
+  {stockNo:"TDM015",year:2023,make:"Hyundai",model:"Tucson",trim:"Preferred",body:"SUV",price:29900,mileage:18000,engine:"2.5L 4-cylinder",transmission:"8-speed automatic",drivetrain:"AWD",horsepower:187,torque:"178 lb-ft",fuelEconomy:"8.4 L/100km",range:null,exteriorColor:"Phantom Black",interiorColor:"Black cloth",features:["Hyundai SmartSense","10.25\" Touchscreen","Apple CarPlay","Android Auto","Wireless Charging","Blind Spot Collision Avoidance","Heated Front Seats","Heated Steering Wheel","LED Headlights","17\" Alloy Wheels"],imageUrl:"https://picsum.photos/seed/TDM015/400/300"},
+  {stockNo:"TDM016",year:2021,make:"Ford",model:"F-150",trim:"XLT",body:"Truck",price:38750,mileage:45000,engine:"2.7L EcoBoost V6 Twin-Turbo",transmission:"10-speed automatic",drivetrain:"4WD",horsepower:325,torque:"400 lb-ft",fuelEconomy:"11.8 L/100km",range:null,exteriorColor:"Iconic Silver Metallic",interiorColor:"Medium Earth Grey cloth",features:["SYNC 4","12\" Touchscreen","Ford Co-Pilot360","Pro Power Onboard 2.4kW","Trailer Tow Package","Tailgate Step","Spray-In Bedliner","18\" Chrome Wheels"],imageUrl:"https://picsum.photos/seed/TDM016/400/300"},
+  {stockNo:"TDM017",year:2023,make:"Mazda",model:"CX-5",trim:"GX",body:"SUV",price:31200,mileage:14500,engine:"2.5L 4-cylinder",transmission:"6-speed SKYACTIV-Drive",drivetrain:"AWD",horsepower:187,torque:"186 lb-ft",fuelEconomy:"8.2 L/100km",range:null,exteriorColor:"Soul Red Crystal Metallic",interiorColor:"Black cloth",features:["Mazda Connect","10.25\" Display","Apple CarPlay","Android Auto","i-Activsense Safety Suite","Smart Brake Support","Blind Spot Monitoring","Heated Front Seats","17\" Alloy Wheels"],imageUrl:"https://picsum.photos/seed/TDM017/400/300"},
+  {stockNo:"TDM018",year:2020,make:"Toyota",model:"Corolla",trim:"SE",body:"Sedan",price:17900,mileage:52000,engine:"2.0L 4-cylinder",transmission:"CVT (Dynamic Shift)",drivetrain:"FWD",horsepower:169,torque:"151 lb-ft",fuelEconomy:"6.8 L/100km",range:null,exteriorColor:"Blue Crush Metallic",interiorColor:"Black fabric",features:["Toyota Safety Sense 2.0","8\" Touchscreen","Apple CarPlay","Android Auto","Blind Spot Monitor","Sport Mode","18\" Alloy Wheels","LED Headlights","Rear Spoiler"],imageUrl:"https://picsum.photos/seed/TDM018/400/300"},
+  {stockNo:"TDM019",year:2022,make:"Chevrolet",model:"Equinox",trim:"LT",body:"SUV",price:25800,mileage:31000,engine:"1.5L Turbo 4-cylinder",transmission:"6-speed automatic",drivetrain:"FWD",horsepower:170,torque:"203 lb-ft",fuelEconomy:"8.2 L/100km",range:null,exteriorColor:"Iron Grey Metallic",interiorColor:"Jet Black cloth",features:["Infotainment 3","7\" Touchscreen","Apple CarPlay","Android Auto","Teen Driver Technology","Keyless Open","Heated Front Seats","17\" Alloy Wheels"],imageUrl:"https://picsum.photos/seed/TDM019/400/300"},
+  {stockNo:"TDM020",year:2019,make:"Audi",model:"A4",trim:"Premium Plus",body:"Sedan",price:26500,mileage:58000,engine:"2.0L Turbo 4-cylinder",transmission:"7-speed S tronic",drivetrain:"AWD (quattro)",horsepower:248,torque:"273 lb-ft",fuelEconomy:"8.1 L/100km",range:null,exteriorColor:"Ibis White",interiorColor:"Black leather",features:["Audi MMI","10.1\" Touchscreen","Wireless Apple CarPlay","Bang & Olufsen 3D Sound","Virtual Cockpit Plus","Adaptive Cruise Control","Lane Departure Warning","Heated Front Seats","Sport Suspension","18\" Wheels"],imageUrl:"https://picsum.photos/seed/TDM020/400/300"}
+];
+
+// Color map for swatches
+const COLOR_MAP = {
+  'Crystal Black Pearl':'#0a0a0a','Oxford White':'#f0f0f0','Magnetic Grey Metallic':'#707070',
+  'Phantom Black':'#1a1a1a','Pure White':'#f5f5f5','Celestial Silver Metallic':'#b0b0b0',
+  'Brilliant Silver Metallic':'#c0c0c0','Go Mango':'#ff6600','Pearl White Multi-Coat':'#f8f8f0',
+  'Riverside Blue Metallic':'#2a5090','Alpine White':'#f0f0f0','Platinum White Pearl':'#f5f5f0',
+  'Eiger Grey':'#808080','Obsidian Black Metallic':'#0c0c0c','Soul Red Crystal Metallic':'#c01010',
+  'Iconic Silver Metallic':'#a8a8a8','Blue Crush Metallic':'#3050a0','Iron Grey Metallic':'#555560',
+  'Ibis White':'#f0f0f0'
+};
+
+// Populate filter bar
+const bodies = ['All', ...new Set(VEHICLES.map(v => v.body))];
+const filterBar = document.getElementById('filterBar');
+bodies.forEach(b => {
+  const btn = document.createElement('button');
+  btn.className = 'filter-btn' + (b === 'All' ? ' active' : '');
+  btn.textContent = b;
+  btn.onclick = () => filterVehicles(b);
+  filterBar.appendChild(btn);
+});
+
+// Populate vehicle dropdown
+const select = document.getElementById('vehicle_stock');
+VEHICLES.forEach(v => {
+  const opt = document.createElement('option');
+  opt.value = v.stockNo;
+  opt.textContent = `${v.stockNo} — ${v.year} ${v.make} ${v.model} ${v.trim}`;
+  select.appendChild(opt);
+});
+
+// Render vehicle grid
+function renderVehicles(list) {
+  const grid = document.getElementById('vehicleGrid');
+  if (!list.length) { grid.innerHTML = '<div class="no-results">No vehicles found in this category.</div>'; return; }
+  grid.innerHTML = list.map(v => `
+    <div class="vehicle-card" onclick="openModal('${v.stockNo}')">
+      <div class="card-img">
+        <img src="${v.imageUrl}" alt="${v.year} ${v.make} ${v.model}" loading="lazy">
+        <span class="badge">${v.body}</span>
+      </div>
+      <div class="card-body">
+        <div class="card-title">${v.year} ${v.make} ${v.model} ${v.trim}</div>
+        <div class="card-subtitle">Stock #${v.stockNo}</div>
+        <div class="card-color"><span class="color-dot" style="background:${COLOR_MAP[v.exteriorColor]||'#888'}"></span> ${v.exteriorColor}</div>
+        <div class="card-specs">
+          <span class="spec-tag">${v.engine}</span>
+          <span class="spec-tag">${v.drivetrain}</span>
+          <span class="spec-tag">${v.horsepower} HP</span>
+        </div>
+        <div class="card-footer">
+          <div class="card-price">$${v.price.toLocaleString()}</div>
+          <div class="card-mileage">${v.mileage.toLocaleString()} km</div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+  // Animate cards in
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.vehicle-card').forEach((card, i) => {
+      setTimeout(() => card.classList.add('visible'), i * 60);
+    });
+  });
+}
+
+function filterVehicles(body) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.textContent === body));
+  renderVehicles(body === 'All' ? VEHICLES : VEHICLES.filter(v => v.body === body));
+}
+
+// Modal
+function openModal(stockNo) {
+  const v = VEHICLES.find(x => x.stockNo === stockNo);
+  if (!v) return;
+  document.getElementById('modalImg').src = v.imageUrl;
+  document.getElementById('modalTitle').textContent = `${v.year} ${v.make} ${v.model} ${v.trim}`;
+  document.getElementById('modalPrice').textContent = `$${v.price.toLocaleString()}`;
+
+  const specs = [
+    ['Engine', v.engine], ['Transmission', v.transmission], ['Drivetrain', v.drivetrain],
+    ['Horsepower', `${v.horsepower} HP`], ['Torque', v.torque],
+    ['Fuel Economy', v.fuelEconomy || '—'], ['Range', v.range || '—'],
+    ['Exterior Color', v.exteriorColor], ['Interior Color', v.interiorColor],
+    ['Mileage', `${v.mileage.toLocaleString()} km`], ['Stock #', v.stockNo], ['Body Style', v.body]
+  ];
+  document.getElementById('specGrid').innerHTML = specs.map(([l, val]) =>
+    `<div class="spec-item"><div class="spec-label">${l}</div><div class="spec-value">${val}</div></div>`
+  ).join('');
+
+  document.getElementById('featuresList').innerHTML = v.features.map(f =>
+    `<span class="feature-tag">${f}</span>`
+  ).join('');
+
+  document.getElementById('modalCta').onclick = () => {
+    closeModal();
+    document.getElementById('vehicle_stock').value = stockNo;
+    document.getElementById('contact').scrollIntoView({ behavior: 'smooth' });
+  };
+
+  document.getElementById('modalOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+document.getElementById('modalClose').onclick = closeModal;
+document.getElementById('modalOverlay').onclick = e => { if (e.target === e.currentTarget) closeModal(); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// Business hours
+const days = [
+  {day:'Monday',time:'9:00 AM – 7:00 PM'},{day:'Tuesday',time:'9:00 AM – 7:00 PM'},
+  {day:'Wednesday',time:'9:00 AM – 7:00 PM'},{day:'Thursday',time:'9:00 AM – 7:00 PM'},
+  {day:'Friday',time:'9:00 AM – 7:00 PM'},{day:'Saturday',time:'10:00 AM – 5:00 PM'},
+  {day:'Sunday',time:'Closed'}
+];
+const todayIdx = new Date().getDay(); // 0=Sun
+const jsToDay = [6,0,1,2,3,4,5];
+const todayRow = jsToDay[todayIdx];
+document.getElementById('hoursTable').innerHTML = days.map((d,i) =>
+  `<div class="hours-row${i===todayRow?' today':''}"><span class="day">${d.day}${i===todayRow?' (Today)':''}</span><span class="time">${d.time}</span></div>`
+).join('');
+
+// Contact form
+document.getElementById('contactForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const msg = document.getElementById('formMsg');
+  msg.className = 'form-msg';
+  msg.style.display = 'none';
+
+  const fd = new FormData(this);
+  const data = {
+    full_name: fd.get('full_name'),
+    phone: fd.get('phone'),
+    email: fd.get('email') || '',
+    vehicle_stock: fd.get('vehicle_stock') || '',
+    message: fd.get('message') || '',
+    consent_sms: document.getElementById('consent_sms').checked
+  };
+
+  try {
+    const res = await fetch('https://speed-to-lead-8tfi.onrender.com/webhook/form/premier-auto-token', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(data)
+    });
+    if (res.ok) {
+      msg.textContent = '✓ Thank you! Your message has been sent. We\'ll get back to you shortly.';
+      msg.className = 'form-msg success';
+      this.reset();
+    } else {
+      throw new Error('Server error');
+    }
+  } catch (err) {
+    msg.textContent = 'Something went wrong. Please try again or call us directly at (778) 762-3122.';
+    msg.className = 'form-msg error';
+  }
+  msg.style.display = 'block';
+});
+
+// Mobile nav toggle
+function toggleMobileNav() {
+  document.getElementById('mobileNav').style.display =
+    document.getElementById('mobileNav').style.display === 'block' ? 'none' : 'block';
+}
+
+// Intersection observer for scroll animations on about cards
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.style.opacity = '1'; e.target.style.transform = 'none'; } });
+}, {threshold: 0.1});
+document.querySelectorAll('.about-card').forEach(c => {
+  c.style.opacity = '0'; c.style.transform = 'translateY(30px)'; c.style.transition = 'all .5s ease';
+  observer.observe(c);
+});
+
+// Initial render
+renderVehicles(VEHICLES);
+</script>
+</body>
+</html>
