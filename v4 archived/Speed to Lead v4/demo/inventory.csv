@@ -1,0 +1,21 @@
+vin,stock,year,make,model,trim,body_style,mileage,price,state_of_vehicle,vehicle_url,image_url
+2HGFC2F50KH500001,TDM001,2022,Honda,Civic,Sport,Sedan,24500,24900,used,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2022+Honda+Civic+Sport,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2022+Honda+Civic+Sport
+1FATP8UH1J5500002,TDM002,2021,Ford,Mustang,GT,Coupe,32000,35950,used,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2021+Ford+Mustang+GT,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2021+Ford+Mustang+GT
+5TDZA23C13S500003,TDM003,2023,Toyota,RAV4,XLE,SUV,15800,34995,used,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2023+Toyota+RAV4+XLE,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2023+Toyota+RAV4+XLE
+KMHD84LF5JU500004,TDM004,2020,Hyundai,Elantra,Preferred,Sedan,51000,16450,used,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2020+Hyundai+Elantra,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2020+Hyundai+Elantra
+3VWDX7AJ5BM500005,TDM005,2019,Volkswagen,Jetta,Comfortline,Sedan,68000,15990,used,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2019+VW+Jetta,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2019+VW+Jetta
+4T1BZ1HK5KU500006,TDM006,2022,Toyota,Camry,SE,Sedan,29000,27900,used,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2022+Toyota+Camry+SE,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2022+Toyota+Camry+SE
+1N4AL3AP5KC500007,TDM007,2021,Nissan,Altima,SV,Sedan,42000,19850,used,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2021+Nissan+Altima+SV,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2021+Nissan+Altima+SV
+2C3CDXCT5NH500008,TDM008,2022,Dodge,Challenger,RT,Coupe,21000,39900,used,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2022+Dodge+Challenger+RT,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2022+Dodge+Challenger+RT
+5YJ3E1EA5KF500009,TDM009,2021,Tesla,Model 3,Standard Plus,Sedan,38000,31500,used,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2021+Tesla+Model+3,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2021+Tesla+Model+3
+1G1YY2D58H500010,TDM010,2020,Chevrolet,Camaro,LT,Coupe,29000,28750,used,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2020+Chevy+Camaro+LT,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2020+Chevy+Camaro+LT
+WBA8E9C59JA500011,TDM011,2022,BMW,330i,xDrive,Sedan,26000,38500,used,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2022+BMW+330i,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2022+BMW+330i
+JHMCG2638AC500012,TDM012,2023,Honda,CR-V,EX-L,SUV,12000,36200,used,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2023+Honda+CR-V+EX-L,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2023+Honda+CR-V+EX-L
+SALWR2WK5HA500013,TDM013,2021,Range Rover,Evoque,S,SUV,35000,42900,used,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2021+Range+Rover+Evoque,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2021+Range+Rover+Evoque
+WDCTG4GB5JJ500014,TDM014,2022,Mercedes-Benz,C300,4MATIC,Sedan,22000,41500,used,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2022+Mercedes+C300,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2022+Mercedes+C300
+5NPE34AF4HH500015,TDM015,2023,Hyundai,Tucson,Preferred,SUV,18000,29900,used,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2023+Hyundai+Tucson,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2023+Hyundai+Tucson
+1FTFW1E8XKK500016,TDM016,2021,Ford,F-150,XLT,Truck,45000,38750,used,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2021+Ford+F-150+XLT,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2021+Ford+F-150+XLT
+3MYU6YEC5MF500017,TDM017,2023,Mazda,CX-5,GX,SUV,14500,31200,used,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2023+Mazda+CX-5,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2023+Mazda+CX-5
+2T3DFREV5GW500018,TDM018,2020,Toyota,Corolla,SE,Sedan,52000,17900,used,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2020+Toyota+Corolla+SE,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2020+Toyota+Corolla+SE
+1GNSCJKC5MR500019,TDM019,2022,Chevrolet,Equinox,LT,SUV,31000,25800,used,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2022+Chevy+Equinox+LT,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2022+Chevy+Equinox+LT
+WBAPH5C55BA500020,TDM020,2019,Audi,A4,Premium Plus,Sedan,58000,26500,used,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2019+Audi+A4,https://placehold.co/800x500/1a1a2e/e0e0e0?text=2019+Audi+A4

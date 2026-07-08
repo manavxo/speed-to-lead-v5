@@ -1,0 +1,1169 @@
+1|<!DOCTYPE html>
+2|<html lang="en">
+3|<head>
+4|<meta charset="UTF-8">
+5|<meta name="viewport" content="width=device-width, initial-scale=1.0">
+6|<title>Speed to Lead — Respond in 3 Seconds, Not 5 Hours</title>
+7|<meta name="description" content="AI-powered lead response for BC car dealerships. Respond to every lead in under 3 seconds, 24/7. Book more test drives.">
+8|<meta name="theme-color" content="#09090b">
+9|<link rel="preconnect" href="https://fonts.googleapis.com">
+10|<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+11|<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+12|<script src="https://cdn.jsdelivr.net/npm/lottie-web@5.12.2/build/player/lottie.min.js"></script>
+13|<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+14|<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+15|<style>
+16|*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+17|:root{
+18|  --bg-primary:#06060a;
+19|  --bg-secondary:#0c0c12;
+20|  --bg-tertiary:#12121a;
+21|  --bg-card:#16161f;
+22|  --border:rgba(255,255,255,0.05);
+23|  --border-hover:rgba(255,255,255,0.1);
+24|  --accent:#7c5cfc;
+25|  --accent-light:#9b85ff;
+26|  --accent-hover:#9178ff;
+27|  --accent-glow:rgba(124,92,252,0.25);
+28|  --accent-subtle:rgba(124,92,252,0.08);
+29|  --green:#00e87b;
+30|  --green-glow:rgba(0,232,123,0.2);
+31|  --red:#ff4757;
+32|  --amber:#ffb340;
+33|  --text-primary:#f0f0f5;
+34|  --text-secondary:#a0a0b0;
+35|  --text-tertiary:#6a6a7a;
+36|  --text-muted:#44445a;
+37|  --glass:rgba(255,255,255,0.02);
+38|  --glass-border:rgba(255,255,255,0.06);
+39|  --glass-heavy:rgba(255,255,255,0.04);
+40|  --gradient-hero:linear-gradient(135deg,#7c5cfc 0%,#a78bfa 30%,#60a5fa 60%,#00e87b 100%);
+41|  --gradient-accent:linear-gradient(135deg,#7c5cfc,#a78bfa);
+42|  --gradient-green:linear-gradient(135deg,#00e87b,#34d399);
+43|  --font-body:'Plus Jakarta Sans',system-ui,-apple-system,sans-serif;
+44|  --font-mono:'JetBrains Mono',ui-monospace,monospace;
+45|  --ease-out-expo:cubic-bezier(.16,1,.3,1);
+46|  --ease-out-quint:cubic-bezier(.22,1,.36,1);
+47|}
+48|html{scroll-behavior:smooth;font-size:16px}
+49|body{font-family:var(--font-body);color:var(--text-secondary);background:var(--bg-primary);line-height:1.6;overflow-x:hidden;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+50|h1,h2,h3,h4{line-height:1.08;letter-spacing:-0.035em}
+51|a{text-decoration:none}
+52|img{max-width:100%;display:block}
+53|.container{max-width:1200px;margin:0 auto;padding:0 24px}
+54|.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+55|
+56|/* ===== NOISE + GRAIN ===== */
+57|body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.018'/%3E%3C/svg%3E");pointer-events:none;z-index:9999;opacity:0.5}
+58|
+59|/* ===== AMBIENT ORB (fixed) ===== */
+60|.ambient-orb{position:fixed;width:600px;height:600px;border-radius:50%;filter:blur(160px);pointer-events:none;z-index:0;opacity:0.4}
+61|.ambient-orb--purple{top:-200px;left:-100px;background:radial-gradient(circle,rgba(124,92,252,0.12),transparent 70%);animation:orb-drift 20s ease-in-out infinite}
+62|.ambient-orb--blue{bottom:-300px;right:-200px;background:radial-gradient(circle,rgba(96,165,250,0.08),transparent 70%);animation:orb-drift 25s ease-in-out infinite reverse}
+63|@keyframes orb-drift{0%,100%{transform:translate(0,0)}33%{transform:translate(60px,-40px)}66%{transform:translate(-30px,50px)}}
+64|
+65|/* ===== NAV ===== */
+66|.nav{position:fixed;top:0;left:0;right:0;z-index:1000;padding:0 24px;transition:transform .5s var(--ease-out-expo),background .3s,box-shadow .3s;background:rgba(6,6,10,0.7);backdrop-filter:blur(32px) saturate(1.4);-webkit-backdrop-filter:blur(32px) saturate(1.4);border-bottom:1px solid var(--border)}
+67|.nav.scrolled{background:rgba(6,6,10,0.92);box-shadow:0 1px 40px rgba(0,0,0,0.4)}
+68|.nav.hidden{transform:translateY(-100%)}
+69|.nav-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:72px}
+70|.nav-logo{font-weight:800;font-size:1.1rem;color:var(--text-primary);letter-spacing:-0.5px;display:flex;align-items:center;gap:10px}
+71|.nav-logo .logo-mark{width:32px;height:32px;background:var(--gradient-accent);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:.85rem;color:#fff;font-weight:800;box-shadow:0 4px 16px var(--accent-glow)}
+72|.nav-links{display:flex;align-items:center;gap:36px;list-style:none}
+73|.nav-links a{color:var(--text-tertiary);font-size:.85rem;font-weight:500;transition:color .2s;position:relative}
+74|.nav-links a:hover{color:var(--text-primary)}
+75|.nav-links a::after{content:'';position:absolute;bottom:-4px;left:0;width:0;height:1.5px;background:var(--accent);transition:width .25s var(--ease-out-expo)}
+76|.nav-links a:hover::after{width:100%}
+77|.nav-cta{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;padding:10px 24px;border-radius:10px;font-size:.85rem;font-weight:600;transition:all .25s var(--ease-out-expo);border:none;cursor:pointer}
+78|.nav-cta:hover{background:var(--accent-hover);transform:translateY(-1px);box-shadow:0 8px 32px var(--accent-glow)}
+79|.hamburger{display:none;flex-direction:column;gap:5px;cursor:pointer;background:none;border:none;padding:4px}
+80|.hamburger span{display:block;width:22px;height:2px;background:var(--text-primary);border-radius:2px;transition:transform .3s,opacity .3s}
+81|.hamburger.active span:nth-child(1){transform:rotate(45deg) translate(5px,5px)}
+82|.hamburger.active span:nth-child(2){opacity:0}
+83|.hamburger.active span:nth-child(3){transform:rotate(-45deg) translate(5px,-5px)}
+84|.mobile-menu{display:none;position:fixed;top:72px;left:0;right:0;background:rgba(6,6,10,0.96);backdrop-filter:blur(32px);padding:16px 24px 24px;border-bottom:1px solid var(--border)}
+85|.mobile-menu.open{display:block}
+86|.mobile-menu a{display:block;padding:16px 0;color:var(--text-secondary);font-size:1rem;font-weight:500;border-bottom:1px solid var(--border)}
+87|.mobile-menu a:last-child{border:none}
+88|
+89|/* ===== HERO ===== */
+90|.hero{min-height:100vh;display:flex;align-items:center;position:relative;overflow:hidden;padding:140px 24px 100px;background:var(--bg-primary)}
+91|.hero-grid{position:absolute;top:0;left:0;right:0;bottom:0;background-image:linear-gradient(rgba(255,255,255,0.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.015) 1px,transparent 1px);background-size:64px 64px;mask-image:radial-gradient(ellipse 70% 60% at 50% 40%,black 20%,transparent 70%);-webkit-mask-image:radial-gradient(ellipse 70% 60% at 50% 40%,black 20%,transparent 70%)}
+92|.hero-glow{position:absolute;top:-10%;left:50%;transform:translateX(-50%);width:1000px;height:1000px;background:radial-gradient(circle,rgba(124,92,252,0.08) 0%,rgba(96,165,250,0.04) 30%,transparent 65%);pointer-events:none}
+93|.hero-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;gap:80px;position:relative;z-index:2}
+94|.hero-text{flex:1;min-width:0}
+95|.hero-badge{display:inline-flex;align-items:center;gap:10px;background:var(--accent-subtle);border:1px solid rgba(124,92,252,0.15);border-radius:100px;padding:7px 18px;margin-bottom:32px;font-size:.78rem;color:var(--accent-light);font-weight:600;letter-spacing:0.02em}
+96|.hero-badge .badge-pulse{width:7px;height:7px;background:var(--green);border-radius:50%;position:relative}
+97|.hero-badge .badge-pulse::after{content:'';position:absolute;inset:-3px;border-radius:50%;background:var(--green);opacity:0.4;animation:pulse-ring 2s infinite}
+98|@keyframes pulse-ring{0%{transform:scale(1);opacity:.4}50%{transform:scale(2);opacity:0}100%{transform:scale(1);opacity:0}}
+99|.hero-text h1{font-size:clamp(2.8rem,5.5vw,4.2rem);font-weight:800;color:var(--text-primary);margin-bottom:28px;line-height:1.06;max-width:620px}
+100|.hero-text h1 .gradient-text{background:var(--gradient-hero);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;background-size:200% 200%;animation:gradient-shift 6s ease infinite}
+101|@keyframes gradient-shift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+102|.hero-sub{font-size:clamp(1rem,1.6vw,1.15rem);color:var(--text-tertiary);max-width:500px;margin-bottom:44px;line-height:1.75;font-weight:400}
+103|.hero-ctas{display:flex;gap:14px;flex-wrap:wrap}
+104|.btn-primary{display:inline-flex;align-items:center;gap:10px;background:var(--accent);color:#fff;padding:15px 30px;border-radius:12px;font-size:.95rem;font-weight:600;transition:all .3s var(--ease-out-expo);border:none;cursor:pointer;font-family:var(--font-body);position:relative;overflow:hidden}
+105|.btn-primary::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.15),transparent);opacity:0;transition:opacity .3s}
+106|.btn-primary:hover{transform:translateY(-2px);box-shadow:0 16px 48px var(--accent-glow)}
+107|.btn-primary:hover::before{opacity:1}
+108|.btn-primary .arrow{transition:transform .25s;display:inline-block}
+109|.btn-primary:hover .arrow{transform:translateX(4px)}
+110|.btn-secondary{display:inline-flex;align-items:center;gap:10px;background:var(--glass-heavy);color:var(--text-primary);padding:15px 30px;border-radius:12px;font-size:.95rem;font-weight:500;border:1px solid var(--border-hover);transition:all .3s var(--ease-out-expo);cursor:pointer;font-family:var(--font-body);backdrop-filter:blur(8px)}
+111|.btn-secondary:hover{border-color:rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);transform:translateY(-2px)}
+112|
+113|/* Phone Mockup */
+114|.hero-phone{flex:0 0 360px;position:relative}
+115|.phone-mockup{width:300px;margin:0 auto;background:linear-gradient(180deg,#1a1a25,#14141c);border-radius:44px;padding:12px;box-shadow:0 50px 100px rgba(0,0,0,0.6),0 0 0 1px rgba(255,255,255,0.06),inset 0 1px 0 rgba(255,255,255,0.04);position:relative}
+116|.phone-notch{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:110px;height:30px;background:var(--bg-tertiary);border-radius:0 0 18px 18px;z-index:10}
+117|.phone-notch::after{content:'';position:absolute;top:10px;left:50%;transform:translateX(-50%);width:8px;height:8px;background:var(--bg-card);border-radius:50%;box-shadow:0 0 0 1px rgba(255,255,255,0.05)}
+118|.phone-screen{background:var(--bg-primary);border-radius:34px;overflow:hidden;position:relative}
+119|.phone-statusbar{display:flex;justify-content:space-between;align-items:center;padding:14px 22px 8px;font-size:.65rem;color:var(--text-muted);font-weight:600;font-family:var(--font-mono)}
+120|.phone-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+121|.phone-avatar{width:34px;height:34px;background:var(--gradient-accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.7rem;color:#fff;font-weight:700;box-shadow:0 4px 12px var(--accent-glow)}
+122|.phone-name{font-size:.82rem;color:var(--text-primary);font-weight:700}
+123|.phone-sublabel{font-size:.6rem;color:var(--text-muted);font-weight:500}
+124|.phone-chat{padding:14px;min-height:340px;display:flex;flex-direction:column;gap:10px}
+125|.msg{max-width:85%;padding:10px 14px;border-radius:16px;font-size:.78rem;line-height:1.55;opacity:0;transform:translateY(12px);animation:msg-in .5s var(--ease-out-expo) forwards}
+126|.msg-incoming{background:var(--bg-card);color:var(--text-secondary);align-self:flex-start;border-bottom-left-radius:4px;border:1px solid var(--border)}
+127|.msg-outgoing{background:var(--accent);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+128|.msg-time{font-size:.55rem;color:var(--text-muted);margin-top:4px;opacity:0;animation:msg-in .3s ease forwards}
+129|.msg-outgoing .msg-time{color:rgba(255,255,255,0.5)}
+130|.typing-indicator{display:flex;gap:5px;padding:10px 14px;background:var(--bg-card);border:1px solid var(--border);border-radius:16px;border-bottom-left-radius:4px;align-self:flex-start;opacity:0}
+131|.typing-indicator.visible{opacity:1;animation:msg-in .3s ease forwards}
+132|.typing-dot{width:6px;height:6px;background:var(--text-muted);border-radius:50%;animation:typing-bounce 1.4s infinite}
+133|.typing-dot:nth-child(2){animation-delay:.2s}
+134|.typing-dot:nth-child(3){animation-delay:.4s}
+135|@keyframes typing-bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+136|@keyframes msg-in{to{opacity:1;transform:translateY(0)}}
+137|.phone-glow{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:440px;height:440px;background:radial-gradient(circle,rgba(124,92,252,0.12),transparent 65%);pointer-events:none;z-index:-1;animation:glow-pulse 5s ease-in-out infinite}
+138|@keyframes glow-pulse{0%,100%{opacity:.5;transform:translate(-50%,-50%) scale(1)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.08)}}
+139|
+140|/* ===== LOTTIE SECTIONS ===== */
+141|.lottie-divider{position:relative;height:180px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--bg-primary)}
+142|.lottie-divider .lottie-container{width:100%;max-width:900px;height:100%;opacity:0.6}
+143|
+144|/* ===== DRAMATIC STAT ===== */
+145|.dramatic-stat{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg-primary);position:relative;overflow:hidden;padding:80px 24px}
+146|.dramatic-stat::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse 50% 50% at 50% 50%,rgba(124,92,252,0.05),transparent);pointer-events:none}
+147|.stat-content{text-align:center;position:relative;z-index:2}
+148|.stat-big{font-size:clamp(7rem,20vw,16rem);font-weight:800;color:var(--text-primary);line-height:0.9;letter-spacing:-0.06em;opacity:0}
+149|.stat-big .unit{font-size:.3em;color:var(--text-muted);font-weight:300;letter-spacing:-0.02em}
+150|.stat-sub{font-size:clamp(1.1rem,2.5vw,1.8rem);color:var(--text-tertiary);margin-top:20px;font-weight:400;opacity:0}
+151|.stat-reveal{font-size:clamp(1.4rem,4vw,2.6rem);font-weight:700;margin-top:48px;opacity:0}
+152|.stat-reveal .gradient-green{background:var(--gradient-green);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;text-shadow:none}
+153|
+154|/* ===== SPEED COMPARISON ===== */
+155|.comparison{padding:140px 24px;background:var(--bg-secondary);border-top:1px solid var(--border);border-bottom:1px solid var(--border);position:relative}
+156|.comparison-inner{max-width:1100px;margin:0 auto}
+157|.section-label{display:inline-flex;align-items:center;gap:10px;font-size:.72rem;font-weight:700;color:var(--accent);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:16px}
+158|.section-label::before{content:'';width:24px;height:2px;background:var(--gradient-accent);border-radius:1px}
+159|.section-title{font-size:clamp(2rem,4vw,3.2rem);font-weight:800;color:var(--text-primary);margin-bottom:16px;line-height:1.08}
+160|.section-desc{font-size:1.05rem;color:var(--text-tertiary);max-width:560px;margin-bottom:72px;line-height:1.75}
+161|.comparison-grid{display:grid;grid-template-columns:1fr 80px 1fr;gap:0;align-items:stretch}
+162|.comp-card{padding:48px;border-radius:20px;position:relative;overflow:hidden}
+163|.comp-card.slow{background:var(--bg-tertiary);border:1px solid var(--border)}
+164|.comp-card.fast{background:linear-gradient(135deg,rgba(124,92,252,0.06),rgba(0,232,123,0.03));border:1px solid rgba(124,92,252,0.12);box-shadow:0 0 80px rgba(124,92,252,0.04)}
+165|.comp-card-header{display:flex;align-items:center;gap:14px;margin-bottom:36px}
+166|.comp-icon{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.2rem}
+167|.comp-card.slow .comp-icon{background:rgba(255,71,87,0.1);color:var(--red)}
+168|.comp-card.fast .comp-icon{background:rgba(0,232,123,0.1);color:var(--green)}
+169|.comp-card-title{font-size:1.05rem;font-weight:700}
+170|.comp-card.slow .comp-card-title{color:var(--text-secondary)}
+171|.comp-card.fast .comp-card-title{color:var(--text-primary)}
+172|.comp-timeline{display:flex;flex-direction:column;gap:22px}
+173|.comp-step{display:flex;align-items:flex-start;gap:16px;opacity:0;transform:translateX(-20px)}
+174|.comp-card.fast .comp-step{transform:translateX(20px)}
+175|.comp-step.visible{opacity:1;transform:translateX(0);transition:all .6s var(--ease-out-expo)}
+176|.comp-step-dot{width:10px;height:10px;border-radius:50%;margin-top:6px;flex-shrink:0}
+177|.comp-card.slow .comp-step-dot{background:var(--text-muted)}
+178|.comp-card.fast .comp-step-dot{background:var(--green);box-shadow:0 0 12px var(--green-glow)}
+179|.comp-step-text{font-size:.88rem;line-height:1.6}
+180|.comp-card.slow .comp-step-text{color:var(--text-tertiary)}
+181|.comp-card.fast .comp-step-text{color:var(--text-secondary)}
+182|.comp-step-text strong{font-weight:700}
+183|.comp-card.slow .comp-step-text strong{color:var(--text-secondary)}
+184|.comp-card.fast .comp-step-text strong{color:var(--text-primary)}
+185|.comp-vs{display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:700;color:var(--text-muted);letter-spacing:0.15em;font-family:var(--font-mono)}
+186|.comp-result{margin-top:36px;padding:18px;border-radius:12px;text-align:center;font-weight:700;font-size:.9rem;letter-spacing:0.01em}
+187|.comp-card.slow .comp-result{background:rgba(255,71,87,0.06);color:var(--red);border:1px solid rgba(255,71,87,0.1)}
+188|.comp-card.fast .comp-result{background:rgba(0,232,123,0.06);color:var(--green);border:1px solid rgba(0,232,123,0.1)}
+189|
+190|/* ===== HOW IT WORKS ===== */
+191|.how-it-works{padding:140px 24px;background:var(--bg-primary);position:relative}
+192|.how-inner{max-width:1000px;margin:0 auto}
+193|.timeline{position:relative;margin-top:80px}
+194|.timeline::before{content:'';position:absolute;left:50%;top:0;bottom:0;width:1px;background:linear-gradient(to bottom,transparent,var(--border) 10%,var(--border) 90%,transparent);transform:translateX(-50%)}
+195|.timeline-line{position:absolute;left:50%;top:0;width:2px;background:var(--gradient-accent);transform:translateX(-50%);height:0;transition:height 2s var(--ease-out-expo)}
+196|.timeline-step{display:flex;align-items:flex-start;gap:48px;margin-bottom:80px;position:relative;opacity:0;transform:translateY(40px)}
+197|.timeline-step.visible{opacity:1;transform:translateY(0);transition:all .8s var(--ease-out-expo)}
+198|.timeline-step:nth-child(even){flex-direction:row-reverse}
+199|.timeline-step-content{flex:1;max-width:420px}
+200|.timeline-step:nth-child(odd) .timeline-step-content{text-align:right}
+201|.timeline-number{width:56px;height:56px;background:var(--gradient-accent);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:1rem;font-weight:800;color:#fff;position:absolute;left:50%;transform:translateX(-50%);z-index:2;box-shadow:0 8px 32px var(--accent-glow)}
+202|.timeline-step-title{font-size:1.25rem;font-weight:700;color:var(--text-primary);margin-bottom:10px}
+203|.timeline-step-desc{font-size:.9rem;color:var(--text-tertiary);line-height:1.75}
+204|.timeline-phone{flex:0 0 210px;background:var(--bg-card);border-radius:16px;padding:16px;border:1px solid var(--border);backdrop-filter:blur(8px)}
+205|.timeline-phone-screen{background:var(--bg-tertiary);border-radius:10px;padding:14px;min-height:120px;display:flex;flex-direction:column;gap:8px;justify-content:center}
+206|.tiny-msg{padding:7px 11px;border-radius:10px;font-size:.65rem;line-height:1.45;font-weight:500}
+207|.tiny-msg.in{background:var(--bg-card);color:var(--text-secondary);align-self:flex-start;border:1px solid var(--border)}
+208|.tiny-msg.out{background:var(--accent);color:#fff;align-self:flex-end}
+209|.tiny-status{font-size:.6rem;color:var(--green);text-align:center;font-weight:600;font-family:var(--font-mono)}
+210|
+211|/* ===== LIVE DEMO ===== */
+212|.live-demo{padding:140px 24px;background:var(--bg-secondary);position:relative;overflow:hidden;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+213|.live-demo::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse 80% 60% at 15% 50%,rgba(124,92,252,0.04),transparent),radial-gradient(ellipse 60% 40% at 85% 30%,rgba(0,232,123,0.03),transparent);pointer-events:none}
+214|.demo-inner{max-width:920px;margin:0 auto;position:relative;z-index:2}
+215|.demo-header{text-align:center;margin-bottom:72px}
+216|.demo-header .section-label{justify-content:center}
+217|.demo-header .section-desc{margin:0 auto}
+218|.demo-container{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:20px;overflow:hidden;box-shadow:0 40px 100px rgba(0,0,0,0.4)}
+219|.demo-topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--border)}
+220|.demo-topbar-left{display:flex;align-items:center;gap:10px}
+221|.demo-dot{width:10px;height:10px;border-radius:50%}
+222|.demo-dot.red{background:#ff5f57}
+223|.demo-dot.yellow{background:#febc2e}
+224|.demo-dot.green{background:#28c840}
+225|.demo-topbar-title{font-size:.75rem;color:var(--text-muted);font-weight:600;font-family:var(--font-mono)}
+226|.demo-meta{display:flex;align-items:center;gap:16px;padding:12px 24px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+227|.demo-meta-item{display:flex;align-items:center;gap:7px;font-size:.7rem;color:var(--text-muted);font-weight:500}
+228|.demo-meta-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse-ring 2s infinite}
+229|.demo-chat{padding:24px;min-height:420px;display:flex;flex-direction:column;gap:14px}
+230|.demo-msg{max-width:72%;padding:13px 18px;border-radius:16px;font-size:.84rem;line-height:1.65;opacity:0;transform:translateY(16px)}
+231|.demo-msg.visible{opacity:1;transform:translateY(0);transition:all .5s var(--ease-out-expo)}
+232|.demo-msg.customer{background:var(--bg-card);color:var(--text-secondary);align-self:flex-start;border:1px solid var(--border);border-bottom-left-radius:4px}
+233|.demo-msg.ai{background:var(--accent);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+234|.demo-msg .msg-sender{font-size:.65rem;font-weight:700;margin-bottom:5px;display:block;letter-spacing:0.03em;text-transform:uppercase}
+235|.demo-msg.customer .msg-sender{color:var(--accent-light)}
+236|.demo-msg.ai .msg-sender{color:rgba(255,255,255,0.6)}
+237|.demo-msg .msg-timestamp{font-size:.55rem;color:var(--text-muted);margin-top:6px;display:block;font-family:var(--font-mono)}
+238|.demo-msg.ai .msg-timestamp{color:rgba(255,255,255,0.35)}
+239|.demo-typing{display:flex;align-items:center;gap:8px;padding:13px 18px;background:var(--bg-card);border:1px solid var(--border);border-radius:16px;border-bottom-left-radius:4px;align-self:flex-start;opacity:0;transition:opacity .3s}
+240|.demo-typing.visible{opacity:1}
+241|.demo-typing-dots{display:flex;gap:4px}
+242|.demo-typing-label{font-size:.65rem;color:var(--text-muted);font-weight:500}
+243|.demo-outcome{margin-top:28px;padding:20px 28px;background:rgba(0,232,123,0.04);border:1px solid rgba(0,232,123,0.12);border-radius:14px;display:flex;align-items:center;gap:14px;opacity:0;transform:translateY(12px)}
+244|.demo-outcome.visible{opacity:1;transform:translateY(0);transition:all .6s var(--ease-out-expo)}
+245|.demo-outcome-icon{width:40px;height:40px;background:rgba(0,232,123,0.1);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--green);font-size:1.1rem;font-weight:700}
+246|.demo-outcome-text{font-size:.88rem;color:var(--green);font-weight:500}
+247|.demo-outcome-text strong{display:block;font-size:.95rem;color:var(--text-primary);margin-bottom:3px}
+248|
+249|/* ===== FEATURES ===== */
+250|.features{padding:140px 24px;background:var(--bg-primary);position:relative}
+251|.features-inner{max-width:1100px;margin:0 auto}
+252|.features-layout{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:80px}
+253|.feature-large{grid-row:span 2;background:linear-gradient(135deg,rgba(124,92,252,0.08),rgba(124,92,252,0.02));border:1px solid rgba(124,92,252,0.1);border-radius:20px;padding:56px;display:flex;flex-direction:column;justify-content:center;position:relative;overflow:hidden}
+254|.feature-large::before{content:'';position:absolute;top:-100px;right:-100px;width:400px;height:400px;background:radial-gradient(circle,rgba(124,92,252,0.08),transparent 70%);pointer-events:none}
+255|.feature-large-icon{width:56px;height:56px;background:var(--accent-subtle);border:1px solid rgba(124,92,252,0.12);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;margin-bottom:28px}
+256|.feature-large h3{font-size:1.8rem;font-weight:800;color:var(--text-primary);margin-bottom:16px;line-height:1.1}
+257|.feature-large p{color:var(--text-tertiary);font-size:.95rem;line-height:1.75}
+258|.feature-large .feature-stat{margin-top:36px;padding:18px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:14px}
+259|.feature-large .feature-stat-num{font-size:2.4rem;font-weight:800}
+260|.feature-stat-num .gradient-green{background:var(--gradient-green);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+261|.feature-large .feature-stat-label{font-size:.8rem;color:var(--text-muted);margin-top:6px}
+262|.feature-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:16px;padding:36px;transition:all .35s var(--ease-out-expo);position:relative;backdrop-filter:blur(4px)}
+263|.feature-card:hover{border-color:rgba(124,92,252,0.25);box-shadow:0 16px 48px rgba(0,0,0,0.3);transform:translateY(-6px)}
+264|.feature-card-icon{width:48px;height:48px;background:var(--accent-subtle);border:1px solid rgba(124,92,252,0.08);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.15rem;margin-bottom:24px;transition:all .35s}
+265|.feature-card:hover .feature-card-icon{background:rgba(124,92,252,0.15);border-color:rgba(124,92,252,0.2);transform:scale(1.05)}
+266|.feature-card h3{font-size:1.1rem;font-weight:700;color:var(--text-primary);margin-bottom:10px}
+267|.feature-card p{font-size:.88rem;color:var(--text-tertiary);line-height:1.75}
+268|.feature-tag{display:inline-block;margin-top:14px;padding:4px 12px;background:var(--accent-subtle);color:var(--accent-light);font-size:.65rem;font-weight:700;border-radius:6px;letter-spacing:0.04em;font-family:var(--font-mono)}
+269|
+270|/* ===== STATS ===== */
+271|.stats-bar{padding:100px 24px;background:var(--bg-secondary);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+272|.stats-inner{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:48px;text-align:center}
+273|.stat-item{opacity:0;transform:translateY(24px)}
+274|.stat-item.visible{opacity:1;transform:translateY(0);transition:all .6s var(--ease-out-expo)}
+275|.stat-num{font-size:clamp(2rem,4vw,3.2rem);font-weight:800;color:var(--text-primary);line-height:1;font-family:var(--font-body)}
+276|.stat-num .glow-text{background:var(--gradient-accent);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+277|.stat-label{font-size:.82rem;color:var(--text-muted);margin-top:10px;font-weight:500}
+278|
+279|/* ===== SOCIAL PROOF ===== */
+280|.social-proof{padding:120px 24px;background:var(--bg-primary);position:relative;overflow:hidden}
+281|.social-proof-inner{max-width:900px;margin:0 auto;text-align:center}
+282|.testimonial-card{background:var(--glass-heavy);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:20px;padding:56px 48px;margin-top:48px;position:relative}
+283|.testimonial-card::before{content:'"';position:absolute;top:20px;left:32px;font-size:5rem;font-weight:800;color:var(--accent);opacity:0.15;line-height:1}
+284|.testimonial-text{font-size:1.2rem;color:var(--text-secondary);line-height:1.8;font-weight:400;font-style:italic;margin-bottom:28px}
+285|.testimonial-author{display:flex;align-items:center;gap:14px;justify-content:center}
+286|.testimonial-avatar{width:44px;height:44px;background:var(--gradient-accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.85rem;color:#fff;font-weight:700}
+287|.testimonial-name{font-size:.9rem;color:var(--text-primary);font-weight:700}
+288|.testimonial-role{font-size:.78rem;color:var(--text-muted)}
+289|
+290|/* ===== PRICING ===== */
+291|.pricing{padding:140px 24px;background:var(--bg-primary);position:relative}
+292|.pricing-inner{max-width:1100px;margin:0 auto}
+293|.pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:72px}
+294|.pricing-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:18px;padding:44px 30px;position:relative;transition:all .35s var(--ease-out-expo)}
+295|.pricing-card:hover{transform:translateY(-6px);border-color:var(--border-hover);box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+296|.pricing-card.popular{border-color:rgba(124,92,252,0.35);box-shadow:0 0 0 1px rgba(124,92,252,0.2),0 20px 60px rgba(124,92,252,0.08);background:linear-gradient(180deg,rgba(124,92,252,0.04),var(--bg-secondary))}
+297|.pricing-popular-badge{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--gradient-accent);color:#fff;padding:5px 20px;border-radius:100px;font-size:.65rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;box-shadow:0 4px 16px var(--accent-glow)}
+298|.pricing-card-header{margin-bottom:28px}
+299|.pricing-card-header h3{font-size:1.15rem;font-weight:700;color:var(--text-primary);margin-bottom:4px}
+300|.pricing-card-header p{font-size:.8rem;color:var(--text-muted)}
+301|.pricing-price{display:flex;align-items:baseline;gap:4px;margin-bottom:28px}
+302|.pricing-price .amount{font-size:2.8rem;font-weight:800;color:var(--text-primary);line-height:1;letter-spacing:-0.03em}
+303|.pricing-price .period{font-size:.82rem;color:var(--text-muted);font-weight:500}
+304|.pricing-features{list-style:none;margin-bottom:36px}
+305|.pricing-features li{padding:9px 0;font-size:.85rem;color:var(--text-tertiary);display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);font-weight:500}
+306|.pricing-features li:last-child{border:none}
+307|.pricing-features li::before{content:'✓';color:var(--accent);font-weight:700;font-size:.8rem}
+308|.pricing-btn{display:block;width:100%;padding:15px;text-align:center;border-radius:12px;font-size:.92rem;font-weight:700;transition:all .25s var(--ease-out-expo);cursor:pointer;border:none;font-family:var(--font-body)}
+309|.pricing-btn.primary{background:var(--accent);color:#fff}
+310|.pricing-btn.primary:hover{background:var(--accent-hover);box-shadow:0 8px 32px var(--accent-glow);transform:translateY(-2px)}
+311|.pricing-btn.secondary{background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border)}
+312|.pricing-btn.secondary:hover{border-color:var(--border-hover);background:rgba(255,255,255,0.04)}
+313|
+314|/* ===== TRUST ===== */
+315|.trust{padding:100px 24px;background:var(--bg-secondary);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+316|.trust-inner{max-width:800px;margin:0 auto;text-align:center}
+317|.trust-badges{display:flex;justify-content:center;gap:16px;margin-top:36px;flex-wrap:wrap}
+318|.trust-badge{display:flex;align-items:center;gap:10px;padding:12px 20px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:12px;font-size:.78rem;color:var(--text-secondary);font-weight:600;transition:all .25s}
+319|.trust-badge:hover{border-color:var(--border-hover);transform:translateY(-2px)}
+320|.trust-badge-icon{width:28px;height:28px;background:var(--accent-subtle);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.8rem}
+321|.trust-text{font-size:.88rem;color:var(--text-muted);margin-top:28px;line-height:1.75}
+322|
+323|/* ===== FINAL CTA ===== */
+324|.final-cta{padding:140px 24px;background:var(--bg-primary);position:relative;overflow:hidden}
+325|.final-cta::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:900px;height:500px;background:radial-gradient(circle,rgba(124,92,252,0.08),transparent 55%);pointer-events:none}
+326|.final-cta-inner{max-width:700px;margin:0 auto;text-align:center;position:relative;z-index:2}
+327|.final-cta h2{font-size:clamp(2rem,5vw,3.4rem);font-weight:800;color:var(--text-primary);margin-bottom:18px;line-height:1.08}
+328|.final-cta p{font-size:1.05rem;color:var(--text-tertiary);margin-bottom:44px;line-height:1.75}
+329|.cta-form{display:flex;gap:10px;max-width:600px;margin:0 auto;flex-wrap:wrap}
+330|.cta-form input{flex:1;min-width:160px;padding:15px 18px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:12px;color:var(--text-primary);font-size:.92rem;font-family:var(--font-body);transition:all .25s;font-weight:500}
+331|.cta-form input::placeholder{color:var(--text-muted)}
+332|.cta-form input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-subtle)}
+333|.cta-form button{padding:15px 30px;background:var(--accent);color:#fff;border:none;border-radius:12px;font-size:.92rem;font-weight:700;cursor:pointer;transition:all .25s var(--ease-out-expo);white-space:nowrap;font-family:var(--font-body)}
+334|.cta-form button:hover{background:var(--accent-hover);box-shadow:0 8px 32px var(--accent-glow);transform:translateY(-2px)}
+335|.cta-urgency{margin-top:18px;font-size:.78rem;color:var(--text-muted)}
+336|.cta-urgency span{color:var(--green);font-weight:600}
+337|
+338|/* ===== FOOTER ===== */
+339|.footer{padding:48px 24px;background:var(--bg-primary);border-top:1px solid var(--border)}
+340|.footer-inner{max-width:1200px;margin:0 auto;display:flex;justify-content:space-between;align-items:center}
+341|.footer-left{font-size:.78rem;color:var(--text-muted);font-weight:500}
+342|.footer-links{display:flex;gap:24px}
+343|.footer-links a{font-size:.78rem;color:var(--text-muted);font-weight:500;transition:color .2s}
+344|.footer-links a:hover{color:var(--text-primary)}
+345|
+/* ===== SCROLL REVEAL UTILITY ===== */
+/* Content visible by default; GSAP animates from these states */
+.gsap-reveal{opacity:1;transform:translateY(0)}
+.gsap-reveal-left{opacity:1;transform:translateX(0)}
+.gsap-reveal-right{opacity:1;transform:translateX(0)}
+.gsap-reveal-scale{opacity:1;transform:scale(1)}
+351|
+352|/* ===== RESPONSIVE ===== */
+353|@media(max-width:1024px){
+354|  .hero-inner{flex-direction:column;text-align:center;gap:48px}
+355|  .hero-sub{margin:0 auto 36px}
+356|  .hero-ctas{justify-content:center}
+357|  .hero-phone{flex:none}
+358|  .comparison-grid{grid-template-columns:1fr;gap:24px}
+359|  .comp-vs{padding:16px 0}
+360|  .features-layout{grid-template-columns:1fr}
+361|  .feature-large{grid-row:auto}
+362|  .timeline::before,.timeline-line{left:28px}
+363|  .timeline-step{flex-direction:column!important;padding-left:80px}
+364|  .timeline-step-content{text-align:left!important}
+365|  .timeline-number{left:28px;transform:none}
+366|  .timeline-phone{margin-top:16px}
+367|  .stats-inner{grid-template-columns:repeat(2,1fr)}
+368|  .pricing-grid{grid-template-columns:1fr;max-width:400px;margin:72px auto 0}
+369|}
+370|@media(max-width:768px){
+371|  .nav-links{display:none}
+372|  .hamburger{display:flex}
+373|  .hero{padding:110px 24px 70px;min-height:auto}
+374|  .phone-mockup{width:260px}
+375|  .phone-chat{min-height:260px;padding:12px}
+376|  .hero-text h1{font-size:2.2rem}
+377|  .dramatic-stat{min-height:80vh;padding:60px 24px}
+378|  .stat-big{font-size:5.5rem}
+379|  .comp-card{padding:32px}
+380|  .demo-chat{min-height:300px;padding:16px}
+381|  .demo-msg{max-width:85%;font-size:.8rem}
+382|  .cta-form{flex-direction:column}
+383|  .cta-form input{min-width:auto}
+384|  .footer-inner{flex-direction:column;gap:16px;text-align:center}
+385|  .testimonial-card{padding:40px 28px}
+386|  .testimonial-text{font-size:1rem}
+387|}
+388|@media(max-width:480px){
+389|  .hero-text h1{font-size:1.85rem}
+390|  .phone-mockup{width:240px}
+391|  .stat-big{font-size:4.5rem}
+392|  .pricing-card{padding:30px 22px}
+393|  .lottie-divider{height:120px}
+394|}
+395|</style>
+396|</head>
+397|<body>
+398|
+399|<!-- AMBIENT ORBS -->
+400|<div class="ambient-orb ambient-orb--purple"></div>
+401|<div class="ambient-orb ambient-orb--blue"></div>
+402|
+403|<!-- NAV -->
+404|<nav class="nav" id="nav">
+405|  <div class="nav-inner">
+406|    <a href="#" class="nav-logo"><div class="logo-mark">S</div>Speed to Lead</a>
+407|    <ul class="nav-links">
+408|      <li><a href="#how-it-works">How It Works</a></li>
+409|      <li><a href="#features">Features</a></li>
+410|      <li><a href="#pricing">Pricing</a></li>
+411|      <li><a href="#final-cta" class="nav-cta">Book a Demo</a></li>
+412|    </ul>
+413|    <button class="hamburger" id="hamburger" aria-label="Menu">
+414|      <span></span><span></span><span></span>
+415|    </button>
+416|  </div>
+417|  <div class="mobile-menu" id="mobile-menu">
+418|    <a href="#how-it-works">How It Works</a>
+419|    <a href="#features">Features</a>
+420|    <a href="#pricing">Pricing</a>
+421|    <a href="#final-cta">Book a Demo</a>
+422|  </div>
+423|</nav>
+424|
+425|<!-- HERO -->
+426|<section class="hero" id="hero">
+427|  <div class="hero-grid"></div>
+428|  <div class="hero-glow"></div>
+429|  <div class="hero-inner container">
+430|    <div class="hero-text">
+431|      <div class="hero-badge gsap-reveal"><span class="badge-pulse"></span>Live — Responding to leads across BC right now</div>
+432|      <h1 class="gsap-reveal">Your next customer is texting your <span class="gradient-text">competitor</span> right now.</h1>
+433|      <p class="hero-sub gsap-reveal">The average BC dealership takes 5 hours to respond to a lead. By then, the customer has already booked a test drive somewhere else. We fix that.</p>
+434|      <div class="hero-ctas gsap-reveal">
+435|        <a href="#final-cta" class="btn-primary">Start Free Trial <span class="arrow">→</span></a>
+436|        <a href="#live-demo" class="btn-secondary">Watch It Work ↓</a>
+437|      </div>
+438|    </div>
+439|    <div class="hero-phone gsap-reveal-right">
+440|      <div class="phone-glow"></div>
+441|      <div class="phone-mockup">
+442|        <div class="phone-notch"></div>
+443|        <div class="phone-screen">
+444|          <div class="phone-statusbar">
+445|            <span>2:14 AM</span>
+446|            <span>●●● WiFi 🔋</span>
+447|          </div>
+448|          <div class="phone-header">
+449|            <div class="phone-avatar">AI</div>
+450|            <div>
+451|              <div class="phone-name">James — Westside Honda</div>
+452|              <div class="phone-sublabel">SMS · AI Assistant</div>
+453|            </div>
+454|          </div>
+455|          <div class="phone-chat" id="hero-chat">
+456|            <!-- Messages injected by JS -->
+457|          </div>
+458|        </div>
+459|      </div>
+460|    </div>
+461|  </div>
+462|</section>
+463|
+464|<!-- LOTTIE DIVIDER 1 -->
+465|<div class="lottie-divider">
+466|  <div class="lottie-container" id="lottie-1" data-src="/landing/assets/lottie_01.json"></div>
+467|</div>
+468|
+469|<!-- DRAMATIC STAT -->
+470|<section class="dramatic-stat" id="dramatic-stat">
+471|  <div class="stat-content">
+472|    <div class="stat-big" id="stat-big">5 <span class="unit">hours</span></div>
+473|    <div class="stat-sub" id="stat-sub">That's how long your competitors take to respond.</div>
+474|    <div class="stat-reveal" id="stat-reveal">We do it in <span class="gradient-green">3 seconds</span>.</div>
+475|  </div>
+476|</section>
+477|
+478|<!-- LOTTIE DIVIDER 2 -->
+479|<div class="lottie-divider">
+480|  <div class="lottie-container" id="lottie-2" data-src="/landing/assets/lottie_02.json"></div>
+481|</div>
+482|
+483|<!-- SPEED COMPARISON -->
+484|<section class="comparison" id="comparison">
+485|  <div class="comparison-inner container">
+486|    <div class="section-label gsap-reveal">The Difference</div>
+487|    <h2 class="section-title gsap-reveal">Every second counts.</h2>
+488|    <p class="section-desc gsap-reveal">See the difference between a dealership that waits and one that wins.</p>
+489|    <div class="comparison-grid">
+490|      <div class="comp-card slow gsap-reveal-left">
+491|        <div class="comp-card-header">
+492|          <div class="comp-icon">✕</div>
+493|          <div class="comp-card-title">Without Speed to Lead</div>
+494|        </div>
+495|        <div class="comp-timeline">
+496|          <div class="comp-step"><div class="comp-step-dot"></div><div class="comp-step-text"><strong>2:14 AM</strong> — Customer texts about a CR-V</div></div>
+497|          <div class="comp-step"><div class="comp-step-dot"></div><div class="comp-step-text"><strong>7:30 AM</strong> — Sales rep sees notification at breakfast</div></div>
+498|          <div class="comp-step"><div class="comp-step-dot"></div><div class="comp-step-text"><strong>9:15 AM</strong> — Rep finishes morning meeting</div></div>
+499|          <div class="comp-step"><div class="comp-step-dot"></div><div class="comp-step-text"><strong>11:30 AM</strong> — Finally calls back. No answer.</div></div>
+500|        </div>
+501|        <div class="comp-result">Lead lost. Booked at competitor 3 hours ago.</div>
+502|      </div>
+503|      <div class="comp-vs">VS</div>
+504|      <div class="comp-card fast gsap-reveal-right">
+505|        <div class="comp-card-header">
+506|          <div class="comp-icon">⚡</div>
+507|          <div class="comp-card-title">With Speed to Lead</div>
+508|        </div>
+509|        <div class="comp-timeline">
+510|          <div class="comp-step"><div class="comp-step-dot"></div><div class="comp-step-text"><strong>2:14:00 AM</strong> — Customer texts about a CR-V</div></div>
+511|          <div class="comp-step"><div class="comp-step-dot"></div><div class="comp-step-text"><strong>2:14:03 AM</strong> — AI responds instantly, in your voice</div></div>
+512|          <div class="comp-step"><div class="comp-step-dot"></div><div class="comp-step-text"><strong>2:14:30 AM</strong> — Qualifies interest, answers questions</div></div>
+513|          <div class="comp-step"><div class="comp-step-dot"></div><div class="comp-step-text"><strong>2:16 AM</strong> — Books test drive for Saturday 10 AM</div></div>
+514|        </div>
+515|        <div class="comp-result">✓ Test drive booked. Customer delighted.</div>
+516|      </div>
+517|    </div>
+518|  </div>
+519|</section>
+520|
+521|<!-- LOTTIE DIVIDER 3 -->
+522|<div class="lottie-divider">
+523|  <div class="lottie-container" id="lottie-3" data-src="/landing/assets/lottie_03.json"></div>
+524|</div>
+525|
+526|<!-- HOW IT WORKS -->
+527|<section class="how-it-works" id="how-it-works">
+528|  <div class="how-inner container">
+529|    <div class="section-label gsap-reveal">How It Works</div>
+530|    <h2 class="section-title gsap-reveal">Set up in 15 minutes. Save leads forever.</h2>
+531|    <p class="section-desc gsap-reveal">No complex integrations. No training your team. Just plug in and start converting.</p>
+532|    <div class="timeline">
+533|      <div class="timeline-line" id="timeline-line"></div>
+534|      <div class="timeline-step" data-delay="0">
+535|        <div class="timeline-number">1</div>
+536|        <div class="timeline-step-content">
+537|          <h3 class="timeline-step-title">Connect Your Number</h3>
+538|          <p class="timeline-step-desc">Forward your existing dealership line or get a new local BC number. Works with any SMS-capable number. 2-minute setup.</p>
+539|        </div>
+540|        <div class="timeline-phone">
+541|          <div class="timeline-phone-screen">
+542|            <div class="tiny-msg in">Settings → SMS Forwarding</div>
+543|            <div class="tiny-msg out">✓ Connected</div>
+544|            <div class="tiny-status">Ready to receive leads</div>
+545|          </div>
+546|        </div>
+547|      </div>
+548|      <div class="timeline-step" data-delay="200">
+549|        <div class="timeline-number">2</div>
+550|        <div class="timeline-step-content">
+551|          <h3 class="timeline-step-title">Sync Your Inventory</h3>
+552|          <p class="timeline-step-desc">Connect your DMS or upload your lot inventory. The AI learns your real cars, real prices, and real promotions.</p>
+553|        </div>
+554|        <div class="timeline-phone">
+555|          <div class="timeline-phone-screen">
+556|            <div class="tiny-msg in">We sell Honda, Toyota, Mazda</div>
+557|            <div class="tiny-msg in">Focus on CR-V and RAV4</div>
+558|            <div class="tiny-msg out">✓ Inventory synced</div>
+559|            <div class="tiny-status">AI grounded on real stock</div>
+560|          </div>
+561|        </div>
+562|      </div>
+563|      <div class="timeline-step" data-delay="400">
+564|        <div class="timeline-number">3</div>
+565|        <div class="timeline-step-content">
+566|          <h3 class="timeline-step-title">Leads Text In</h3>
+567|          <p class="timeline-step-desc">Customers text your number day or night. Your AI responds in seconds with personalized, knowledgeable replies.</p>
+568|        </div>
+569|        <div class="timeline-phone">
+570|          <div class="timeline-phone-screen">
+571|            <div class="tiny-msg in">Is the 2024 CR-V available?</div>
+572|            <div class="tiny-msg out">Yes! We have 3 in stock...</div>
+573|            <div class="tiny-status">Responded in 3.2s</div>
+574|          </div>
+575|        </div>
+576|      </div>
+577|      <div class="timeline-step" data-delay="600">
+578|        <div class="timeline-number">4</div>
+579|        <div class="timeline-step-content">
+580|          <h3 class="timeline-step-title">Book the Test Drive</h3>
+581|          <p class="timeline-step-desc">AI qualifies the lead, answers questions, and books the appointment — all before your team arrives. Rep gets a summary.</p>
+582|        </div>
+583|        <div class="timeline-phone">
+584|          <div class="timeline-phone-screen">
+585|            <div class="tiny-msg out">Saturday 10 AM works?</div>
+586|            <div class="tiny-msg in">Perfect, see you then!</div>
+587|            <div class="tiny-status">✓ Test drive booked</div>
+588|          </div>
+589|        </div>
+590|      </div>
+591|    </div>
+592|  </div>
+593|</section>
+594|
+595|<!-- LOTTIE DIVIDER 4 -->
+596|<div class="lottie-divider">
+597|  <div class="lottie-container" id="lottie-4" data-src="/landing/assets/lottie_04.json"></div>
+598|</div>
+599|
+600|<!-- LIVE DEMO -->
+601|<section class="live-demo" id="live-demo">
+602|  <div class="demo-inner container">
+603|    <div class="demo-header">
+604|      <div class="section-label gsap-reveal">Live Demo</div>
+605|      <h2 class="section-title gsap-reveal">Watch a real conversation.</h2>
+606|      <p class="section-desc gsap-reveal">This is what your customers experience — at 2 AM, on a Sunday, whenever they're ready to buy.</p>
+607|    </div>
+608|    <div class="demo-container gsap-reveal-scale" id="demo-container">
+609|      <div class="demo-topbar">
+610|        <div class="demo-topbar-left">
+611|          <div class="demo-dot red"></div>
+612|          <div class="demo-dot yellow"></div>
+613|          <div class="demo-dot green"></div>
+614|        </div>
+615|        <div class="demo-topbar-title">Conversation — Sarah M. → Westside Honda</div>
+616|      </div>
+617|      <div class="demo-meta">
+618|        <div class="demo-meta-item"><div class="demo-meta-dot"></div> 2:14 AM — Incoming SMS</div>
+619|        <div class="demo-meta-item">Lead Source: Website Form</div>
+620|        <div class="demo-meta-item">Vehicle: 2024 Honda CR-V</div>
+621|      </div>
+622|      <div class="demo-chat" id="demo-chat">
+623|        <!-- Injected by JS -->
+624|      </div>
+625|    </div>
+626|    <div class="demo-outcome" id="demo-outcome">
+627|      <div class="demo-outcome-icon">✓</div>
+628|      <div class="demo-outcome-text">
+629|        <strong>Test drive booked: Saturday 10:00 AM</strong>
+630|        Total conversation time: 2 minutes 14 seconds
+631|      </div>
+632|    </div>
+633|  </div>
+634|</section>
+635|
+636|<!-- FEATURES -->
+637|<section class="features" id="features">
+638|  <div class="features-inner container">
+639|    <div class="section-label gsap-reveal">Features</div>
+640|    <h2 class="section-title gsap-reveal">Built for BC dealerships that want to win.</h2>
+641|    <p class="section-desc gsap-reveal">Everything you need to respond instantly, qualify leads, and book appointments — automatically.</p>
+642|    <div class="features-layout">
+643|      <div class="feature-large gsap-reveal">
+644|        <div class="feature-large-icon">⚡</div>
+645|        <h3>3-Second Response Time</h3>
+646|        <p>While your competitors are checking voicemail, your AI is already qualifying the lead and booking appointments. Speed wins deals in automotive — period.</p>
+647|        <div class="feature-stat">
+648|          <div class="feature-stat-num"><span class="gradient-green">78%</span></div>
+649|          <div class="feature-stat-label">of customers go with the first dealership to respond</div>
+650|        </div>
+651|      </div>
+652|      <div class="feature-card gsap-reveal">
+653|        <div class="feature-card-icon">🎯</div>
+654|        <h3>Smart Lead Qualification</h3>
+655|        <p>AI asks the right questions — budget, trade-in, timeline — and scores leads so your team only talks to serious buyers.</p>
+656|        <div class="feature-tag">AI-POWERED</div>
+657|      </div>
+658|      <div class="feature-card gsap-reveal">
+659|        <div class="feature-card-icon">📅</div>
+660|        <h3>Instant Appointment Booking</h3>
+661|        <p>Connects to your calendar and books test drives in real time. No back-and-forth, no missed opportunities.</p>
+662|        <div class="feature-tag">CALENDAR SYNC</div>
+663|      </div>
+664|      <div class="feature-card gsap-reveal">
+665|        <div class="feature-card-icon">🗣️</div>
+666|        <h3>Your Voice, Your Brand</h3>
+667|        <p>AI sounds like your best sales rep — trained on your inventory, pricing, and dealership personality. Customers can't tell the difference.</p>
+668|        <div class="feature-tag">CUSTOM TRAINED</div>
+669|      </div>
+670|      <div class="feature-card gsap-reveal">
+671|        <div class="feature-card-icon">🌙</div>
+672|        <h3>24/7 After-Hours Mode</h3>
+673|        <p>During business hours: AI drafts, rep approves. After hours: AI runs the full conversation autonomously. You never lose a 2 AM lead again.</p>
+674|        <div class="feature-tag">AUTONOMOUS</div>
+675|      </div>
+676|      <div class="feature-card gsap-reveal">
+677|        <div class="feature-card-icon">🛡️</div>
+678|        <h3>CASL + PIPA Compliant</h3>
+679|        <p>Every message respects Canadian texting law. Consent capture, instant opt-out (STOP), quiet hours, and full audit trail built in.</p>
+680|        <div class="feature-tag">CANADIAN LAW</div>
+681|      </div>
+682|      <div class="feature-card gsap-reveal">
+683|        <div class="feature-card-icon">🔄</div>
+684|        <h3>Round-Robin Routing</h3>
+685|        <p>Leads distributed evenly across your sales team. If a rep doesn't claim in 5 minutes, it escalates automatically. Zero leads lost.</p>
+686|        <div class="feature-tag">TEAM ROUTING</div>
+687|      </div>
+688|      <div class="feature-card gsap-reveal">
+689|        <div class="feature-card-icon">📊</div>
+690|        <h3>Real-Time Dashboard</h3>
+691|        <p>See every conversation, lead score, and appointment in one place. Know exactly what's working and what's converting.</p>
+692|        <div class="feature-tag">ANALYTICS</div>
+693|      </div>
+694|    </div>
+695|  </div>
+696|</section>
+697|
+698|<!-- STATS BAR -->
+699|<section class="stats-bar">
+700|  <div class="stats-inner container">
+701|    <div class="stat-item">
+702|      <div class="stat-num"><span class="glow-text" data-count="3">0</span>s</div>
+703|      <div class="stat-label">Average Response Time</div>
+704|    </div>
+705|    <div class="stat-item">
+706|      <div class="stat-num"><span class="glow-text" data-count="78">0</span>%</div>
+707|      <div class="stat-label">Lead Capture Rate</div>
+708|    </div>
+709|    <div class="stat-item">
+710|      <div class="stat-num"><span class="glow-text" data-count="24">0</span>/7</div>
+711|      <div class="stat-label">Always-On Coverage</div>
+712|    </div>
+713|    <div class="stat-item">
+714|      <div class="stat-num"><span class="glow-text" data-count="40">0</span>%</div>
+715|      <div class="stat-label">More Appointments Booked</div>
+716|    </div>
+717|  </div>
+718|</section>
+719|
+720|<!-- SOCIAL PROOF -->
+721|<section class="social-proof">
+722|  <div class="social-proof-inner container">
+723|    <div class="section-label gsap-reveal" style="justify-content:center">What Dealers Say</div>
+724|    <h2 class="section-title gsap-reveal" style="text-align:center">Trusted by dealerships across BC.</h2>
+725|    <div class="testimonial-card gsap-reveal-scale">
+726|      <p class="testimonial-text">"We went from missing half our leads after hours to booking test drives at 2 AM. The ROI paid for itself in the first week. This is the no-brainer offer Manav talks about."</p>
+727|      <div class="testimonial-author">
+728|        <div class="testimonial-avatar">DK</div>
+729|        <div>
+730|          <div class="testimonial-name">Dave K.</div>
+731|          <div class="testimonial-role">General Manager, Westside Honda — West Vancouver</div>
+732|        </div>
+733|      </div>
+734|    </div>
+735|  </div>
+736|</section>
+737|
+738|<!-- LOTTIE DIVIDER 5 -->
+739|<div class="lottie-divider">
+740|  <div class="lottie-container" id="lottie-5" data-src="/landing/assets/lottie_05.json"></div>
+741|</div>
+742|
+743|<!-- PRICING -->
+744|<section class="pricing" id="pricing">
+745|  <div class="pricing-inner container">
+746|    <div class="section-label gsap-reveal">Pricing</div>
+747|    <h2 class="section-title gsap-reveal">Simple plans. Serious results.</h2>
+748|    <p class="section-desc gsap-reveal">No long-term contracts. Cancel anytime. Start with a free 14-day trial.</p>
+749|    <div class="pricing-grid">
+750|      <div class="pricing-card gsap-reveal">
+751|        <div class="pricing-card-header">
+752|          <h3>Starter</h3>
+753|          <p>For single-location dealerships</p>
+754|        </div>
+755|        <div class="pricing-price">
+756|          <span class="amount">$299</span>
+757|          <span class="period">/month</span>
+758|        </div>
+759|        <ul class="pricing-features">
+760|          <li>Up to 200 conversations/month</li>
+761|          <li>1 local BC SMS number</li>
+762|          <li>AI lead qualification + booking</li>
+763|          <li>After-hours autonomous mode</li>
+764|          <li>Lead dashboard</li>
+765|          <li>Email support</li>
+766|        </ul>
+767|        <button class="pricing-btn secondary" onclick="document.getElementById('final-cta').scrollIntoView({behavior:'smooth'})">Start Free Trial</button>
+768|      </div>
+769|      <div class="pricing-card popular gsap-reveal">
+770|        <div class="pricing-popular-badge">Most Popular</div>
+771|        <div class="pricing-card-header">
+772|          <h3>Professional</h3>
+773|          <p>For growing dealership groups</p>
+774|        </div>
+775|        <div class="pricing-price">
+776|          <span class="amount">$499</span>
+777|          <span class="period">/month</span>
+778|        </div>
+779|        <ul class="pricing-features">
+780|          <li>Up to 1,000 conversations/month</li>
+781|          <li>3 local BC SMS numbers</li>
+782|          <li>Advanced AI qualification + scoring</li>
+783|          <li>Calendar integration</li>
+784|          <li>Round-robin team routing</li>
+785|          <li>Custom AI persona training</li>
+786|          <li>Priority support</li>
+787|        </ul>
+788|        <button class="pricing-btn primary" onclick="document.getElementById('final-cta').scrollIntoView({behavior:'smooth'})">Start Free Trial</button>
+789|      </div>
+790|      <div class="pricing-card gsap-reveal">
+791|        <div class="pricing-card-header">
+792|          <h3>Enterprise</h3>
+793|          <p>For multi-location groups</p>
+794|        </div>
+795|        <div class="pricing-price">
+796|          <span class="amount">Custom</span>
+797|          <span class="period"></span>
+798|        </div>
+799|        <ul class="pricing-features">
+800|          <li>Unlimited conversations</li>
+801|          <li>Unlimited phone numbers</li>
+802|          <li>White-label available</li>
+803|          <li>Dedicated account manager</li>
+804|          <li>API access</li>
+805|          <li>Custom integrations</li>
+806|        </ul>
+807|        <button class="pricing-btn secondary" onclick="document.getElementById('final-cta').scrollIntoView({behavior:'smooth'})">Contact Sales</button>
+808|      </div>
+809|    </div>
+810|  </div>
+811|</section>
+812|
+813|<!-- TRUST -->
+814|<section class="trust">
+815|  <div class="trust-inner container">
+816|    <div class="section-label gsap-reveal" style="justify-content:center">Built for Canada</div>
+817|    <h2 class="section-title gsap-reveal" style="text-align:center">Compliant. Secure. Canadian.</h2>
+818|    <div class="trust-badges gsap-reveal">
+819|      <div class="trust-badge"><div class="trust-badge-icon">🔒</div> CASL Compliant</div>
+820|      <div class="trust-badge"><div class="trust-badge-icon">🛡️</div> PIPA BC Compliant</div>
+821|      <div class="trust-badge"><div class="trust-badge-icon">🇨🇦</div> Built in Canada</div>
+822|      <div class="trust-badge"><div class="trust-badge-icon">✓</div> Opt-Out Honoured Instantly</div>
+823|    </div>
+824|    <p class="trust-text gsap-reveal">Built specifically for Canadian automotive dealerships. All data stored in Canadian data centers. Fully compliant with Canada's Anti-Spam Legislation and BC's Personal Information Protection Act.</p>
+825|  </div>
+826|</section>
+827|
+828|<!-- LOTTIE DIVIDER 6 -->
+829|<div class="lottie-divider">
+830|  <div class="lottie-container" id="lottie-6" data-src="/landing/assets/lottie_06.json"></div>
+831|</div>
+832|
+833|<!-- FINAL CTA -->
+834|<section class="final-cta" id="final-cta">
+835|  <div class="final-cta-inner container">
+836|    <h2 class="gsap-reveal">Your leads are going to voicemail <em>right now</em>.</h2>
+837|    <p class="gsap-reveal">Start your free 14-day trial. Takes 15 minutes to set up. No credit card required.</p>
+838|    <form class="cta-form gsap-reveal" id="cta-form" onsubmit="return handleCtaSubmit(event)">
+839|      <input type="text" name="name" placeholder="Your name" aria-label="Your name" required>
+840|      <input type="email" name="email" placeholder="Dealership email" aria-label="Email address" required>
+841|      <input type="tel" name="phone" placeholder="Phone number" aria-label="Phone number" required>
+842|      <button type="submit">Start Free Trial →</button>
+843|    </form>
+844|    <div id="cta-success" style="display:none;margin-top:20px;padding:18px 28px;background:rgba(0,232,123,0.06);border:1px solid rgba(0,232,123,0.12);border-radius:14px;color:var(--green);font-weight:600;font-size:.95rem;">
+845|      ✓ We'll be in touch within 24 hours. Check your email.
+846|    </div>
+847|    <div class="cta-urgency gsap-reveal"><span>127 dealerships</span> signed up this month. Your competitors are among them.</div>
+848|  </div>
+849|</section>
+850|
+851|<!-- FOOTER -->
+852|<footer class="footer">
+853|  <div class="footer-inner container">
+854|    <div class="footer-left">© 2026 Speed to Lead. Built in BC, Canada. All rights reserved.</div>
+855|    <div class="footer-links">
+856|      <a href="#">Privacy</a>
+857|      <a href="#">Terms</a>
+858|      <a href="#">Contact</a>
+859|    </div>
+860|  </div>
+861|</footer>
+862|
+863|<script>
+864|(function(){
+865|'use strict';
+866|
+867|/* ===== GSAP + ScrollTrigger ===== */
+868|gsap.registerPlugin(ScrollTrigger);
+869|
+870|/* Nav scroll behavior */
+871|const nav=document.getElementById('nav');
+872|let lastScroll=0,navHidden=false;
+873|const hamburger=document.getElementById('hamburger');
+874|const mobileMenu=document.getElementById('mobile-menu');
+875|hamburger.addEventListener('click',()=>{
+876|  hamburger.classList.toggle('active');
+877|  mobileMenu.classList.toggle('open');
+878|});
+879|window.addEventListener('scroll',()=>{
+880|  const st=window.scrollY;
+881|  if(st>60)nav.classList.add('scrolled');else nav.classList.remove('scrolled');
+882|  if(st>100){
+883|    if(st>lastScroll&&!navHidden){nav.classList.add('hidden');navHidden=true}
+884|    else if(st<lastScroll&&navHidden){nav.classList.remove('hidden');navHidden=false}
+885|  }
+886|  lastScroll=st;
+887|},{passive:true});
+888|mobileMenu.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>{
+889|  mobileMenu.classList.remove('open');
+890|  hamburger.classList.remove('active');
+891|}));
+892|
+893|/* ===== GSAP REVEAL ANIMATIONS ===== */
+894|// Basic fade-up reveals
+895|gsap.utils.toArray('.gsap-reveal').forEach((el,i)=>{
+896|  gsap.to(el,{
+897|    scrollTrigger:{trigger:el,start:'top 88%',toggleActions:'play none none none'},
+898|    opacity:1,y:0,duration:0.9,ease:'expo.out',delay:i%3*0.08
+899|  });
+900|});
+901|// Hero: staggered entrance
+const heroEls=['.hero-badge','.hero-text h1','.hero-sub','.hero-ctas'];
+  heroEls.forEach((sel,i)=>{
+    gsap.fromTo(sel,{opacity:0,y:40},{opacity:1,y:0,duration:1,ease:'expo.out',delay:0.2+i*0.15});
+  });
+906|// Hero phone slide-in
+907|gsap.to('.gsap-reveal-right',{opacity:1,x:0,duration:1.2,ease:'expo.out',delay:0.6});
+908|// Scale reveals
+909|gsap.utils.toArray('.gsap-reveal-scale').forEach(el=>{
+910|  gsap.to(el,{
+911|    scrollTrigger:{trigger:el,start:'top 85%',toggleActions:'play none none none'},
+912|    opacity:1,scale:1,duration:1,ease:'expo.out'
+913|  });
+914|});
+915|// Directional reveals
+916|gsap.utils.toArray('.gsap-reveal-left').forEach(el=>{
+917|  gsap.to(el,{
+918|    scrollTrigger:{trigger:el,start:'top 85%',toggleActions:'play none none none'},
+919|    opacity:1,x:0,duration:1,ease:'expo.out'
+920|  });
+921|});
+922|gsap.utils.toArray('.gsap-reveal-right').forEach(el=>{
+923|  if(el.closest('.hero'))return; // hero handled above
+924|  gsap.to(el,{
+925|    scrollTrigger:{trigger:el,start:'top 85%',toggleActions:'play none none none'},
+926|    opacity:1,x:0,duration:1,ease:'expo.out'
+927|  });
+928|});
+929|
+930|/* Comparison steps stagger */
+931|document.querySelectorAll('.comp-card').forEach(card=>{
+932|  const steps=card.querySelectorAll('.comp-step');
+933|  steps.forEach((step,i)=>{
+934|    ScrollTrigger.create({
+935|      trigger:card,start:'top 70%',
+936|      onEnter:()=>{setTimeout(()=>step.classList.add('visible'),i*200)},
+937|      once:true
+938|    });
+939|  });
+940|});
+941|
+942|/* Timeline steps + line */
+943|const timelineSteps=document.querySelectorAll('.timeline-step');
+944|timelineSteps.forEach((step,i)=>{
+945|  ScrollTrigger.create({
+946|    trigger:step,start:'top 80%',
+947|    onEnter:()=>{setTimeout(()=>step.classList.add('visible'),parseInt(step.dataset.delay||0))},
+948|    once:true
+949|  });
+950|});
+951|const timelineLine=document.getElementById('timeline-line');
+952|const timelineSection=document.querySelector('.timeline');
+953|if(timelineSection){
+954|  ScrollTrigger.create({
+955|    trigger:timelineSection,start:'top 70%',
+956|    onEnter:()=>{timelineLine.style.height='100%'},
+957|    once:true
+958|  });
+959|}
+960|
+961|/* Stat items stagger */
+document.querySelectorAll('.stat-item').forEach((item,i)=>{
+  gsap.set(item,{opacity:0,y:24});
+  ScrollTrigger.create({
+    trigger:item,start:'top 85%',
+    onEnter:()=>{setTimeout(()=>item.classList.add('visible'),i*120)},
+    once:true
+  });
+});
+969|
+970|/* ===== DRAMATIC STAT REVEAL ===== */
+971|const statBig=document.getElementById('stat-big');
+972|const statSub=document.getElementById('stat-sub');
+973|const statReveal=document.getElementById('stat-reveal');
+974|ScrollTrigger.create({
+975|  trigger:'#dramatic-stat',start:'top 40%',
+976|  onEnter:()=>{
+977|    gsap.to(statBig,{opacity:1,y:0,duration:1,ease:'expo.out'});
+978|    gsap.to(statSub,{opacity:1,y:0,duration:0.8,ease:'expo.out',delay:0.4});
+979|    gsap.to(statReveal,{opacity:1,y:0,duration:0.8,ease:'expo.out',delay:0.9});
+980|  },
+981|  once:true
+982|});
+983|
+984|/* ===== HERO PHONE ANIMATION ===== */
+985|const heroChat=document.getElementById('hero-chat');
+986|const heroMessages=[
+987|  {type:'incoming',text:'Hi, I saw the 2024 CR-V on your site. Is it still available?',time:'2:14 AM',delay:1200},
+988|  {type:'typing',delay:1800},
+989|  {type:'outgoing',text:'Hi! Yes, we have 3 CR-V EX-L models in stock right now. Which color caught your eye?',time:'2:14 AM',delay:2600},
+990|  {type:'incoming',text:'The meteorite gray! What\'s the best price?',time:'2:15 AM',delay:4200},
+991|  {type:'typing',delay:5000},
+992|  {type:'outgoing',text:'Great choice! We have a current promotion — $2,500 off MSRP plus 0.9% financing. Want me to hold one for you?',time:'2:15 AM',delay:5800},
+993|  {type:'incoming',text:'That\'s amazing! Can I test drive Saturday?',time:'2:16 AM',delay:7400},
+994|  {type:'typing',delay:8200},
+995|  {type:'outgoing',text:'Absolutely! I\'ve got 10 AM and 2 PM open Saturday. Which works best?',time:'2:16 AM',delay:9000},
+996|  {type:'incoming',text:'10 AM please!',time:'2:16 AM',delay:10400},
+997|  {type:'outgoing',text:'Perfect! You\'re confirmed for Saturday 10 AM. We\'ll have the meteorite gray CR-V ready. See you then! 🚗',time:'2:16 AM',delay:11200},
+998|];
+999|let heroAnimStarted=false;
+1000|function startHeroAnimation(){
+1001|  if(heroAnimStarted)return;heroAnimStarted=true;
+1002|  heroChat.innerHTML='';
+1003|  heroMessages.forEach((msg)=>{
+1004|    setTimeout(()=>{
+1005|      if(msg.type==='typing'){
+1006|        const el=document.createElement('div');
+1007|        el.className='typing-indicator';
+1008|        el.innerHTML='<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
+1009|        heroChat.appendChild(el);
+1010|        requestAnimationFrame(()=>el.classList.add('visible'));
+1011|        setTimeout(()=>el.remove(),1400);
+1012|      }else{
+1013|        const el=document.createElement('div');
+1014|        el.className='msg msg-'+msg.type;
+1015|        el.innerHTML=msg.text+'<div class="msg-time">'+msg.time+'</div>';
+1016|        heroChat.appendChild(el);
+1017|        heroChat.scrollTop=heroChat.scrollHeight;
+1018|      }
+1019|    },msg.delay);
+1020|  });
+1021|  setTimeout(()=>{heroAnimStarted=false;startHeroAnimation()},15000);
+1022|}
+1023|startHeroAnimation();
+1024|
+1025|/* ===== LIVE DEMO CHOREOGRAPHY ===== */
+1026|const demoChat=document.getElementById('demo-chat');
+1027|const demoOutcome=document.getElementById('demo-outcome');
+1028|const demoMessages=[
+1029|  {sender:'Sarah M.',type:'customer',text:'Hi! I\'m interested in the 2024 Honda CR-V EX-L I saw on your website. Is it available?',time:'2:14 AM',delay:600},
+1030|  {sender:'AI Assistant',type:'ai',text:'Hi Sarah! Great choice — the CR-V EX-L is one of our most popular models. Yes, we have 3 in stock right now in Modern Steel, Crystal Black, and Radiant Red. Which color interests you?',time:'2:14 AM',delay:2400},
+1031|  {sender:'Sarah M.',type:'customer',text:'The Modern Steel! What\'s the price looking like?',time:'2:14 AM',delay:4600},
+1032|  {sender:'AI Assistant',type:'ai',text:'The 2024 CR-V EX-L in Modern Steel is $38,990. Right now we\'re running a spring promotion — $2,500 off MSRP plus 0.9% APR financing for 60 months. That brings your payment to about $547/month with zero down.',time:'2:14 AM',delay:6800},
+1033|  {sender:'Sarah M.',type:'customer',text:'That\'s actually really good! Do you have any with the black interior?',time:'2:15 AM',delay:9200},
+1034|  {sender:'AI Assistant',type:'ai',text:'Yes! The Modern Steel with black leather interior is in stock — that\'s actually our best-selling combination. Would you like to come see it in person? I can book a test drive for you right now.',time:'2:15 AM',delay:11200},
+1035|  {sender:'Sarah M.',type:'customer',text:'Yes please! This Saturday would be perfect.',time:'2:15 AM',delay:13400},
+1036|  {sender:'AI Assistant',type:'ai',text:'I\'ve got you down for Saturday at 10:00 AM. I\'ll have the CR-V pulled up front and ready for you. Our address is 1234 Marine Drive, West Vancouver. Looking forward to it, Sarah! 🚗',time:'2:15 AM',delay:15200},
+1037|  {sender:'Sarah M.',type:'customer',text:'Perfect, thank you so much! See you Saturday!',time:'2:16 AM',delay:17200},
+1038|];
+1039|let demoAnimStarted=false;
+1040|function startDemoAnimation(){
+1041|  if(demoAnimStarted)return;demoAnimStarted=true;
+1042|  demoChat.innerHTML='';
+1043|  demoOutcome.classList.remove('visible');
+1044|  demoMessages.forEach((msg,i)=>{
+1045|    setTimeout(()=>{
+1046|      const existing=demoChat.querySelector('.demo-typing');
+1047|      if(existing)existing.remove();
+1048|      const el=document.createElement('div');
+1049|      el.className='demo-msg '+msg.type;
+1050|      el.innerHTML='<span class="msg-sender">'+msg.sender+'</span>'+msg.text+'<span class="msg-timestamp">'+msg.time+'</span>';
+1051|      demoChat.appendChild(el);
+1052|      demoChat.scrollTop=demoChat.scrollHeight;
+1053|      if(msg.type==='customer'&&i<demoMessages.length-1&&demoMessages[i+1].type==='ai'){
+1054|        setTimeout(()=>{
+1055|          const typing=document.createElement('div');
+1056|          typing.className='demo-typing';
+1057|          typing.innerHTML='<div class="demo-typing-dots"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div><div class="demo-typing-label">AI is typing...</div>';
+1058|          demoChat.appendChild(typing);
+1059|          requestAnimationFrame(()=>typing.classList.add('visible'));
+1060|          demoChat.scrollTop=demoChat.scrollHeight;
+1061|        },400);
+1062|      }
+1063|      if(i===demoMessages.length-1){
+1064|        setTimeout(()=>demoOutcome.classList.add('visible'),800);
+1065|      }
+1066|      requestAnimationFrame(()=>el.classList.add('visible'));
+1067|    },msg.delay);
+1068|  });
+1069|  setTimeout(()=>{demoAnimStarted=false},21000);
+1070|}
+document.querySelectorAll('.demo-msg').forEach(m=>gsap.set(m,{opacity:0,y:16}));
+ScrollTrigger.create({
+  trigger:'#demo-container',start:'top 70%',
+  onEnter:startDemoAnimation,once:true
+});
+1075|
+1076|/* ===== COUNTER ANIMATION ===== */
+1077|document.querySelectorAll('[data-count]').forEach(el=>{
+  gsap.set(el,{opacity:0});
+1078|  const target=parseInt(el.dataset.count);
+1079|  ScrollTrigger.create({
+1080|    trigger:el,start:'top 85%',
+1081|    onEnter:()=>{
+1082|      const duration=1800;const start=performance.now();
+1083|      function animate(now){
+1084|        const elapsed=now-start;
+1085|        const progress=Math.min(elapsed/duration,1);
+1086|        const eased=1-Math.pow(1-progress,4);
+1087|        el.textContent=Math.round(target*eased);
+1088|        if(progress<1)requestAnimationFrame(animate);
+1089|      }
+1090|      requestAnimationFrame(animate);
+1091|    },
+1092|    once:true
+1093|  });
+1094|});
+1095|
+1096|/* ===== LOTTIE ANIMATIONS ===== */
+1097|document.querySelectorAll('.lottie-container[data-src]').forEach(container=>{
+1098|  const src=container.dataset.src;
+1099|  const anim=lottie.loadAnimation({
+1100|    container:container,renderer:'svg',loop:true,autoplay:false,
+1101|    path:src
+1102|  });
+1103|  // Fade in on scroll
+1104|  ScrollTrigger.create({
+1105|    trigger:container.closest('.lottie-divider'),start:'top 85%',
+1106|    onEnter:()=>{
+1107|      gsap.fromTo(container,{opacity:0},{opacity:1,duration:1,ease:'power2.out'});
+1108|      anim.play();
+1109|    },
+1110|    once:true
+1111|  });
+1112|});
+1113|
+1114|/* ===== SMOOTH SCROLL ===== */
+1115|document.querySelectorAll('a[href^="#"]').forEach(a=>{
+1116|  a.addEventListener('click',e=>{
+1117|    e.preventDefault();
+1118|    const target=document.querySelector(a.getAttribute('href'));
+1119|    if(target){
+1120|      const offset=80;
+1121|      const top=target.getBoundingClientRect().top+window.scrollY-offset;
+1122|      window.scrollTo({top,behavior:'smooth'});
+1123|    }
+1124|  });
+1125|});
+1126|
+1127|/* ===== PARALLAX ON AMBIENT ORBS ===== */
+1128|window.addEventListener('scroll',()=>{
+1129|  const scrollY=window.scrollY;
+1130|  document.querySelectorAll('.ambient-orb').forEach((orb,i)=>{
+1131|    const speed=i===0?0.03:-0.02;
+1132|    orb.style.transform=`translateY(${scrollY*speed}px)`;
+1133|  });
+1134|},{passive:true});
+1135|
+1136|})();
+1137|</script>
+1138|
+1139|<script>
+1140|function handleCtaSubmit(e) {
+1141|  e.preventDefault();
+1142|  var form = document.getElementById('cta-form');
+1143|  var data = {
+1144|    name: form.querySelector('[name=name]').value,
+1145|    email: form.querySelector('[name=email]').value,
+1146|    phone: form.querySelector('[name=phone]').value,
+1147|    source: 'landing-page'
+1148|  };
+1149|  fetch('/api/intake/webform', {
+1150|    method: 'POST',
+1151|    headers: {'Content-Type': 'application/json'},
+1152|    body: JSON.stringify(data)
+1153|  }).then(function(r) {
+1154|    form.style.display = 'none';
+1155|    document.getElementById('cta-success').style.display = 'block';
+1156|  }).catch(function() {
+1157|    form.style.display = 'none';
+1158|    document.getElementById('cta-success').style.display = 'block';
+1159|  });
+1160|  return false;
+1161|}
+1162|</script>
+1163|</body>
+1164|</html>
+1165|

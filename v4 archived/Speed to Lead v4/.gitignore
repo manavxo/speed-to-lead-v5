@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.db
+.git
+.speed-to-lead.db
+demo_local.db
+credentials.json
+token.json
+_archive_phase1/
+test_sms_send.py
+TWILIO_TEST_PROMPT.md
+CX-EVALUATION-CHECKLIST.md
+PHASE1_COMPLETION_REPORT.md
+speed to lead v3/

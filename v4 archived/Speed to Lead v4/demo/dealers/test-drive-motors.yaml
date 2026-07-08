@@ -1,0 +1,67 @@
+# Demo dealer for real-world testing.
+# Fill in real phone numbers for your sales team, then provision:
+#   python tools/provision_dealer.py demo/dealers/test-drive-motors.yaml
+
+dealer:
+  slug: test-drive-motors
+  name: "Test Drive Motors"
+  timezone: America/Vancouver
+  hours:
+    mon: "09:00-19:00"
+    tue: "09:00-19:00"
+    wed: "09:00-19:00"
+    thu: "09:00-19:00"
+    fri: "09:00-19:00"
+    sat: "10:00-17:00"
+    sun: "closed"
+  location_address: "742 Industrial Ave, Burnaby, BC V5C 4A1"
+  maps_url: "https://maps.google.com/?q=742+Industrial+Ave+Burnaby+BC"
+  main_phone: "+17785559000"
+
+channels:
+  # !! REPLACE these with your real Twilio numbers after provisioning !!
+  sms_number: "+1XXXXXXXXXX"              # Your Twilio SMS number (lead-facing)
+  whatsapp_sender: "+1XXXXXXXXXX"         # Your Twilio WhatsApp sender (rep-facing)
+  lead_email_inbox: "leads@testdrivemotors.example.ca"
+  facebook_page_id: ""
+  web_form_token: "tdm-test-token-2026"   # Website form posts to /webhook/form/{this}
+
+sales_team:
+  # !! REPLACE with real phone numbers — these are your test "salespeople" !!
+  # Each person needs a WhatsApp-enabled phone number (can be personal numbers for testing).
+  - { name: "Manav",  phone: "+1XXXXXXXXXX", active: true }    # You (manager)
+  - { name: "Friend1", phone: "+1XXXXXXXXXX", active: true }   # Friend acting as sales rep
+  - { name: "Friend2", phone: "+1XXXXXXXXXX", active: true }   # Friend acting as sales rep
+
+routing:
+  strategy: round_robin
+  claim_timeout_min: 5
+  escalation: [reassign, notify_manager]
+  manager_phone: "+1XXXXXXXXXX"           # Your phone — gets escalation alerts
+
+ai:
+  persona: "friendly, knowledgeable, zero-pressure local car sales consultant"
+  goal: book_appointment
+  guardrails:
+    no_price_negotiation: true
+    no_financing_promises: true
+
+followups:
+  cadence_min: [5, 60, 1440, 4320, 10080]   # 5m, 1h, 1d, 3d, 7d
+
+inventory:
+  source: feed
+  url: "demo/inventory.csv"
+  refresh_min: 60
+  field_map: auto
+
+lead_org:
+  mode: native
+  target: ""
+  credentials_ref: ""
+
+compliance:
+  region: CA-BC
+  consent_text: "By submitting you agree to receive texts from Test Drive Motors. Reply STOP to opt out."
+  opt_out_keywords: [STOP, STOPALL, UNSUBSCRIBE, ARRET]
+  quiet_hours: "21:00-08:00"

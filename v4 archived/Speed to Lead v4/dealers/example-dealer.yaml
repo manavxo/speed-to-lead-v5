@@ -1,0 +1,65 @@
+# Example drop-in dealer config. Copy to dealers/<slug>.yaml, fill in, then run:
+#   python tools/provision_dealer.py dealers/<slug>.yaml
+# Every runtime behavior reads from this file — no code changes per dealer.
+# Field-by-field docs: dealers/_schema.md
+
+dealer:
+  slug: sunrise-auto                 # tenant key (kebab-case, unique)
+  name: "Sunrise Auto Sales"
+  timezone: America/Vancouver        # BC
+  hours:                             # drives the hybrid AI-autonomy switch
+    mon: "09:00-19:00"
+    tue: "09:00-19:00"
+    wed: "09:00-19:00"
+    thu: "09:00-19:00"
+    fri: "09:00-19:00"
+    sat: "10:00-17:00"
+    sun: "closed"
+  location_address: "1234 Kingsway, Vancouver, BC"
+  maps_url: "https://maps.google.com/?q=Sunrise+Auto+Sales"
+  main_phone: "+16045550100"
+
+channels:                            # AXIS 3 — channels they use to generate leads
+  sms_number: "+17785550111"         # Canadian Twilio number — lead-facing SMS
+  whatsapp_sender: "+17785550112"    # Twilio WhatsApp sender — rep-facing claim pings
+  lead_email_inbox: "leads+sunrise@yourdomain.com"   # forwarded Cars.com/CarGurus/AutoTrader/Kijiji emails
+  facebook_page_id: ""               # optional, via Twilio Conversations
+  web_form_token: "sunrise-9f3a2b"   # embeddable form posts to /webhook/form/{token}
+
+sales_team:                          # round-robin pool; whatsapp must be WhatsApp-enabled
+  - { name: "Mike",  phone: "+16045550121", active: true }
+  - { name: "Dana",  phone: "+16045550122", active: true }
+
+routing:
+  strategy: round_robin
+  claim_timeout_min: 5               # reassign if unclaimed within this many minutes
+  escalation: [reassign, notify_manager]
+  manager_phone: "+16045550130"
+
+ai:
+  persona: "friendly, concise, no-pressure local sales rep"
+  goal: book_appointment
+  guardrails:
+    no_price_negotiation: true
+    no_financing_promises: true
+
+followups:
+  cadence_min: [60, 1440, 4320, 10080]   # 1h, 1d, 3d, 7d if the lead goes cold
+
+inventory:                           # AXIS 1 — how they maintain their website
+  source: auto                       # auto | feed | dms | structured_data | website_scrape | manual | none
+  url: "https://sunriseauto.example.ca/inventory"
+  platform: ""                       # optional hint: dealerpull | dealercenter | autosync | ...
+  refresh_min: 180
+  field_map: auto                    # 'auto' (known map or LLM-assisted) or explicit overrides
+
+lead_org:                            # AXIS 2 — how they organize/track their leads
+  mode: native                       # native | crm_sync | sheet | webhook | email_digest
+  target: ""                         # CRM/DMS name, Google Sheet ID, or webhook URL (per mode)
+  credentials_ref: ""                # name of the secret in .env / host vault (never inline)
+
+compliance:                          # Canada / BC
+  region: CA-BC
+  consent_text: "By submitting you agree to receive texts from Sunrise Auto Sales. Reply STOP to opt out."
+  opt_out_keywords: [STOP, STOPALL, UNSUBSCRIBE, ARRET]   # ARRET for bilingual compliance
+  quiet_hours: "21:00-08:00"         # no outbound sends in this window (dealer timezone)

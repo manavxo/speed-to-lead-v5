@@ -1,0 +1,314 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ lead.name or 'Lead' }} — Lead Detail{% endblock %}
+{% block page_title %}Lead Detail{% endblock %}
+
+{% block top_actions %}
+<button class="btn btn-ghost" onclick="window.location.href='/dashboard/leads'">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M19 12H5"></path>
+        <path d="M12 19l-7-7 7-7"></path>
+    </svg>
+    Back to Leads
+</button>
+{% endblock %}
+
+{% block content %}
+<div class="lead-detail-grid" style="display: grid; grid-template-columns: 280px 1fr 280px; gap: 20px; height: calc(100vh - 130px);">
+    
+    <!-- LEFT: Lead Info Card -->
+    <div class="card" style="align-self: start;">
+        <div class="card-header">
+            <span class="card-title">Lead Info</span>
+            <span class="badge badge-{{ lead.state.value|lower if lead.state else 'new' }}">
+                {{ lead.state.value if lead.state else 'NEW' }}
+            </span>
+        </div>
+        <div class="card-body">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--accent-subtle); color: var(--accent); font-size: 20px; font-weight: 600; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
+                    {% if lead.name %}
+                    {{ lead.name.split()[0][0] }}{% if lead.name.split()|length > 1 %}{{ lead.name.split()[1][0] }}{% endif %}
+                    {% else %}?{% endif %}
+                </div>
+                <div style="font-size: 16px; font-weight: 600;">{{ lead.name or 'Unknown' }}</div>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 14px;">
+                <div>
+                    <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px;">Phone</div>
+                    <div style="font-size: 13px; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                        {{ lead.phone or '—' }}
+                        {% if lead.phone %}
+                        <a href="tel:{{ lead.phone }}" title="Call" style="color: var(--accent); text-decoration: none; font-size: 12px;">📞</a>
+                        <a href="sms:{{ lead.phone }}" title="Text" style="color: var(--accent); text-decoration: none; font-size: 12px;">💬</a>
+                        <span onclick="navigator.clipboard.writeText('{{ lead.phone }}'); showToast('Phone copied', 'success')" title="Copy" style="cursor: pointer; font-size: 12px;">📋</span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                {% if lead.email %}
+                <div>
+                    <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px;">Email</div>
+                    <div style="font-size: 13px; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                        {{ lead.email }}
+                        <a href="mailto:{{ lead.email }}" title="Send email" style="color: var(--accent); text-decoration: none; font-size: 12px;">✉️</a>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <div>
+                    <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px;">Source</div>
+                    <div style="font-size: 13px; color: var(--text-secondary);">{{ lead.source.value if lead.source else '—' }}</div>
+                </div>
+                
+                {% if lead.vehicle_ref %}
+                <div>
+                    <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px;">Vehicle Interest</div>
+                    <div style="font-size: 13px; color: var(--text-primary);">{{ lead.vehicle_ref }}</div>
+                </div>
+                {% endif %}
+                
+                <div>
+                    <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px;">Assigned Rep</div>
+                    <div style="font-size: 13px; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                        {% if lead.assigned_rep %}
+                        <span style="width: 20px; height: 20px; border-radius: 50%; background: var(--accent-subtle); color: var(--accent); font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center;">
+                            {{ lead.assigned_rep[:2]|upper }}
+                        </span>
+                        {{ lead.assigned_rep }}
+                        {% else %}
+                        —
+                        {% endif %}
+                    </div>
+                </div>
+                
+                {% if lead.state and lead.state.value == 'LOST' and lead.loss_reason %}
+                <div>
+                    <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px;">Loss Reason</div>
+                    <div style="font-size: 13px; color: var(--error); display: flex; align-items: center; gap: 6px;">
+                        {{ lead.loss_reason }}
+                    </div>
+                </div>
+                {% endif %}
+                
+                <div>
+                    <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px;">Consent</div>
+                    <div style="font-size: 13px; color: {{ 'var(--success)' if lead.consent else 'var(--text-muted)' }}; display: flex; align-items: center; gap: 6px;">
+                        {% if lead.consent %}
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        SMS &amp; Email consented
+                        {% else %}
+                        No consent recorded
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div style="border-top: 1px solid var(--border); padding-top: 14px; margin-top: 4px;">
+                    <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px;">Created</div>
+                    <div style="font-size: 13px; color: var(--text-secondary);">
+                        {% if lead.created_at %}
+                        {{ lead.created_at|local_time('%b %d, %Y at %I:%M %p') }}
+                        {% else %}
+                        —
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- CENTER: Conversation Thread -->
+    <div class="card" style="display: flex; flex-direction: column; min-height: 0;">
+        <div class="card-header">
+            <span class="card-title">Conversation</span>
+            <span style="font-size: 12px; color: var(--text-muted);">
+                {{ messages|length }} message{{ 's' if messages|length != 1 else '' }}
+            </span>
+        </div>
+        <div style="flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+            
+            {% for entry in timeline %}
+                {% if entry.type == 'message' %}
+                    {% if entry.direction == 'inbound' %}
+                    <!-- Inbound message from lead -->
+                    <div style="display: flex; gap: 10px; max-width: 80%;">
+                        <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--bg-elevated); color: var(--text-secondary); font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            {% if lead.name %}{{ lead.name.split()[0][0] }}{% if lead.name.split()|length > 1 %}{{ lead.name.split()[1][0] }}{% endif %}{% else %}?{% endif %}
+                        </div>
+                        <div>
+                            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">
+                                {{ lead.name or 'Lead' }} &middot; {{ entry.time|local_time('%I:%M %p') if entry.time else '' }}
+                            </div>
+                            <div style="background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px 8px 8px 2px; padding: 10px 14px; font-size: 13px; color: var(--text-primary);">
+                                {{ entry.body }}
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <!-- Outbound message (AI or rep) -->
+                    <div style="display: flex; gap: 10px; max-width: 80%; align-self: flex-end; flex-direction: row-reverse;">
+                        <div style="width: 28px; height: 28px; border-radius: 50%; background: {{ 'var(--accent-subtle)' if entry.ai_generated else 'rgba(34, 197, 94, 0.1)' }}; color: {{ 'var(--accent)' if entry.ai_generated else 'var(--success)' }}; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            {{ 'AI' if entry.ai_generated else (lead.assigned_rep[:2]|upper if lead.assigned_rep else 'R') }}
+                        </div>
+                        <div>
+                            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px; text-align: right;">
+                                {{ 'AI Assistant' if entry.ai_generated else (lead.assigned_rep or 'Rep') }}
+                                &middot; {{ entry.time|local_time('%I:%M %p') if entry.time else '' }}
+                                {% if entry.ai_generated %}
+                                <span style="background: var(--accent-subtle); color: var(--accent); padding: 1px 6px; border-radius: 3px; font-size: 10px; margin-left: 4px;">AI</span>
+                                {% endif %}
+                            </div>
+                            <div style="background: {{ 'var(--accent-subtle)' if entry.ai_generated else 'var(--bg-elevated)' }}; border: 1px solid {{ 'rgba(99, 102, 241, 0.15)' if entry.ai_generated else 'var(--border)' }}; border-radius: 8px 8px 2px 8px; padding: 10px 14px; font-size: 13px; color: var(--text-primary);">
+                                {{ entry.body }}
+                            </div>
+                            {% if entry.delivery_status %}
+                            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px; text-align: right;">
+                                {{ entry.delivery_status }}
+                                {% if entry.error_code %} ({{ entry.error_code }}){% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                {% elif entry.type == 'event' %}
+                <!-- Event entry -->
+                <div style="text-align: center; padding: 4px 0;">
+                    <span style="font-size: 11px; color: var(--text-muted); background: var(--bg-elevated); padding: 3px 10px; border-radius: 10px;">
+                        {{ entry.description }}
+                        {% if entry.detail %} — {{ entry.detail }}{% endif %}
+                        {% if entry.time %} &middot; {{ entry.time|local_time('%I:%M %p') }}{% endif %}
+                    </span>
+                </div>
+                {% endif %}
+            {% endfor %}
+            
+            {% if not timeline %}
+            <div style="text-align: center; color: var(--text-muted); padding: 40px;">
+                No messages or events yet.
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Message Input -->
+        <div style="padding: 16px 20px; border-top: 1px solid var(--border); display: flex; gap: 8px;">
+            <input type="text" class="input" placeholder="Type a message..." style="flex: 1;">
+            <button class="btn btn-primary" hx-post="/dashboard/leads/{{ lead.id }}/messages" hx-include="previous .input">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+                Send
+            </button>
+        </div>
+    </div>
+    
+    <!-- RIGHT: Actions Panel -->
+    <div class="card" style="align-self: start;">
+        <div class="card-header">
+            <span class="card-title">Actions</span>
+        </div>
+        <div class="card-body">
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+                <!-- Reassign Rep -->
+                <div class="form-group">
+                    <label class="form-label">Reassign Rep</label>
+                    <select class="select" name="rep" hx-post="/dashboard/leads/{{ lead.id }}/reassign" hx-trigger="change" hx-include="this">
+                        <option value="" {{ 'selected' if not lead.assigned_rep }}>— Select —</option>
+                        {% for rep in sales_team %}
+                        <option value="{{ rep.name }}" {{ 'selected' if lead.assigned_rep == rep.name }}>{{ rep.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Change Status -->
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select class="select" name="status" hx-post="/dashboard/leads/{{ lead.id }}/status" hx-trigger="change" hx-include="this">
+                        {% for state_option in ['NEW', 'AUTO_REPLIED', 'ASSIGNED', 'CLAIMED', 'ENGAGED', 'APPT_SET', 'SHOWED', 'SOLD', 'LOST', 'OPTED_OUT'] %}
+                        <option value="{{ state_option }}" {{ 'selected' if lead.state and lead.state.value == state_option }}>
+                            {{ state_option }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Appointments -->
+                {% if appointments %}
+                <div class="form-group">
+                    <label class="form-label">Appointments</label>
+                    {% for appt in appointments %}
+                    <div style="font-size: 12px; color: var(--text-secondary); padding: 6px 0; border-bottom: 1px solid var(--border);">
+                        {{ appt.scheduled_for|local_time('%b %d, %Y %I:%M %p') if appt.scheduled_for else '—' }}
+                        <span style="font-size: 11px; color: var(--text-muted);">({{ appt.status }})</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                
+                <!-- Schedule Follow-up -->
+                <div class="form-group">
+                    <label class="form-label">Schedule Follow-up</label>
+                    <input type="datetime-local" class="input" name="follow_up">
+                    <button class="btn btn-secondary btn-sm" style="width: 100%; margin-top: 8px;" hx-post="/dashboard/leads/{{ lead.id }}/follow-up" hx-include="previous [name='follow_up']" onclick="showToast('Follow-up scheduled', 'success')">
+                        Set Reminder
+                    </button>
+                </div>
+
+                <!-- Quick Activity Notes -->
+                <div class="form-group">
+                    <label class="form-label">Quick Log Activity</label>
+                    <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                        <button class="btn btn-ghost btn-sm" style="font-size: 11px; padding: 4px 10px;"
+                                hx-post="/dashboard/leads/{{ lead.id }}/activity" hx-vals='{"note": "Called — no answer"}'
+                                hx-on::after-request="showToast('Activity logged', 'success')">📞 No Answer</button>
+                        <button class="btn btn-ghost btn-sm" style="font-size: 11px; padding: 4px 10px;"
+                                hx-post="/dashboard/leads/{{ lead.id }}/activity" hx-vals='{"note": "Left voicemail"}'
+                                hx-on::after-request="showToast('Activity logged', 'success')">🎙️ Voicemail</button>
+                        <button class="btn btn-ghost btn-sm" style="font-size: 11px; padding: 4px 10px;"
+                                hx-post="/dashboard/leads/{{ lead.id }}/activity" hx-vals='{"note": "Sent text message"}'
+                                hx-on::after-request="showToast('Activity logged', 'success')">💬 Texted</button>
+                        <button class="btn btn-ghost btn-sm" style="font-size: 11px; padding: 4px 10px;"
+                                hx-post="/dashboard/leads/{{ lead.id }}/activity" hx-vals='{"note": "Spoke with lead"}'
+                                hx-on::after-request="showToast('Activity logged', 'success')">🗣️ Spoke</button>
+                        <button class="btn btn-ghost btn-sm" style="font-size: 11px; padding: 4px 10px;"
+                                hx-post="/dashboard/leads/{{ lead.id }}/activity" hx-vals='{"note": "Appointment confirmed"}'
+                                hx-on::after-request="showToast('Activity logged', 'success')">✅ Confirmed</button>
+                        <button class="btn btn-ghost btn-sm" style="font-size: 11px; padding: 4px 10px;"
+                                hx-post="/dashboard/leads/{{ lead.id }}/activity" hx-vals='{"note": "Made offer / pricing discussed"}'
+                                hx-on::after-request="showToast('Activity logged', 'success')">💰 Offer</button>
+                    </div>
+                </div>
+
+                <div style="border-top: 1px solid var(--border); padding-top: 16px;">
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <button class="btn btn-primary" style="width: 100%;" hx-post="/dashboard/leads/{{ lead.id }}/mark-sold" onclick="showToast('Lead marked as sold!', 'success')">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                            Mark as Sold
+                        </button>
+                        <div class="form-group" style="margin-bottom: 8px;">
+                            <label class="form-label" style="font-size: 11px; margin-bottom: 4px;">Loss Reason (if marking lost)</label>
+                            <select class="select" id="loss-reason" name="reason">
+                                <option value="">— Select reason —</option>
+                                <option value="Price">Price</option>
+                                <option value="Went elsewhere">Went elsewhere</option>
+                                <option value="No response">No response</option>
+                                <option value="Not qualified">Not qualified</option>
+                                <option value="Timing">Timing</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-danger" style="width: 100%;" hx-post="/dashboard/leads/{{ lead.id }}/mark-lost" hx-include="#loss-reason" hx-confirm="Mark this lead as lost?" onclick="showToast('Lead marked as lost', 'warning')">
+                            Mark as Lost
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

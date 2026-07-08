@@ -1,0 +1,21 @@
+{
+  "_comment": "Axis-3 inbound SMS fixtures (Twilio webhook form params). Two cases: a normal inquiry and an opt-out.",
+  "inquiry": {
+    "MessageSid": "SM00000000000000000000000000000001",
+    "From": "+16045551234",
+    "To": "+17785550111",
+    "Body": "Hi, still have the silver RAV4?"
+  },
+  "opt_out": {
+    "MessageSid": "SM00000000000000000000000000000002",
+    "From": "+16045551234",
+    "To": "+17785550111",
+    "Body": "STOP"
+  },
+  "opt_out_french": {
+    "MessageSid": "SM00000000000000000000000000000003",
+    "From": "+16045559999",
+    "To": "+17785550111",
+    "Body": "ARRET"
+  }
+}

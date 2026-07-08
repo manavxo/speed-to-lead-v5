@@ -30,13 +30,13 @@ Use the Render API to update the three Twilio env vars:
 
 ```
 Service ID: srv-d8misim7r5hc739rf7sg
-API Key: ***REMOVED-RENDER-API-KEY***
+API Key: ${RENDER_API_KEY_PLACEHOLDER}
 ```
 
 For each variable, make a PATCH request:
 ```bash
 curl -s -X PATCH "https://api.render.com/v1/services/srv-d8misim7r5hc739rf7sg/env-vars" \
-  -H "Authorization: Bearer ***REMOVED-RENDER-API-KEY***" \
+  -H "Authorization: Bearer ${RENDER_API_KEY_PLACEHOLDER}" \
   -H "Content-Type: application/json" \
   --data-raw '{"TWILIO_ACCOUNT_SID":"THE_AC_SID_FROM_CONSOLE"}'
 ```
@@ -54,7 +54,7 @@ curl -s -X PATCH "..." --data-raw '{"TWILIO_PHONE_NUMBER":"+12097972694"}'
 ### Step 3: Trigger Deploy
 ```bash
 curl -s -X POST "https://api.render.com/v1/services/srv-d8misim7r5hc739rf7sg/deploys" \
-  -H "Authorization: Bearer ***REMOVED-RENDER-API-KEY***" \
+  -H "Authorization: Bearer ${RENDER_API_KEY_PLACEHOLDER}" \
   -H "Content-Type: application/json" \
   -d '{}'
 ```
@@ -63,7 +63,7 @@ curl -s -X POST "https://api.render.com/v1/services/srv-d8misim7r5hc739rf7sg/dep
 Poll until status is "live":
 ```bash
 curl -s "https://api.render.com/v1/services/srv-d8misim7r5hc739rf7sg/deploys?limit=1" \
-  -H "Authorization: Bearer ***REMOVED-RENDER-API-KEY***"
+  -H "Authorization: Bearer ${RENDER_API_KEY_PLACEHOLDER}"
 ```
 
 ### Step 5: Send Test SMS to Manav

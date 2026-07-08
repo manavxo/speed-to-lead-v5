@@ -1,0 +1,109 @@
+# Render Blueprint — Speed-to-Lead v4
+# Deploy the full stack (web + Postgres) in one click from the Render dashboard.
+# See: https://render.com/docs/blueprint-spec
+#
+# ============================================================================
+# SCALE PLAN — See docs/09-SCALE-PLAN.md for the full upgrade path
+# ============================================================================
+#
+# TIER PROGRESSION:
+#   Tier 0 (Free):        plan: free / free              = $0/mo   (1 dealer, dev/staging)
+#   Tier 1 (Starter):     plan: starter / basic_256mb    = $14/mo  (2-5 dealers, 24/7)
+#   Tier 2 (Growth):      plan: standard / basic_1gb     = $47/mo  (6-15 dealers, +scheduler worker)
+#   Tier 3 (Scale):       plan: pro / pro_4gb            = $159/mo (16-50 dealers)
+#   Tier 4 (Enterprise):  plan: pro(2x) / pro_16gb       = $391+/mo (50+ dealers)
+#
+# WHEN TO UPGRADE:
+#   Tier 0 → 1: First paying customer OR free Postgres expiring (90 days)
+#   Tier 1 → 2: 5+ active dealers OR response latency > 5s peak
+#   Tier 2 → 3: 15+ dealers OR MRR > $5,000
+#   Tier 3 → 4: 50+ dealers OR need horizontal scaling
+#
+# UVICORN WORKERS (set in startCommand below):
+#   Tier 0: --workers 1
+#   Tier 1: --workers 2
+#   Tier 2: --workers 3
+#   Tier 3: --workers 5
+#   Tier 4: --workers 5 (multiple instances)
+#
+# CONNECTION POOLING (set in app/db.py):
+#   Tier 0: pool_size=1, max_overflow=0
+#   Tier 1: pool_size=5, max_overflow=10
+#   Tier 2: pool_size=10, max_overflow=20
+#   Tier 3: pool_size=20, max_overflow=10 (PgBouncer from Render Pro DB)
+# ============================================================================
+
+databases:
+  - name: speed-to-lead-db
+    databaseName: speedtolead
+    plan: free              # TIER 0: free (90 days!)
+                              # TIER 1: basic_256mb ($7/mo)
+                              # TIER 2: basic_1gb ($15/mo)
+                              # TIER 3: pro_4gb ($60/mo) — includes PgBouncer
+                              # TIER 4: pro_16gb ($200/mo)
+    ipAllowList: []         # Allow connections from Render services only
+
+services:
+  - type: web
+    name: speed-to-lead
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free              # TIER 0: free (sleeps after 15 min!)
+                              # TIER 1: starter ($7/mo, 24/7 uptime, 512 MB RAM)
+                              # TIER 2: standard ($25/mo, 1 GB RAM, 1 CPU)
+                              # TIER 3: pro ($85/mo, 2 GB RAM, 2 CPU)
+    region: oregon           # US West — closest to BC/Canada clients
+    # TIER 3+: Uncomment for horizontal scaling:
+    # scaling:
+    #   numInstances: 1       # Increase to 2-3 for redundancy
+    #   minInstances: 1
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
+                              # TIER 1: --workers 2
+                              # TIER 2: --workers 3
+                              # TIER 3: --workers 5
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: speed-to-lead-db
+          property: connectionString
+      - key: ENVIRONMENT
+        value: production
+      - key: PUBLIC_BASE_URL
+        value: https://speed-to-lead-8tfi.onrender.com
+      - key: OUTBOUND_ENABLED
+        value: "false"      # Safety gate — set to "true" in Render dashboard when ready
+      - key: OPENROUTER_MODEL
+        value: "google/gemini-2.5-flash"   # gemini-2.0-flash-001 was retired from OpenRouter
+      # --- Add these manually in Render dashboard (Settings -> Environment) ---
+      # TWILIO_ACCOUNT_SID  (from twilio.com console)
+      # TWILIO_AUTH_TOKEN   (from twilio.com console)
+      # OPENROUTER_API_KEY  (from openrouter.ai)
+      # OPENROUTER_BASE_URL (e.g. https://openrouter.ai/api/v1)
+      # DASHBOARD_USER      (default: admin)
+      # DASHBOARD_PASSWORD  (set a strong password!)
+    healthCheckPath: /healthz
+    autoDeploy: true        # Auto-deploy on push to main branch
+
+  # TIER 2+: Uncomment to add a dedicated scheduler worker
+  # This ensures scheduled jobs (follow-ups, inventory sync) survive deploys
+  # and don't compete with web request handling.
+  # - type: worker
+  #   name: speed-to-lead-scheduler
+  #   runtime: docker
+  #   dockerfilePath: ./Dockerfile
+  #   plan: starter              # $7/mo
+  #   startCommand: python -m app.scheduler_worker
+  #   envVars:
+  #     - key: DATABASE_URL
+  #       fromDatabase:
+  #         name: speed-to-lead-db
+  #         property: connectionString
+  #     - key: ENVIRONMENT
+  #       value: production
+
+  # TIER 3+: Uncomment for periodic health monitoring
+  # - type: cron
+  #   name: health-monitor
+  #   schedule: "*/5 * * * *"    # Every 5 minutes
+  #   startCommand: python -m app.health_check
+  #   plan: starter              # $7/mo

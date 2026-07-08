@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Drive Motors � Quality Used Cars in Vancouver</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; background: #fafafa; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 0 1.5rem; }
+    header { background: #0a6847; color: white; padding: 1rem 0; }
+    header .container { display: flex; justify-content: space-between; align-items: center; }
+    .logo { font-size: 1.5rem; font-weight: 700; }
+    .logo span { color: #90cdf4; }
+    nav a { color: rgba(255,255,255,0.85); text-decoration: none; margin-left: 2rem; font-size: 0.9rem; }
+    nav a:hover { color: white; }
+    .hero { background: linear-gradient(135deg, #0a6847 0%, #085338 100%); color: white; padding: 4rem 0; text-align: center; }
+    .hero h1 { font-size: 2.5rem; margin-bottom: 1rem; }
+    .hero p { font-size: 1.1rem; opacity: 0.9; max-width: 600px; margin: 0 auto; }
+    .section { padding: 3rem 0; }
+    .section h2 { font-size: 1.75rem; margin-bottom: 2rem; text-align: center; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; }
+    .card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); transition: transform 0.2s, box-shadow 0.2s; }
+    .card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+    .card img { width: 100%; height: 200px; object-fit: cover; background: #e0e0e0; }
+    .card-body { padding: 1.25rem; }
+    .card-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .card-details { font-size: 0.85rem; color: #666; margin-bottom: 0.75rem; }
+    .card-price { font-size: 1.25rem; font-weight: 700; color: #0a6847; }
+    .btn { display: inline-block; padding: 0.6rem 1.25rem; border-radius: 8px; font-weight: 600; font-size: 0.9rem; cursor: pointer; border: none; transition: all 0.2s; }
+    .btn-primary { background: #0a6847; color: white; }
+    .btn-primary:hover { background: #085338; }
+    .btn-outline { background: transparent; border: 2px solid #0a6847; color: #0a6847; }
+    .btn-outline:hover { background: #0a6847; color: white; }
+    .inquire-btn { margin-top: 1rem; width: 100%; }
+    /* Form */
+    .form-section { background: #f0f0f0; }
+    .form-card { background: white; max-width: 600px; margin: 0 auto; padding: 2.5rem; border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+    .form-card h3 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .form-card .subtitle { color: #666; margin-bottom: 1.5rem; }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; font-weight: 500; margin-bottom: 0.35rem; font-size: 0.9rem; }
+    .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.7rem 1rem; border: 1.5px solid #ddd; border-radius: 8px; font-size: 0.95rem; font-family: inherit; transition: border-color 0.2s; }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #0a6847; box-shadow: 0 0 0 3px rgba(10,104,71,0.1); }
+    .form-group textarea { resize: vertical; min-height: 80px; }
+    .checkbox-group { display: flex; align-items: flex-start; gap: 0.5rem; margin: 1.5rem 0; }
+    .checkbox-group input[type=checkbox] { margin-top: 0.25rem; width: auto; }
+    .checkbox-group label { font-size: 0.8rem; color: #666; font-weight: 400; }
+    .form-submit { width: 100%; padding: 0.85rem; font-size: 1rem; }
+    .success-msg { display: none; background: #e8f5ef; border: 1px solid #0a6847; color: #0a6847; padding: 1.25rem; border-radius: 8px; text-align: center; margin-top: 1rem; }
+    .success-msg.show { display: block; }
+    .error-msg { display: none; background: #fef2f2; border: 1px solid #dc2626; color: #dc2626; padding: 1rem; border-radius: 8px; text-align: center; margin-top: 1rem; }
+    .error-msg.show { display: block; }
+    footer { background: #1a1a1a; color: rgba(255,255,255,0.6); padding: 2rem 0; text-align: center; font-size: 0.85rem; }
+    @media (max-width: 640px) { .hero h1 { font-size: 1.75rem; } .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="logo">Test Drive <span>Motors</span></div>
+      <nav>
+        <a href="#inventory">Inventory</a>
+        <a href="#contact">Contact</a>
+        <a href="tel:+177****3122">Call Us</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="container">
+      <h1>Find Your Perfect Ride</h1>
+      <p>Quality used vehicles in Vancouver. Every inquiry gets a response within seconds � even at 2 AM.</p>
+    </div>
+  </section>
+
+  <section class="section" id="inventory">
+    <div class="container">
+      <h2>Our Inventory</h2>
+      <div class="grid" id="inventoryGrid"></div>
+    </div>
+  </section>
+
+  <section class="section form-section" id="contact">
+    <div class="container">
+      <div class="form-card">
+        <h3>Get More Information</h3>
+        <p class="subtitle">Fill out the form and we'll get back to you right away.</p>
+        <form id="leadForm">
+          <div class="form-group">
+            <label for="fullName">Full Name *</label>
+            <input type="text" id="fullName" required placeholder="John Smith">
+          </div>
+          <div class="form-group">
+            <label for="phone">Phone Number *</label>
+            <input type="tel" id="phone" required placeholder="+160****4567">
+          </div>
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" placeholder="john@example.com">
+          </div>
+          <div class="form-group">
+            <label for="vehicle">Vehicle of Interest</label>
+            <select id="vehicle">
+              <option value="">� No specific vehicle �</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="message">Message</label>
+            <textarea id="message" placeholder="Tell us what you're looking for..."></textarea>
+          </div>
+          <div class="checkbox-group">
+            <input type="checkbox" id="consent" required>
+            <label for="consent">I agree to receive text messages from Test Drive Motors about my inquiry. Reply STOP to opt out at any time.</label>
+          </div>
+          <button type="submit" class="btn btn-primary form-submit">Send Inquiry</button>
+        </form>
+        <div class="success-msg" id="successMsg">
+          <strong>Thank you!</strong> We've received your inquiry and will get back to you within seconds. Check your phone for a text from us.
+        </div>
+        <div class="error-msg" id="errorMsg">
+          <strong>Something went wrong.</strong> Please try again or call us at +1 (778) 762-3122.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <p>� 2026 Test Drive Motors. 4217 Main Street, Vancouver, BC. +1 (778) 762-3122</p>
+      <p style="margin-top:0.5rem">Powered by Outpost � Every lead answered in seconds.</p>
+    </div>
+  </footer>
+
+  <script>
+    // === CONFIG: Set this to your webhook URL ===
+    var WEBHOOK_URL = 'https://speed-to-lead-8tfi.onrender.com/webhook/form/premier-auto-token';
+
+    // Vehicle inventory (loaded from CSV)
+    var inventory = [
+      { stock: 'TDM001', year: 2022, make: 'Honda', model: 'Civic', trim: 'Sport', price: 24900, mileage: 24500 },
+      { stock: 'TDM002', year: 2021, make: 'Ford', model: 'Mustang', trim: 'GT', price: 35950, mileage: 32000 },
+      { stock: 'TDM003', year: 2023, make: 'Toyota', model: 'RAV4', trim: 'XLE', price: 34995, mileage: 15800 },
+      { stock: 'TDM004', year: 2020, make: 'Hyundai', model: 'Elantra', trim: 'Preferred', price: 16450, mileage: 51000 },
+      { stock: 'TDM005', year: 2019, make: 'Volkswagen', model: 'Jetta', trim: 'Comfortline', price: 15990, mileage: 68000 },
+      { stock: 'TDM006', year: 2022, make: 'Toyota', model: 'Camry', trim: 'SE', price: 27900, mileage: 29000 },
+      { stock: 'TDM007', year: 2021, make: 'Nissan', model: 'Altima', trim: 'SV', price: 19850, mileage: 42000 },
+      { stock: 'TDM008', year: 2022, make: 'Dodge', model: 'Challenger', trim: 'RT', price: 39900, mileage: 21000 },
+      { stock: 'TDM009', year: 2021, make: 'Tesla', model: 'Model 3', trim: 'Standard Plus', price: 31500, mileage: 38000 },
+      { stock: 'TDM010', year: 2020, make: 'Chevrolet', model: 'Camaro', trim: 'LT', price: 28750, mileage: 29000 },
+      { stock: 'TDM011', year: 2022, make: 'BMW', model: '330i', trim: 'xDrive', price: 38500, mileage: 26000 },
+      { stock: 'TDM012', year: 2023, make: 'Honda', model: 'CR-V', trim: 'EX-L', price: 36200, mileage: 12000 },
+      { stock: 'TDM013', year: 2021, make: 'Range Rover', model: 'Evoque', trim: 'S', price: 42900, mileage: 35000 },
+      { stock: 'TDM014', year: 2022, make: 'Mercedes-Benz', model: 'C300', trim: '4MATIC', price: 41500, mileage: 22000 },
+      { stock: 'TDM015', year: 2023, make: 'Hyundai', model: 'Tucson', trim: 'Preferred', price: 29900, mileage: 18000 },
+      { stock: 'TDM016', year: 2021, make: 'Ford', model: 'F-150', trim: 'XLT', price: 38750, mileage: 45000 },
+      { stock: 'TDM017', year: 2023, make: 'Mazda', model: 'CX-5', trim: 'GX', price: 31200, mileage: 14500 },
+      { stock: 'TDM018', year: 2020, make: 'Toyota', model: 'Corolla', trim: 'SE', price: 17900, mileage: 52000 },
+      { stock: 'TDM019', year: 2022, make: 'Chevrolet', model: 'Equinox', trim: 'LT', price: 25800, mileage: 31000 },
+      { stock: 'TDM020', year: 2019, make: 'Audi', model: 'A4', trim: 'Premium Plus', price: 26500, mileage: 58000 }
+    ];
+
+    // Render inventory cards
+    var grid = document.getElementById('inventoryGrid');
+    var vehicleSelect = document.getElementById('vehicle');
+
+    inventory.forEach(function(v) {
+      // Card
+      var card = document.createElement('div');
+      card.className = 'card';
+      var priceStr = '$' + v.price.toLocaleString();
+      var mileageStr = v.mileage.toLocaleString() + ' km';
+      card.innerHTML = '<div style="height:200px;background:#e8e8e8;display:flex;align-items:center;justify-content:center;font-size:3rem">??</div>' +
+        '<div class="card-body">' +
+        '<div class="card-title">' + v.year + ' ' + v.make + ' ' + v.model + '</div>' +
+        '<div class="card-details">' + v.trim + ' � ' + mileageStr + '</div>' +
+        '<div class="card-price">' + priceStr + '</div>' +
+        '<button class="btn btn-outline inquire-btn" data-stock="' + v.stock + '">Inquire</button>' +
+        '</div>';
+      grid.appendChild(card);
+
+      // Dropdown option
+      var opt = document.createElement('option');
+      opt.value = v.stock;
+      opt.textContent = v.year + ' ' + v.make + ' ' + v.model + ' ' + v.trim + ' � ' + priceStr;
+      vehicleSelect.appendChild(opt);
+    });
+
+    // Inquire buttons scroll to form + pre-select vehicle
+    document.querySelectorAll('.inquire-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        vehicleSelect.value = this.getAttribute('data-stock');
+        document.getElementById('contact').scrollIntoView({ behavior: 'smooth' });
+        document.getElementById('fullName').focus();
+      });
+    });
+
+    // Form submission
+    document.getElementById('leadForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      var payload = {
+        full_name: document.getElementById('fullName').value.trim(),
+        phone: document.getElementById('phone').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        vehicle_ref: document.getElementById('vehicle').value || null,
+        message: document.getElementById('message').value.trim(),
+        consent_sms: document.getElementById('consent').checked
+      };
+
+      var submitBtn = this.querySelector('.form-submit');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending...';
+
+      fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(function(resp) { return resp.json(); })
+      .then(function(data) {
+        if (data.status === 'ok' || data.lead_id) {
+          document.getElementById('successMsg').classList.add('show');
+          document.getElementById('errorMsg').classList.remove('show');
+          document.getElementById('leadForm').style.display = 'none';
+        } else {
+          throw new Error(data.error || 'Unknown error');
+        }
+      })
+      .catch(function(err) {
+        document.getElementById('errorMsg').classList.add('show');
+        console.error('Form error:', err);
+      })
+      .finally(function() {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Send Inquiry';
+      });
+    });
+  </script>
+</body>
+</html>

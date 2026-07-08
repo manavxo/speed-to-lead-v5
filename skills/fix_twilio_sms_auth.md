@@ -21,7 +21,7 @@ always already sitting in the repo's `.env.local`.
 | Render service id | `srv-d8misim7r5hc739rf7sg` |
 | Customer/AI sender (BC) | `+17787623122` (area code 778 = British Columbia) |
 | Secondary number (not sender) | `+12097972694` (US 209) |
-| Account SID | `AC9c402b4729de1e43469b7d21f3eeb58a` |
+| Account SID | `${TWILIO_ACCOUNT_SID}` |
 | Local creds | `<repo>/.env.local` (never commit) |
 | Landing page | `https://speed-to-lead-v5.onrender.com/` |
 | Script | `skills/fix_twilio_sms_auth.py` |

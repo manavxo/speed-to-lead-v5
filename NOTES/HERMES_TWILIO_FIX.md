@@ -36,7 +36,7 @@ replacing the whole set):
 |---|---|
 | `TWILIO_AUTH_TOKEN` | correct token from repo `.env.local` (matches SID) |
 | `TWILIO_PHONE_NUMBER` | `+17787623122` |
-| `TWILIO_ACCOUNT_SID` | `AC9c402b4729de1e43469b7d21f3eeb58a` (already correct, unchanged) |
+| `TWILIO_ACCOUNT_SID` | `${TWILIO_ACCOUNT_SID}` (already correct, unchanged) |
 
 ```bash
 curl -s -X PUT \

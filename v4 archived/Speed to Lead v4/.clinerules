@@ -1,0 +1,57 @@
+# Cline Rules — Speed to Lead v4
+
+## Project Type
+Python FastAPI web application with Jinja2 + HTMX dashboard. Speed-to-lead response engine for car dealerships.
+
+## Key Commands
+```bash
+# Install
+pip install -e ".[dev]"
+
+# Test
+pytest -q --tb=short
+
+# Run
+uvicorn app.main:app --reload
+
+# DB init
+python -c "from app.db import init_db; init_db()"
+```
+
+## Architecture
+- FastAPI app in `app/main.py` with lifespan-managed APScheduler
+- Three-axis adapter model: intake / inventory / organization
+- Single messaging chokepoint: `tools/send_sms.py` (compliance gate)
+- State machine: `app/engine/lifecycle.py` (DO NOT MODIFY)
+- Dashboard: Jinja2 templates in `app/dashboard/templates/`, routes in `app/dashboard/__init__.py`
+- Dealer config: YAML files in `dealers/<slug>.yaml`
+
+## Config
+- Environment variables in `.env` (see `.env.example`)
+- Per-dealer config in `dealers/<slug>.yaml`
+- `OUTBOUND_ENABLED=false` by default (safety gate)
+- `DASHBOARD_USER` / `DASHBOARD_PASSWORD` for auth
+
+## Anti-Patterns
+- Don't call Twilio directly — use `tools/send_sms.py`
+- Don't modify `app/engine/lifecycle.py`
+- Don't add new database tables — use existing models
+- Don't use React/Vue/Next.js — Jinja2 + HTMX
+- Don't add Alembic, Redis, Celery
+- Don't set `OUTBOUND_ENABLED=true` until Twilio is tested
+- Don't store PII at INFO log level
+- Don't hardcode secrets
+
+## When Building Features
+1. Read `docs/04-FRONTEND.md` before writing HTML/CSS
+2. Read `docs/06-SKILLS.md` for compliance rules and pitfalls
+3. Read `docs/07-TASKS.md` for the current task list
+4. Run `pytest -q` after every change
+5. Test with `OUTBOUND_ENABLED=false` first
+
+## Design System (Dashboard)
+- Background: `#0a0a0f`, Surface: `#12121a`
+- Border: `rgba(255,255,255,0.06)`
+- Text: `#e8e8ed` (primary), `#6b7280` (secondary)
+- Accent: `#6366f1` (indigo)
+- Font: Inter, Border radius: 6px-8px

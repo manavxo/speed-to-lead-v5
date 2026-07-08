@@ -1,0 +1,6 @@
+vin,stock,year,make,model,trim,body_style,mileage,price,state_of_vehicle,vehicle_url,image_url
+2HGFC2F50KH500001,SA1001,2019,Honda,Civic,EX,Sedan,48000,18900,used,https://sunriseauto.example.ca/inventory/SA1001,https://sunriseauto.example.ca/img/SA1001-1.jpg
+1FATP8UH1J5500002,SA1002,2018,Ford,Mustang,GT,Coupe,52000,29950,used,https://sunriseauto.example.ca/inventory/SA1002,https://sunriseauto.example.ca/img/SA1002-1.jpg
+5TDZA23C13S500003,SA1003,2020,Toyota,RAV4,XLE,SUV,31000,28995,used,https://sunriseauto.example.ca/inventory/SA1003,https://sunriseauto.example.ca/img/SA1003-1.jpg
+KMHD84LF5JU500004,SA1004,2017,Hyundai,Elantra,GL,Sedan,76000,12450,used,https://sunriseauto.example.ca/inventory/SA1004,https://sunriseauto.example.ca/img/SA1004-1.jpg
+3VWDX7AJ5BM500005,SA1005,2016,Volkswagen,Jetta,Comfortline,Sedan,98000,9990,used,https://sunriseauto.example.ca/inventory/SA1005,https://sunriseauto.example.ca/img/SA1005-1.jpg

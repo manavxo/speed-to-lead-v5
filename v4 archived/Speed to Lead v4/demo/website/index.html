@@ -1,0 +1,1829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Outpost - Every Lead Answered in Seconds</title>
+  <meta name="description" content="Outpost is the always-on response engine for independent car dealerships. Every customer inquiry gets a warm, helpful reply within seconds, 24/7.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    /* =========================================
+       DESIGN TOKENS
+       ========================================= */
+    :root {
+      --bg: #fafafa;
+      --bg-subtle: #f2f2f2;
+      --bg-muted: #e8e8e8;
+      --text-primary: #141414;
+      --text-secondary: #525252;
+      --text-tertiary: #787878;
+      --accent: #0a6847;
+      --accent-hover: #085338;
+      --accent-subtle: #e8f5ef;
+      --border: #e0e0e0;
+      --border-subtle: #ebebeb;
+      --font-display: 'Space Grotesk', system-ui, sans-serif;
+      --font-body: 'Outfit', system-ui, sans-serif;
+      --section-gap: clamp(5rem, 8vw, 8rem);
+      --content-max: 1200px;
+      --content-padding: clamp(1.25rem, 4vw, 2.5rem);
+      --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+      --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+      --ease-strong: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+    body {
+      font-family: var(--font-body);
+      font-weight: 400;
+      font-size: 1rem;
+      line-height: 1.6;
+      color: var(--text-primary);
+      background-color: var(--bg);
+      overflow-x: hidden;
+    }
+
+    img { display: block; max-width: 100%; height: auto; }
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; cursor: pointer; border: none; background: none; }
+
+    .container {
+      max-width: var(--content-max);
+      margin: 0 auto;
+      padding-left: var(--content-padding);
+      padding-right: var(--content-padding);
+    }
+
+    .section {
+      padding-top: var(--section-gap);
+      padding-bottom: var(--section-gap);
+    }
+
+    /* =========================================
+       NAVIGATION
+       ========================================= */
+    .nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: rgba(250, 250, 250, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-subtle);
+      transition: transform 300ms var(--ease-out), box-shadow 300ms ease;
+    }
+
+    .nav.scrolled {
+      box-shadow: 0 1px 8px rgba(0,0,0,0.04);
+    }
+
+    .nav-inner {
+      max-width: var(--content-max);
+      margin: 0 auto;
+      padding: 0 var(--content-padding);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+    }
+
+    .nav-logo {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.25rem;
+      letter-spacing: -0.03em;
+      color: var(--text-primary);
+    }
+
+    .nav-logo span { color: var(--accent); }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      list-style: none;
+    }
+
+    .nav-links a {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      transition: color 200ms ease;
+      position: relative;
+    }
+
+    .nav-links a:not(.nav-cta):hover { color: var(--text-primary); }
+
+    .nav-links a:not(.nav-cta)::after {
+      content: '';
+      position: absolute;
+      bottom: -4px;
+      left: 0;
+      width: 0;
+      height: 1.5px;
+      background: var(--accent);
+      transition: width 250ms var(--ease-out);
+    }
+
+    .nav-links a:not(.nav-cta):hover::after { width: 100%; }
+
+    .nav-cta {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--bg) !important;
+      background: var(--accent);
+      padding: 0.5rem 1.25rem;
+      border-radius: 6px;
+      transition: background 200ms ease, transform 160ms ease-out, box-shadow 200ms ease;
+    }
+
+    .nav-cta:hover {
+      background: var(--accent-hover);
+      box-shadow: 0 4px 14px rgba(10, 104, 71, 0.25);
+    }
+
+    .nav-cta:active { transform: scale(0.97); }
+
+    .nav-hamburger {
+      display: none;
+      flex-direction: column;
+      gap: 5px;
+      padding: 4px;
+    }
+
+    .nav-hamburger span {
+      display: block;
+      width: 22px;
+      height: 2px;
+      background: var(--text-primary);
+      border-radius: 1px;
+      transition: transform 200ms ease, opacity 200ms ease;
+    }
+
+    /* =========================================
+       HERO
+       ========================================= */
+    .hero {
+      padding-top: calc(64px + clamp(4rem, 10vw, 7rem));
+      padding-bottom: var(--section-gap);
+      min-height: min(100dvh, 900px);
+      display: flex;
+      align-items: center;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(2rem, 5vw, 5rem);
+      align-items: center;
+    }
+
+    .hero-content { max-width: 560px; }
+
+    .hero-headline {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: clamp(2.5rem, 4.5vw, 3.75rem);
+      line-height: 1.08;
+      letter-spacing: -0.04em;
+      text-wrap: balance;
+      color: var(--text-primary);
+      margin-bottom: 1.25rem;
+    }
+
+    .hero-headline .accent { color: var(--accent); }
+
+    /* Text split animation */
+    .word {
+      display: inline-block;
+      overflow: hidden;
+      vertical-align: bottom;
+      line-height: 1.15;
+    }
+
+    .word-inner {
+      display: inline-block;
+      transform: translateY(105%);
+      transition: transform 800ms var(--ease-strong);
+    }
+
+    .loaded .word-inner {
+      transform: translateY(0);
+    }
+
+    .word:nth-child(2) .word-inner { transition-delay: 60ms; }
+    .word:nth-child(3) .word-inner { transition-delay: 120ms; }
+    .word:nth-child(4) .word-inner { transition-delay: 180ms; }
+    .word:nth-child(5) .word-inner { transition-delay: 240ms; }
+    .word:nth-child(6) .word-inner { transition-delay: 300ms; }
+    .word:nth-child(7) .word-inner { transition-delay: 360ms; }
+    .word:nth-child(8) .word-inner { transition-delay: 420ms; }
+    .word:nth-child(9) .word-inner { transition-delay: 480ms; }
+    .word:nth-child(10) .word-inner { transition-delay: 540ms; }
+    .word:nth-child(11) .word-inner { transition-delay: 600ms; }
+
+    .hero-sub {
+      font-size: clamp(1.0625rem, 1.5vw, 1.1875rem);
+      line-height: 1.55;
+      color: var(--text-secondary);
+      max-width: 440px;
+      margin-bottom: 2rem;
+    }
+
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 0.9375rem;
+      color: var(--bg);
+      background: var(--accent);
+      padding: 0.8125rem 1.75rem;
+      border-radius: 8px;
+      transition: background 200ms ease, transform 160ms ease-out, box-shadow 200ms ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-primary::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%);
+      transform: translateX(-100%);
+      transition: transform 600ms var(--ease-out);
+    }
+
+    .btn-primary:hover::before { transform: translateX(100%); }
+    .btn-primary:hover { background: var(--accent-hover); box-shadow: 0 6px 20px rgba(10, 104, 71, 0.3); }
+    .btn-primary:active { transform: scale(0.97); }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 0.9375rem;
+      color: var(--text-primary);
+      background: transparent;
+      padding: 0.8125rem 1.75rem;
+      border-radius: 8px;
+      border: 1.5px solid var(--border);
+      transition: border-color 200ms ease, transform 160ms ease-out, background 200ms ease;
+    }
+
+    .btn-secondary:hover { border-color: var(--text-secondary); background: var(--bg-subtle); }
+    .btn-secondary:active { transform: scale(0.97); }
+
+    .hero-visual {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .hero-visual-mock {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+      transform: perspective(1200px) rotateY(-2deg) rotateX(1deg);
+      transition: transform 600ms var(--ease-out);
+    }
+
+    .hero-visual:hover .hero-visual-mock {
+      transform: perspective(1200px) rotateY(0deg) rotateX(0deg);
+    }
+
+    .mock-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.875rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+
+    .mock-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(10, 104, 71, 0.3); }
+      50% { opacity: 0.7; box-shadow: 0 0 0 6px rgba(10, 104, 71, 0); }
+    }
+
+    .mock-header-text {
+      font-family: var(--font-display);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .mock-body {
+      flex: 1;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .mock-bubble {
+      max-width: 75%;
+      padding: 0.75rem 1rem;
+      border-radius: 12px;
+      font-size: 0.8125rem;
+      line-height: 1.5;
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity 400ms ease, transform 400ms var(--ease-out);
+    }
+
+    .mock-bubble.animate-in {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .mock-bubble-incoming {
+      background: var(--bg-muted);
+      color: var(--text-primary);
+      align-self: flex-start;
+      border-bottom-left-radius: 4px;
+    }
+
+    .mock-bubble-reply {
+      background: var(--accent);
+      color: #fff;
+      align-self: flex-end;
+      border-bottom-right-radius: 4px;
+    }
+
+    .mock-timestamp {
+      font-size: 0.6875rem;
+      color: var(--text-tertiary);
+      align-self: flex-end;
+      margin-top: -0.25rem;
+      opacity: 0;
+      transition: opacity 300ms ease;
+    }
+
+    .mock-timestamp.animate-in { opacity: 1; }
+
+    .mock-typing {
+      align-self: flex-end;
+      display: flex;
+      gap: 4px;
+      padding: 0.75rem 1rem;
+      opacity: 0;
+      transition: opacity 200ms ease;
+    }
+
+    .mock-typing.animate-in { opacity: 1; }
+
+    .mock-typing-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      opacity: 0.4;
+      animation: typingBounce 1.2s ease-in-out infinite;
+    }
+
+    .mock-typing-dot:nth-child(2) { animation-delay: 150ms; }
+    .mock-typing-dot:nth-child(3) { animation-delay: 300ms; }
+
+    @keyframes typingBounce {
+      0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+      30% { transform: translateY(-4px); opacity: 1; }
+    }
+
+    /* =========================================
+       MARQUEE STRIP
+       ========================================= */
+    .marquee-strip {
+      overflow: hidden;
+      padding: 1rem 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+
+    .marquee-track {
+      display: flex;
+      gap: 3rem;
+      animation: marquee 25s linear infinite;
+      width: max-content;
+    }
+
+    .marquee-strip:hover .marquee-track {
+      animation-play-state: paused;
+    }
+
+    @keyframes marquee {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+
+    .marquee-item {
+      font-family: var(--font-display);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--text-tertiary);
+      white-space: nowrap;
+      letter-spacing: 0.02em;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .marquee-dot {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex-shrink: 0;
+    }
+
+    /* =========================================
+       PROBLEM
+       ========================================= */
+    .problem {
+      background: var(--text-primary);
+      color: var(--bg);
+    }
+
+    .problem-inner { max-width: 720px; }
+
+    .problem-headline {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: clamp(1.75rem, 3.5vw, 2.75rem);
+      line-height: 1.15;
+      letter-spacing: -0.03em;
+      text-wrap: balance;
+      margin-bottom: 1.5rem;
+    }
+
+    .problem-text {
+      font-size: 1.0625rem;
+      line-height: 1.65;
+      color: rgba(250, 250, 250, 0.7);
+      max-width: 600px;
+    }
+
+    .problem-stat-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2rem;
+      margin-top: 3.5rem;
+      padding-top: 2.5rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .problem-stat { display: flex; flex-direction: column; }
+
+    .problem-stat-number {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: clamp(2rem, 3vw, 2.75rem);
+      letter-spacing: -0.03em;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: 0.5rem;
+    }
+
+    .problem-stat-label {
+      font-size: 0.875rem;
+      color: rgba(250, 250, 250, 0.55);
+      line-height: 1.4;
+    }
+
+    /* =========================================
+       SOLUTION PILLARS
+       ========================================= */
+    .pillars-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+    }
+
+    .pillar {
+      padding: clamp(2rem, 4vw, 3.5rem);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      transition: background 300ms ease, transform 300ms var(--ease-out);
+      position: relative;
+    }
+
+    .pillar::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--accent);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 400ms var(--ease-out);
+    }
+
+    .pillar:hover::before { transform: scaleX(1); }
+
+    @media (hover: hover) and (pointer: fine) {
+      .pillar:hover { background: var(--bg-subtle); }
+    }
+
+    .pillar:nth-child(odd) { border-right: 1px solid var(--border); }
+    .pillar:nth-child(1), .pillar:nth-child(2) { border-top: 1px solid var(--border); }
+
+    .pillar-number {
+      font-family: var(--font-display);
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--accent);
+      letter-spacing: 0.05em;
+    }
+
+    .pillar-title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: clamp(1.25rem, 2vw, 1.5rem);
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+
+    .pillar-desc {
+      font-size: 0.9375rem;
+      line-height: 1.6;
+      color: var(--text-secondary);
+    }
+
+    .pillars-grid .pillar:nth-child(3) {
+      grid-column: 1 / -1;
+      border-right: none;
+      border-bottom: none;
+      background: var(--accent-subtle);
+    }
+
+    .pillar-standalone .pillar-title {
+      font-size: clamp(1.375rem, 2.5vw, 1.75rem);
+    }
+
+    .pillar-standalone .pillar-desc {
+      max-width: 600px;
+      font-size: 1rem;
+    }
+
+    /* =========================================
+       AFTER HOURS
+       ========================================= */
+    .afterhours { background: var(--bg-subtle); }
+
+    .afterhours-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(2rem, 5vw, 5rem);
+      align-items: center;
+    }
+
+    .afterhours-headline {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: clamp(1.75rem, 3.5vw, 2.75rem);
+      line-height: 1.15;
+      letter-spacing: -0.03em;
+      text-wrap: balance;
+      margin-bottom: 1.25rem;
+    }
+
+    .afterhours-text {
+      font-size: 1.0625rem;
+      line-height: 1.65;
+      color: var(--text-secondary);
+      margin-bottom: 2rem;
+    }
+
+    .timeline {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      position: relative;
+    }
+
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 15px;
+      top: 32px;
+      bottom: 32px;
+      width: 2px;
+      background: var(--border);
+    }
+
+    .timeline-fill {
+      position: absolute;
+      left: 15px;
+      top: 32px;
+      width: 2px;
+      background: var(--accent);
+      height: 0;
+      transition: height 1.5s var(--ease-out);
+    }
+
+    .timeline-fill.animate-in { height: calc(100% - 64px); }
+
+    .timeline-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 1.25rem;
+      padding: 1rem 0;
+    }
+
+    .timeline-dot {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--bg);
+      border: 2px solid var(--border);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      z-index: 1;
+      transition: border-color 400ms ease, box-shadow 400ms ease;
+    }
+
+    .timeline-item.active .timeline-dot {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px rgba(10, 104, 71, 0.1);
+    }
+
+    .timeline-dot-inner {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+      transition: background 400ms ease;
+    }
+
+    .timeline-item.active .timeline-dot-inner {
+      background: var(--accent);
+    }
+
+    .timeline-content { padding-top: 0.25rem; }
+
+    .timeline-time {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 0.8125rem;
+      color: var(--text-tertiary);
+      margin-bottom: 0.125rem;
+      transition: color 400ms ease;
+    }
+
+    .timeline-item.active .timeline-time { color: var(--accent); }
+
+    .timeline-desc {
+      font-size: 0.9375rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    /* =========================================
+       HOW IT WORKS
+       ========================================= */
+    .how-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2.5rem;
+    }
+
+    .how-step {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      position: relative;
+    }
+
+    .how-step:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      top: 1.5rem;
+      right: -1.25rem;
+      width: 2.5rem;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .how-step-num {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      background: var(--accent-subtle);
+      color: var(--accent);
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 200ms ease, color 200ms ease, transform 200ms var(--ease-out);
+    }
+
+    .how-step:hover .how-step-num {
+      background: var(--accent);
+      color: #fff;
+      transform: scale(1.08);
+    }
+
+    .how-step-title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.125rem;
+      letter-spacing: -0.01em;
+    }
+
+    .how-step-desc {
+      font-size: 0.9375rem;
+      line-height: 1.6;
+      color: var(--text-secondary);
+    }
+
+    /* =========================================
+       DEMO PLACEHOLDER
+       ========================================= */
+    .demo { background: var(--bg-subtle); }
+
+    .demo-inner {
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .demo-headline {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: clamp(1.75rem, 3vw, 2.5rem);
+      letter-spacing: -0.03em;
+      text-wrap: balance;
+      margin-bottom: 1rem;
+    }
+
+    .demo-text {
+      font-size: 1.0625rem;
+      line-height: 1.6;
+      color: var(--text-secondary);
+      margin-bottom: 2.5rem;
+    }
+
+    .demo-placeholder {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: var(--bg);
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      color: var(--text-tertiary);
+      transition: border-color 300ms ease, background 300ms ease;
+    }
+
+    .demo-placeholder:hover {
+      border-color: var(--accent);
+      background: var(--accent-subtle);
+    }
+
+    .demo-placeholder-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: var(--accent-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 300ms var(--ease-out), background 300ms ease;
+    }
+
+    .demo-placeholder:hover .demo-placeholder-icon {
+      transform: scale(1.1);
+      background: rgba(10, 104, 71, 0.15);
+    }
+
+    .demo-placeholder-icon svg {
+      width: 24px;
+      height: 24px;
+      color: var(--accent);
+    }
+
+    .demo-placeholder-text {
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    .demo-placeholder-sub {
+      font-size: 0.8125rem;
+      color: var(--text-tertiary);
+      opacity: 0.7;
+    }
+
+    /* =========================================
+       THE FIT
+       ========================================= */
+    .fit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(2rem, 5vw, 5rem);
+      align-items: center;
+    }
+
+    .fit-headline {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: clamp(1.75rem, 3.5vw, 2.75rem);
+      line-height: 1.15;
+      letter-spacing: -0.03em;
+      text-wrap: balance;
+      margin-bottom: 1.25rem;
+    }
+
+    .fit-text {
+      font-size: 1.0625rem;
+      line-height: 1.65;
+      color: var(--text-secondary);
+      margin-bottom: 2rem;
+    }
+
+    .fit-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .fit-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      font-size: 0.9375rem;
+      line-height: 1.5;
+      color: var(--text-secondary);
+    }
+
+    .fit-list li svg {
+      flex-shrink: 0;
+      margin-top: 0.125rem;
+      color: var(--accent);
+    }
+
+    .fit-right {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2.5rem;
+      transition: box-shadow 300ms ease;
+    }
+
+    .fit-right:hover {
+      box-shadow: 0 8px 30px rgba(0,0,0,0.04);
+    }
+
+    .fit-right-title {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 0.875rem;
+      color: var(--text-tertiary);
+      margin-bottom: 1.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .fit-integrations {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+
+    .fit-integration-tag {
+      font-size: 0.8125rem;
+      font-weight: 500;
+      padding: 0.5rem 1rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      transition: border-color 200ms ease, color 200ms ease, transform 200ms var(--ease-out), box-shadow 200ms ease;
+    }
+
+    .fit-integration-tag:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(10, 104, 71, 0.1);
+    }
+
+    /* =========================================
+       TRUST STRIP
+       ========================================= */
+    .trust {
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 2rem 0;
+    }
+
+    .trust-inner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: clamp(2rem, 5vw, 4rem);
+      flex-wrap: wrap;
+    }
+
+    .trust-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .trust-item svg {
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+
+    /* =========================================
+       CTA / CONTACT
+       ========================================= */
+    .cta-section {
+      background: var(--text-primary);
+      color: var(--bg);
+    }
+
+    .cta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(2rem, 5vw, 5rem);
+      align-items: center;
+    }
+
+    .cta-headline {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: clamp(1.75rem, 3.5vw, 2.75rem);
+      line-height: 1.15;
+      letter-spacing: -0.03em;
+      text-wrap: balance;
+      margin-bottom: 1.25rem;
+    }
+
+    .cta-text {
+      font-size: 1.0625rem;
+      line-height: 1.65;
+      color: rgba(250, 250, 250, 0.65);
+    }
+
+    .cta-form {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.375rem;
+    }
+
+    .form-label {
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: rgba(250, 250, 250, 0.7);
+    }
+
+    .form-input {
+      font-family: var(--font-body);
+      font-size: 0.9375rem;
+      padding: 0.75rem 1rem;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      color: #fff;
+      transition: border-color 200ms ease, background 200ms ease, box-shadow 200ms ease;
+      outline: none;
+    }
+
+    .form-input::placeholder { color: rgba(255, 255, 255, 0.3); }
+    .form-input:focus {
+      border-color: var(--accent);
+      background: rgba(255, 255, 255, 0.12);
+      box-shadow: 0 0 0 3px rgba(10, 104, 71, 0.2);
+    }
+
+    .form-submit {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 0.9375rem;
+      color: var(--text-primary);
+      background: #fff;
+      padding: 0.875rem 2rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 200ms ease, transform 160ms ease-out, box-shadow 200ms ease;
+      margin-top: 0.5rem;
+    }
+
+    .form-submit:hover {
+      background: #f0f0f0;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+    }
+
+    .form-submit:active { transform: scale(0.97); }
+
+    /* =========================================
+       FOOTER
+       ========================================= */
+    .footer {
+      padding: 3rem 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .footer-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .footer-logo {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1rem;
+      letter-spacing: -0.02em;
+    }
+
+    .footer-logo span { color: var(--accent); }
+
+    .footer-text {
+      font-size: 0.8125rem;
+      color: var(--text-tertiary);
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 1.5rem;
+      list-style: none;
+    }
+
+    .footer-links a {
+      font-size: 0.8125rem;
+      color: var(--text-tertiary);
+      transition: color 200ms ease;
+    }
+
+    .footer-links a:hover { color: var(--text-primary); }
+
+    /* =========================================
+       REVEAL ANIMATION
+       ========================================= */
+    .reveal {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 800ms var(--ease-strong), transform 800ms var(--ease-strong);
+    }
+
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .reveal-delay-1 { transition-delay: 100ms; }
+    .reveal-delay-2 { transition-delay: 200ms; }
+    .reveal-delay-3 { transition-delay: 300ms; }
+
+    /* Clip-path reveal variant */
+    .reveal-clip {
+      clip-path: inset(0 0 100% 0);
+      transition: clip-path 900ms var(--ease-strong);
+    }
+
+    .reveal-clip.visible {
+      clip-path: inset(0 0 0 0);
+    }
+
+    /* Scale-in variant */
+    .reveal-scale {
+      opacity: 0;
+      transform: scale(0.92);
+      transition: opacity 700ms var(--ease-strong), transform 700ms var(--ease-strong);
+    }
+
+    .reveal-scale.visible {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    /* Stagger children */
+    .stagger-children > * {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 500ms var(--ease-strong), transform 500ms var(--ease-strong);
+    }
+
+    .stagger-children.visible > *:nth-child(1) { transition-delay: 0ms; opacity: 1; transform: translateY(0); }
+    .stagger-children.visible > *:nth-child(2) { transition-delay: 80ms; opacity: 1; transform: translateY(0); }
+    .stagger-children.visible > *:nth-child(3) { transition-delay: 160ms; opacity: 1; transform: translateY(0); }
+    .stagger-children.visible > *:nth-child(4) { transition-delay: 240ms; opacity: 1; transform: translateY(0); }
+    .stagger-children.visible > *:nth-child(5) { transition-delay: 320ms; opacity: 1; transform: translateY(0); }
+    .stagger-children.visible > *:nth-child(6) { transition-delay: 400ms; opacity: 1; transform: translateY(0); }
+    .stagger-children.visible > *:nth-child(7) { transition-delay: 480ms; opacity: 1; transform: translateY(0); }
+    .stagger-children.visible > *:nth-child(8) { transition-delay: 560ms; opacity: 1; transform: translateY(0); }
+    .stagger-children.visible > *:nth-child(9) { transition-delay: 640ms; opacity: 1; transform: translateY(0); }
+    .stagger-children.visible > *:nth-child(10) { transition-delay: 720ms; opacity: 1; transform: translateY(0); }
+
+    @media (prefers-reduced-motion: reduce) {
+      .reveal, .reveal-clip, .reveal-scale, .stagger-children > * {
+        opacity: 1 !important;
+        transform: none !important;
+        clip-path: none !important;
+        transition: none !important;
+      }
+      .mock-dot { animation: none; }
+      .mock-typing-dot { animation: none; }
+      .marquee-track { animation: none; }
+      .timeline-fill { transition: none; }
+    }
+
+    /* =========================================
+       RESPONSIVE
+       ========================================= */
+    @media (max-width: 1024px) {
+      .hero-grid { grid-template-columns: 1fr; gap: 3rem; }
+      .hero-visual { order: -1; }
+      .hero-content { max-width: 100%; }
+      .hero-visual-mock { transform: none; }
+      .hero-visual:hover .hero-visual-mock { transform: none; }
+      .afterhours-grid { grid-template-columns: 1fr; gap: 3rem; }
+      .fit-grid { grid-template-columns: 1fr; gap: 2.5rem; }
+      .cta-grid { grid-template-columns: 1fr; gap: 3rem; }
+      .how-step:not(:last-child)::after { display: none; }
+    }
+
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .nav-hamburger { display: flex; }
+      .hero { min-height: auto; padding-top: calc(64px + 3rem); padding-bottom: 4rem; }
+      .hero-headline { font-size: 2.25rem; }
+      .problem-stat-row { grid-template-columns: 1fr; gap: 1.5rem; }
+      .pillars-grid { grid-template-columns: 1fr; }
+      .pillar:nth-child(odd) { border-right: none; }
+      .pillars-grid .pillar:nth-child(3) { grid-column: auto; }
+      .how-grid { grid-template-columns: 1fr; gap: 2rem; }
+      .form-row { grid-template-columns: 1fr; }
+      .hero-actions { flex-direction: column; align-items: flex-start; }
+      .trust-inner { justify-content: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAVIGATION -->
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <div class="nav-inner">
+      <a href="#" class="nav-logo">Outpost<span>.</span></a>
+      <ul class="nav-links">
+        <li><a href="#how">How It Works</a></li>
+        <li><a href="#demo">Demo</a></li>
+        <li><a href="#fit">The Fit</a></li>
+        <li><a href="#contact" class="nav-cta">Get Started</a></li>
+      </ul>
+      <button class="nav-hamburger" aria-label="Menu" aria-expanded="false">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero section">
+    <div class="container">
+      <div class="hero-grid">
+        <div class="hero-content">
+          <h1 class="hero-headline">
+            <span class="word"><span class="word-inner">Every</span></span>
+            <span class="word"><span class="word-inner">lead</span></span>
+            <span class="word"><span class="word-inner">answered.</span></span><br>
+            <span class="word"><span class="word-inner accent">Every</span></span>
+            <span class="word"><span class="word-inner accent">time.</span></span>
+            <span class="word"><span class="word-inner accent">In</span></span>
+            <span class="word"><span class="word-inner accent">seconds.</span></span>
+          </h1>
+          <p class="hero-sub reveal">
+            Outpost is the always-on response engine for independent dealerships. No customer inquiry goes unanswered, no matter when it comes in.
+          </p>
+          <div class="hero-actions reveal reveal-delay-1">
+            <a href="#contact" class="btn-primary">Get started</a>
+            <a href="#demo" class="btn-secondary">See it in action</a>
+          </div>
+        </div>
+        <div class="hero-visual">
+          <div class="hero-visual-mock reveal-scale">
+            <div class="mock-header">
+              <div class="mock-dot"></div>
+              <span class="mock-header-text">Live conversation</span>
+            </div>
+            <div class="mock-body" id="mockBody">
+              <div class="mock-bubble mock-bubble-incoming" data-delay="800">
+                Hi, I saw the 2021 Honda CR-V on your website. Is it still available? I'd love to come see it this weekend.
+              </div>
+              <span class="mock-timestamp" data-delay="1600">11:47 PM</span>
+              <div class="mock-bubble mock-bubble-reply" data-delay="2200">
+                Hi there! Yes, the 2021 CR-V in Modern Steel is still on the lot. Great choice. Would Saturday or Sunday work better for a test drive?
+              </div>
+              <div class="mock-bubble mock-bubble-incoming" data-delay="3200">
+                Saturday morning would be perfect.
+              </div>
+              <div class="mock-bubble mock-bubble-reply" data-delay="4000">
+                Done. I've reserved 10 AM Saturday for you. We're at 4217 Main Street. See you then!
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MARQUEE STRIP -->
+  <div class="marquee-strip" aria-hidden="true">
+    <div class="marquee-track">
+      <span class="marquee-item"><span class="marquee-dot"></span>Website Forms</span>
+      <span class="marquee-item"><span class="marquee-dot"></span>AutoTrader</span>
+      <span class="marquee-item"><span class="marquee-dot"></span>Cars.com</span>
+      <span class="marquee-item"><span class="marquee-dot"></span>Facebook Messenger</span>
+      <span class="marquee-item"><span class="marquee-dot"></span>SMS / Text</span>
+      <span class="marquee-item"><span class="marquee-dot"></span>Phone Calls</span>
+      <span class="marquee-item"><span class="marquee-dot"></span>Google Sheets</span>
+      <span class="marquee-item"><span class="marquee-dot"></span>HubSpot</span>
+      <span class="marquee-item"><span class="marquee-dot"></span>WhatsApp</span>
+      <!-- Duplicate for seamless loop -->
+      <span class="marquee-item"><span class="marquee-dot"></span>Website Forms</span>
+      <span class="marquee-item"><span class="marquee-dot"></span>AutoTrader</span>
+      <span class="marquee-item"><span class="marquee-dot"></span>Cars.com</span>
+      <span class="marquee-item"><span class="marquee-dot"></span>Facebook Messenger</span>
+      <span class="marquee-item"><span class="marquee-dot"></span>SMS / Text</span>
+      <span class="marquee-item"><span class="marquee-dot"></span>Phone Calls</span>
+      <span class="marquee-item"><span class="marquee-dot"></span>Google Sheets</span>
+      <span class="marquee-item"><span class="marquee-dot"></span>HubSpot</span>
+      <span class="marquee-item"><span class="marquee-dot"></span>WhatsApp</span>
+    </div>
+  </div>
+
+  <!-- PROBLEM -->
+  <section class="problem section">
+    <div class="container">
+      <div class="problem-inner">
+        <h2 class="problem-headline reveal">
+          They messaged three dealers.<br>Two replied the next day.
+        </h2>
+        <p class="problem-text reveal reveal-delay-1">
+          Car shoppers send inquiries to multiple dealerships at once. Whoever responds first, in a helpful and friendly way, gets the visit and the sale. The others get nothing. Not because of price. Because of timing.
+        </p>
+        <div class="problem-stat-row">
+          <div class="problem-stat reveal">
+            <span class="problem-stat-number" data-count="78" data-suffix="%">0%</span>
+            <span class="problem-stat-label">of customers buy from the dealer that responds first</span>
+          </div>
+          <div class="problem-stat reveal reveal-delay-1">
+            <span class="problem-stat-number" data-count="5" data-suffix=" min">0 min</span>
+            <span class="problem-stat-label">response window before lead quality drops sharply</span>
+          </div>
+          <div class="problem-stat reveal reveal-delay-2">
+            <span class="problem-stat-number" data-count="55" data-suffix="%">0%</span>
+            <span class="problem-stat-label">of leads come in outside business hours</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SOLUTION PILLARS -->
+  <section class="pillars section">
+    <div class="container">
+      <div class="pillars-grid">
+        <div class="pillar reveal">
+          <span class="pillar-number">Respond</span>
+          <h3 class="pillar-title">Instant response, 24/7</h3>
+          <p class="pillar-desc">
+            Every inquiry gets a warm, helpful reply within seconds. Weekends, holidays, 2 AM on a Tuesday. Your customers never wait.
+          </p>
+        </div>
+        <div class="pillar reveal reveal-delay-1">
+          <span class="pillar-number">Ground</span>
+          <h3 class="pillar-title">Knows your real inventory</h3>
+          <p class="pillar-desc">
+            Outpost talks about cars you actually have, at prices you actually charge. Grounded in your live inventory. Never makes things up.
+          </p>
+        </div>
+        <div class="pillar pillar-standalone reveal">
+          <span class="pillar-number">Book</span>
+          <h3 class="pillar-title">Qualifies and books the visit</h3>
+          <p class="pillar-desc">
+            Answers common questions, figures out what the customer needs, and steers the conversation toward the real goal: getting them on the lot. Your team gets warm handoffs with full context, not cold lead forms.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AFTER HOURS -->
+  <section class="afterhours section">
+    <div class="container">
+      <div class="afterhours-grid">
+        <div>
+          <h2 class="afterhours-headline reveal">
+            Saturday at midnight.<br>Your competitor's inbox is empty.
+          </h2>
+          <p class="afterhours-text reveal reveal-delay-1">
+            During business hours, your team handles leads with Outpost drafting replies for quick approval. After hours, Outpost takes over completely, engaging, qualifying, and booking. Then leaves a summary for the morning.
+          </p>
+          <a href="#contact" class="btn-primary reveal reveal-delay-2">Never miss a lead</a>
+        </div>
+        <div class="timeline reveal-clip" id="timeline">
+          <div class="timeline-fill" id="timelineFill"></div>
+          <div class="timeline-item" data-delay="0">
+            <div class="timeline-dot"><div class="timeline-dot-inner"></div></div>
+            <div class="timeline-content">
+              <div class="timeline-time">11:00 PM</div>
+              <div class="timeline-desc">Customer texts about a vehicle they saw online</div>
+            </div>
+          </div>
+          <div class="timeline-item" data-delay="300">
+            <div class="timeline-dot"><div class="timeline-dot-inner"></div></div>
+            <div class="timeline-content">
+              <div class="timeline-time">11:00 PM</div>
+              <div class="timeline-desc">Outpost replies instantly with vehicle details and availability</div>
+            </div>
+          </div>
+          <div class="timeline-item" data-delay="600">
+            <div class="timeline-dot"><div class="timeline-dot-inner"></div></div>
+            <div class="timeline-content">
+              <div class="timeline-time">11:05 PM</div>
+              <div class="timeline-desc">Customer questions answered, test drive booked for Saturday</div>
+            </div>
+          </div>
+          <div class="timeline-item" data-delay="900">
+            <div class="timeline-dot"><div class="timeline-dot-inner"></div></div>
+            <div class="timeline-content">
+              <div class="timeline-time">9:00 AM</div>
+              <div class="timeline-desc">Full conversation summary waiting for your sales team</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="how section" id="how">
+    <div class="container">
+      <h2 class="reveal" style="font-family: var(--font-display); font-weight: 700; font-size: clamp(1.75rem, 3.5vw, 2.75rem); letter-spacing: -0.03em; text-wrap: balance; margin-bottom: 3rem;">
+        Up and running in an afternoon
+      </h2>
+      <div class="how-grid stagger-children">
+        <div class="how-step">
+          <div class="how-step-num">1</div>
+          <h3 class="how-step-title">Connect your sources</h3>
+          <p class="how-step-desc">
+            Website forms, Cars.com, AutoTrader, Facebook, phone. We plug into wherever your leads already come from.
+          </p>
+        </div>
+        <div class="how-step">
+          <div class="how-step-num">2</div>
+          <h3 class="how-step-title">Outpost learns your world</h3>
+          <p class="how-step-desc">
+            Your inventory, your hours, your sales team, your tone of voice. Everything it needs to represent you.
+          </p>
+        </div>
+        <div class="how-step">
+          <div class="how-step-num">3</div>
+          <h3 class="how-step-title">Leads flow in, responses flow out</h3>
+          <p class="how-step-desc">
+            Your team gets notified on WhatsApp, claims leads, and closes deals. No new software to learn.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DEMO PLACEHOLDER -->
+  <section class="demo section" id="demo">
+    <div class="container">
+      <div class="demo-inner">
+        <h2 class="demo-headline reveal">See it in action</h2>
+        <p class="demo-text reveal reveal-delay-1">
+          Watch how a real lead gets answered, qualified, and booked. From first message to confirmed appointment, in under two minutes.
+        </p>
+        <div class="demo-placeholder reveal-scale" id="demoPlaceholder">
+          <div class="demo-placeholder-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347c-.75.412-1.667-.13-1.667-.986V5.653Z" />
+            </svg>
+          </div>
+          <span class="demo-placeholder-text">Interactive demo coming soon</span>
+          <span class="demo-placeholder-sub">We're building a live walkthrough for you</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- THE FIT -->
+  <section class="fit section" id="fit">
+    <div class="container">
+      <div class="fit-grid">
+        <div>
+          <h2 class="fit-headline reveal">
+            Works with how you already work
+          </h2>
+          <p class="fit-text reveal reveal-delay-1">
+            No new software to learn. No system to replace. Outpost plugs into your existing tools and setup, whether that's a full CRM, a spreadsheet, or nothing at all.
+          </p>
+          <ul class="fit-list stagger-children">
+            <li>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg>
+              Plugs into your website, listing sites, and social channels
+            </li>
+            <li>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg>
+              Syncs with your existing CRM or works as a standalone
+            </li>
+            <li>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg>
+              Pulls inventory from your website, DMS, or a spreadsheet
+            </li>
+            <li>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg>
+              Setup is filling out your details once
+            </li>
+          </ul>
+        </div>
+        <div class="fit-right reveal">
+          <div class="fit-right-title">Works with your tools</div>
+          <div class="fit-integrations stagger-children">
+            <span class="fit-integration-tag">Website Forms</span>
+            <span class="fit-integration-tag">AutoTrader</span>
+            <span class="fit-integration-tag">Cars.com</span>
+            <span class="fit-integration-tag">Facebook</span>
+            <span class="fit-integration-tag">Google Sheets</span>
+            <span class="fit-integration-tag">WhatsApp</span>
+            <span class="fit-integration-tag">SMS</span>
+            <span class="fit-integration-tag">Phone</span>
+            <span class="fit-integration-tag">HubSpot</span>
+            <span class="fit-integration-tag">Your CRM</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRUST STRIP -->
+  <section class="trust">
+    <div class="container">
+      <div class="trust-inner stagger-children">
+        <div class="trust-item">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z"/></svg>
+          CASL compliant
+        </div>
+        <div class="trust-item">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z"/></svg>
+          PIPA compliant
+        </div>
+        <div class="trust-item">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+          Always-on uptime
+        </div>
+        <div class="trust-item">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0"/></svg>
+          Human handoff built in
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA / CONTACT -->
+  <section class="cta-section section" id="contact">
+    <div class="container">
+      <div class="cta-grid">
+        <div>
+          <h2 class="cta-headline reveal">
+            Ready to stop losing leads?
+          </h2>
+          <p class="cta-text reveal reveal-delay-1">
+            Tell us about your dealership. We'll show you how Outpost fits into your operation, usually in under 30 minutes.
+          </p>
+        </div>
+        <form class="cta-form reveal-scale" onsubmit="event.preventDefault()">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="name">Name</label>
+              <input class="form-input" type="text" id="name" placeholder="Your name" autocomplete="name">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="dealership">Dealership</label>
+              <input class="form-input" type="text" id="dealership" placeholder="Dealership name" autocomplete="organization">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="phone">Phone</label>
+              <input class="form-input" type="tel" id="phone" placeholder="(555) 000-0000" autocomplete="tel">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="email">Email</label>
+              <input class="form-input" type="email" id="email" placeholder="you@dealership.com" autocomplete="email">
+            </div>
+          </div>
+          <button type="submit" class="form-submit">Book a walkthrough</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-inner">
+        <span class="footer-logo">Outpost<span>.</span></span>
+        <span class="footer-text">The always-on response engine for independent dealerships.</span>
+        <ul class="footer-links">
+          <li><a href="#how">How It Works</a></li>
+          <li><a href="#demo">Demo</a></li>
+          <li><a href="#contact">Contact</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    (function() {
+      'use strict';
+
+      var prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      // ========================================
+      // NAV SCROLL SHADOW
+      // ========================================
+      var nav = document.querySelector('.nav');
+      var lastScroll = 0;
+
+      if (!prefersReducedMotion) {
+        window.addEventListener('scroll', function() {
+          var scrollY = window.scrollY;
+          if (scrollY > 20) {
+            nav.classList.add('scrolled');
+          } else {
+            nav.classList.remove('scrolled');
+          }
+          lastScroll = scrollY;
+        }, { passive: true });
+      }
+
+      // ========================================
+      // HERO TEXT REVEAL (word-by-word)
+      // ========================================
+      function initHeroReveal() {
+        document.documentElement.classList.add('loaded');
+      }
+
+      if (prefersReducedMotion) {
+        document.documentElement.classList.add('loaded');
+      } else {
+        // Small delay for page load
+        setTimeout(initHeroReveal, 200);
+      }
+
+      // ========================================
+      // CONVERSATION MOCK ANIMATION
+      // ========================================
+      function animateConversation() {
+        var bubbles = document.querySelectorAll('.mock-bubble');
+        var timestamps = document.querySelectorAll('.mock-timestamp');
+
+        if (prefersReducedMotion) {
+          bubbles.forEach(function(b) { b.classList.add('animate-in'); });
+          timestamps.forEach(function(t) { t.classList.add('animate-in'); });
+          return;
+        }
+
+        var allElements = [];
+        bubbles.forEach(function(b) {
+          allElements.push({ el: b, delay: parseInt(b.getAttribute('data-delay') || '0') });
+        });
+        timestamps.forEach(function(t) {
+          allElements.push({ el: t, delay: parseInt(t.getAttribute('data-delay') || '0') });
+        });
+
+        allElements.sort(function(a, b) { return a.delay - b.delay; });
+
+        allElements.forEach(function(item) {
+          setTimeout(function() {
+            item.el.classList.add('animate-in');
+          }, item.delay + 600); // 600ms after page load
+        });
+      }
+
+      setTimeout(animateConversation, 400);
+
+      // ========================================
+      // SCROLL REVEAL (IntersectionObserver)
+      // ========================================
+      function createRevealObserver() {
+        var reveals = document.querySelectorAll('.reveal, .reveal-clip, .reveal-scale, .stagger-children');
+        var observer = new IntersectionObserver(function(entries) {
+          entries.forEach(function(entry) {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('visible');
+              observer.unobserve(entry.target);
+            }
+          });
+        }, {
+          threshold: 0.15,
+          rootMargin: '0px 0px -60px 0px'
+        });
+
+        reveals.forEach(function(el) {
+          observer.observe(el);
+        });
+      }
+
+      if (prefersReducedMotion) {
+        document.querySelectorAll('.reveal, .reveal-clip, .reveal-scale, .stagger-children').forEach(function(el) {
+          el.classList.add('visible');
+        });
+      } else {
+        createRevealObserver();
+      }
+
+      // ========================================
+      // COUNTER ANIMATION
+      // ========================================
+      function animateCounter(el) {
+        var target = parseInt(el.getAttribute('data-count'));
+        var suffix = el.getAttribute('data-suffix') || '';
+        var duration = 1200;
+        var start = 0;
+        var startTime = null;
+
+        function step(timestamp) {
+          if (!startTime) startTime = timestamp;
+          var progress = Math.min((timestamp - startTime) / duration, 1);
+          // ease-out cubic
+          var eased = 1 - Math.pow(1 - progress, 3);
+          var current = Math.round(start + (target - start) * eased);
+          el.textContent = current + suffix;
+          if (progress < 1) {
+            requestAnimationFrame(step);
+          }
+        }
+
+        if (prefersReducedMotion) {
+          el.textContent = target + suffix;
+        } else {
+          requestAnimationFrame(step);
+        }
+      }
+
+      var counters = document.querySelectorAll('[data-count]');
+      var counterObserver = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+          if (entry.isIntersecting) {
+            animateCounter(entry.target);
+            counterObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.5 });
+
+      counters.forEach(function(el) {
+        counterObserver.observe(el);
+      });
+
+      // ========================================
+      // TIMELINE ANIMATION
+      // ========================================
+      var timeline = document.getElementById('timeline');
+      var timelineFill = document.getElementById('timelineFill');
+
+      if (timeline && timelineFill) {
+        var timelineObserver = new IntersectionObserver(function(entries) {
+          entries.forEach(function(entry) {
+            if (entry.isIntersecting) {
+              timelineFill.classList.add('animate-in');
+
+              var items = timeline.querySelectorAll('.timeline-item');
+              items.forEach(function(item) {
+                var delay = parseInt(item.getAttribute('data-delay') || '0');
+                if (prefersReducedMotion) {
+                  item.classList.add('active');
+                } else {
+                  setTimeout(function() {
+                    item.classList.add('active');
+                  }, delay + 300);
+                }
+              });
+
+              timelineObserver.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.3 });
+
+        timelineObserver.observe(timeline);
+      }
+
+      // ========================================
+      // SMOOTH SCROLL
+      // ========================================
+      document.querySelectorAll('a[href^="#"]').forEach(function(link) {
+        link.addEventListener('click', function(e) {
+          var target = document.querySelector(this.getAttribute('href'));
+          if (target) {
+            e.preventDefault();
+            target.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' });
+          }
+        });
+      });
+
+      // ========================================
+      // HAMBURGER MENU
+      // ========================================
+      var hamburger = document.querySelector('.nav-hamburger');
+      if (hamburger) {
+        hamburger.addEventListener('click', function() {
+          var expanded = this.getAttribute('aria-expanded') === 'true';
+          this.setAttribute('aria-expanded', !expanded);
+        });
+      }
+
+      // ========================================
+      // MAGNETIC BUTTON EFFECT (CTA buttons)
+      // ========================================
+      if (!prefersReducedMotion && window.matchMedia('(hover: hover)').matches) {
+        var magneticBtns = document.querySelectorAll('.btn-primary, .nav-cta');
+        magneticBtns.forEach(function(btn) {
+          btn.addEventListener('mousemove', function(e) {
+            var rect = this.getBoundingClientRect();
+            var x = e.clientX - rect.left - rect.width / 2;
+            var y = e.clientY - rect.top - rect.height / 2;
+            this.style.transform = 'translate(' + (x * 0.15) + 'px, ' + (y * 0.15) + 'px)';
+          });
+
+          btn.addEventListener('mouseleave', function() {
+            this.style.transform = 'translate(0, 0)';
+          });
+        });
+      }
+    })();
+  </script>
+
+</body>
+</html>

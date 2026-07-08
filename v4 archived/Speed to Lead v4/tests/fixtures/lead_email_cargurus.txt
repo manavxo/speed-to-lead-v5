@@ -1,0 +1,23 @@
+From: leads@cargurus.com
+To: leads+sunrise@yourdomain.com
+Subject: New Lead: 2018 Ford Mustang GT - Stock SA1002
+
+You have a new lead from CarGurus.
+
+Customer Name: Marcus Bell
+Phone: 778-555-9087
+Email: marcus.bell@example.com
+
+Vehicle of Interest:
+  2018 Ford Mustang GT
+  Stock #: SA1002
+  VIN: 1FATP8UH1J5500002
+  Price: $29,950
+
+Customer Message:
+  "Hi, is financing available on the Mustang? What's your best out-the-door price?"
+
+Lead submitted: Jun 4, 2026 5:51 PM PT
+--
+Fixture for the email_lead intake adapter / tools/parse_lead_email.py (known CarGurus template).
+Expected: name='Marcus Bell', phone='+17785559087', vehicle_ref='SA1002', provider='cargurus'.

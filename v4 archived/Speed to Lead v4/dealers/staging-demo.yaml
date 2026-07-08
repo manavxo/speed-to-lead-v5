@@ -1,0 +1,72 @@
+﻿dealer:
+  slug: staging-demo
+  name: Staging Demo Motors
+  timezone: America/Vancouver
+  hours:
+    # TESTING ONLY — 24h hours for testing business-hours and after-hours behavior
+    # Remove this file before deploying to production
+    mon: "00:00-23:59"   # 24h on Monday for "always business hours" testing
+    tue: "09:00-12:00"   # Only 3h on Tuesday for "after hours by 12:01" testing
+    wed: "00:00-23:59"
+    thu: "09:00-12:00"
+    fri: "00:00-23:59"
+    sat: "09:00-12:00"
+    sun: closed
+  main_phone: "+177****3122"
+
+channels:
+  sms_number: "+177****3122"
+  whatsapp_sender: "+14155238886"      # STAGING_WHATSAPP_SENDER (Twilio WhatsApp SANDBOX)
+  web_form_token: staging-demo-token
+  lead_email_inbox: leads@staging-demo.example.com
+
+sales_team:
+  # Reps = the user's friends (Manav + Friend) so we can test claim/passing/escalation
+  - name: Manav
+    phone: "+16048392870"           # CUSTOMER_TEST_PHONE reused for Manav
+    active: true
+  - name: Friend
+    phone: "+17787694366"           # MANAGER_PHONE reused for Friend
+    active: true
+
+routing:
+  strategy: round_robin
+  claim_timeout_min: 2                  # Short so escalation is fast to observe
+  escalation:
+    - reassign
+    - notify_manager
+  manager_phone: "+17787694366"        # MANAGER_PHONE = Friend's number
+
+ai:
+  persona: "friendly, concise, no-pressure local sales rep at a BC dealership"
+  goal: "book_appointment"
+  guardrails:
+    no_price_negotiation: true
+    no_financing_promises: true
+
+followups:
+  cadence_min: [60, 1440, 4320, 10080]
+
+inventory:
+  source: manual                        # Manual upload = the universal floor
+  url: "file://./demo/inventory.csv"
+  refresh_min: 180
+  field_map: auto
+
+lead_org:
+  # ORG_SINK_WEBHOOK â€” fill in from https://webhook.site if you have a URL,
+  # otherwise leave target blank and the dashboard ("native") will be the system of record.
+  mode: webhook
+  target: ""                            # SET ME: paste your https://webhook.site URL here
+  credentials_ref: ORG_SINK_WEBHOOK     # Name of the secret in .env / Render vault
+
+compliance:
+  region: CA-BC
+  consent_text: "By submitting you agree to receive texts from Staging Demo Motors. Reply STOP to opt out."
+  opt_out_keywords:
+    - STOP
+    - STOPALL
+    - UNSUBSCRIBE
+    - ARRET
+  quiet_hours: "23:00-03:00"           # No outbound sends in this window (dealer tz)
+

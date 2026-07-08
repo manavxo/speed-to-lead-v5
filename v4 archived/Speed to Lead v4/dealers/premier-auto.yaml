@@ -1,0 +1,64 @@
+# Premier Auto Group — production dealer config
+# This is the canonical config file. The DB Dealer row's config column should match.
+
+dealer:
+  slug: premier-auto
+  name: "Premier Auto Group"
+  timezone: America/Vancouver
+  hours:
+    mon: "09:00-19:00"
+    tue: "09:00-19:00"
+    wed: "09:00-19:00"
+    thu: "09:00-19:00"
+    fri: "09:00-19:00"
+    sat: "10:00-17:00"
+    sun: "closed"
+  location_address: "4217 Main Street, Vancouver, BC V5V 3R1"
+  maps_url: "https://maps.google.com/?q=4217+Main+Street+Vancouver+BC"
+  main_phone: "+17787623122"
+
+channels:
+  sms_number: "+17787623122"
+  whatsapp_sender: ""
+  web_form_token: "premier-auto-token"
+  lead_email_inbox: ""
+
+sales_team:
+  - { name: "Ravi",   phone: "+17787624366", active: true }
+  - { name: "Ramesh", phone: "+16048398418", active: true }
+
+routing:
+  strategy: round_robin
+  claim_timeout_min: 5
+  escalation: [reassign, notify_manager]
+  manager_phone: "+16048392870"
+  digest_enabled: true
+  digest_time: "08:00"
+
+ai:
+  persona: "friendly, knowledgeable, no-pressure sales rep at a trusted Vancouver used car dealership"
+  goal: book_appointment
+  engagement_mode: "full_auto"  # full_auto | qualify_only | greeting_only
+  guardrails:
+    no_price_negotiation: true
+    no_financing_promises: true
+
+followups:
+  cadence_min: [60, 1440, 4320, 10080]
+
+inventory:
+  source: manual
+  url: ""
+  refresh_min: 180
+  field_map: auto
+
+lead_org:
+  mode: native
+  target: ""
+  credentials_ref: ""
+
+compliance:
+  region: CA-BC
+  consent_text: "By submitting you agree to receive texts from Premier Auto Group. Reply STOP to opt out."
+  opt_out_keywords: [STOP, STOPALL, UNSUBSCRIBE, ARRET]
+  quiet_hours: "21:00-08:00"

@@ -14,7 +14,7 @@ Verify that the core speed-to-lead pipeline works correctly — when a real cust
 ### 1. Auth & Config Health
 ```bash
 cd /c/Speed\ to\ Lead\ v5
-RENDER_API_KEY=***REMOVED-RENDER-API-KEY*** python skills/fix_twilio_sms_auth.py
+RENDER_API_KEY=${RENDER_API_KEY} python skills/fix_twilio_sms_auth.py
 ```
 Expected: Local pair 200, Render pair 200, Render PHONE_NUMBER = +17787623122
 
@@ -44,8 +44,8 @@ Expected: `{"status":"ok","lead_id":<N>,"state":"ENGAGED","dealer":"premier-auto
 
 ### 4. Check Twilio Logs for SMS Delivery
 ```bash
-curl -s -u "AC9c402b4729de1e43469b7d21f3eeb58a:***REMOVED-TWILIO-AUTH-TOKEN***" \
-  "https://api.twilio.com/2010-04-01/Accounts/AC9c402b4729de1e43469b7d21f3eeb58a/Messages.json?PageSize=5" \
+curl -s -u "${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}" \
+  "https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json?PageSize=5" \
   | python -c "import sys,json; data=json.load(sys.stdin); [print(f'From: {m[\"from\"]}  To: {m[\"to\"]}  Status: {m[\"status\"]}  Body: {m.get(\"body\",\"\")[:80]}') for m in data.get('messages',[])]"
 ```
 Expected: Two SMS messages from `+17787623122` to the test number, both with status `delivered` or `sent`. The messages must NOT have a `whatsapp:` prefix.

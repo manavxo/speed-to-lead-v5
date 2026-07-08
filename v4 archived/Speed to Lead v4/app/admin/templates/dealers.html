@@ -1,0 +1,153 @@
+{% extends 'base_admin.html' %}
+
+{% block title %}Dealers — Admin — Speed to Lead{% endblock %}
+{% block page_title %}Dealer Management{% endblock %}
+
+{% block top_actions %}
+<a href="/admin/onboarding" class="btn btn-primary">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+    </svg>
+    Add New Dealer
+</a>
+<a href="/admin/dealers/export-all" class="btn btn-secondary">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
+    </svg>
+    Export All YAML
+</a>
+{% endblock %}
+
+{% block content %}
+<!-- Stats Row -->
+<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;" class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">Total Dealers</div>
+        <div class="stat-value">{{ total_clients }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Active</div>
+        <div class="stat-value" style="color: var(--success);">{{ active_clients }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Total Leads</div>
+        <div class="stat-value">{{ total_leads }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Pending Setup</div>
+        <div class="stat-value" style="color: var(--warning);">{{ pending_clients }}</div>
+    </div>
+</div>
+
+<!-- Dealer Table -->
+<div class="card">
+    <div class="card-header">
+        <span class="card-title">All Dealers</span>
+        <span style="font-size: 12px; color: var(--text-muted);">{{ clients|length }} dealer{{ 's' if clients|length != 1 }}</span>
+    </div>
+    {% if clients %}
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Dealer</th>
+                    <th>Slug</th>
+                    <th>Status</th>
+                    <th>Leads</th>
+                    <th>Channels</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in clients %}
+                <tr onclick="window.location.href='/admin/dealers/{{ item.slug }}'" style="cursor: pointer;">
+                    <td data-label="Dealer">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="width: 32px; height: 32px; border-radius: 6px; background: var(--accent-subtle); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; color: var(--accent);">
+                                {{ item.name[0]|upper if item.name else '?' }}
+                            </div>
+                            <div>
+                                <div style="font-weight: 500;">{{ item.name }}</div>
+                                <div style="font-size: 11px; color: var(--text-muted);">{{ item.timezone }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td data-label="Slug">
+                        <code style="font-size: 12px; padding: 2px 6px; background: var(--bg-elevated); border-radius: 4px;">{{ item.slug }}</code>
+                    </td>
+                    <td data-label="Status">
+                        {% if item.is_active %}
+                        <span class="badge badge-new">Active</span>
+                        {% else %}
+                        <span class="badge badge-lost">Pending</span>
+                        {% endif %}
+                    </td>
+                    <td data-label="Leads">
+                        <span style="font-weight: 500;">{{ item.lead_count }}</span>
+                    </td>
+                    <td data-label="Channels">
+                        <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                            {% if item.has_sms %}
+                            <span style="font-size: 10px; padding: 2px 6px; background: rgba(59, 130, 246, 0.12); color: var(--info); border-radius: 4px;">SMS</span>
+                            {% endif %}
+                            {% if item.has_whatsapp %}
+                            <span style="font-size: 10px; padding: 2px 6px; background: rgba(34, 197, 94, 0.12); color: var(--success); border-radius: 4px;">WA</span>
+                            {% endif %}
+                            {% if item.has_web_form %}
+                            <span style="font-size: 10px; padding: 2px 6px; background: rgba(168, 85, 247, 0.12); color: var(--purple); border-radius: 4px;">Web</span>
+                            {% endif %}
+                            {% if not item.has_sms and not item.has_whatsapp and not item.has_web_form %}
+                            <span style="font-size: 11px; color: var(--text-muted);">—</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td data-label="Created">
+                        <span style="font-size: 12px; color: var(--text-secondary);">{{ item.created_display }}</span>
+                    </td>
+                    <td data-label="Actions">
+                        <div style="display: flex; gap: 6px;" onclick="event.stopPropagation();">
+                            <a href="/admin/dealers/{{ item.slug }}" class="btn btn-ghost btn-sm" title="View Details">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                            </a>
+                            <a href="/admin/dealers/{{ item.slug }}/export-yaml" class="btn btn-ghost btn-sm" title="Export YAML">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                            </a>
+                            <a href="/admin/onboarding?edit={{ item.slug }}" class="btn btn-ghost btn-sm" title="Edit Config">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <line x1="20" y1="8" x2="20" y2="14"></line>
+            <line x1="23" y1="11" x2="17" y2="11"></line>
+        </svg>
+        <h3>No Dealers Yet</h3>
+        <p>Get started by onboarding your first dealer using the form.</p>
+        <a href="/admin/onboarding" class="btn btn-primary" style="margin-top: 16px;">Onboard First Dealer</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
