@@ -29,8 +29,9 @@ def test_sales_team_endpoint_exposes_only_names(tmp_path):
 
     reps = data.get("sales_team", [])
     names = [rep.get("name") for rep in reps]
-    # Dropdown still works.
-    assert "Helly" in names and "Vishva" in names
+    # Only active reps appear in the dropdown.
+    assert "Helly" in names, f"Active rep Helly should be in {names}"
+    assert "Vishva" not in names, f"Inactive rep Vishva should NOT be in {names}"
 
     # No secret of any kind may appear in the unauthenticated response.
     for rep in reps:

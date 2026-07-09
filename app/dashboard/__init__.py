@@ -882,7 +882,7 @@ async def api_sales_team(dealer_slug: str = ""):
         names = [
             rep.get("name")
             for rep in config.get("sales_team", [])
-            if rep.get("name")
+            if rep.get("name") and rep.get("active", True)
         ]
         return {
             "sales_team": [{"name": n} for n in names],
