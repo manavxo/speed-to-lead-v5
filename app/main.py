@@ -1117,6 +1117,38 @@ async def webhook_telegram(request: Request) -> dict:
     if callback_data:
         return _handle_telegram_callback(callback_data, chat_id, from_user, callback)
 
+    # ── Free-text from known rep ─────────────────────────────────────────
+    if text and not text.startswith("/"):
+        # Look up the rep by chat_id
+        session = _get_session()
+        try:
+            from sqlalchemy import select as _select
+            from app.models import Dealer as _Dealer
+            dealers = session.execute(_select(_Dealer)).scalars().all()
+            for dealer in dealers:
+                d_config = dealer.config or {}
+                sales_team = d_config.get("sales_team", [])
+                rep_config = next(
+                    (r for r in sales_team if str(r.get("telegram_chat_id", "")) == chat_id),
+                    None,
+                )
+                if rep_config:
+                    from app.telegram_free_text import handle_free_text
+                    result = handle_free_text(
+                        session=session,
+                        text=text,
+                        chat_id=chat_id,
+                        dealer_config=d_config,
+                        rep_config=rep_config,
+                    )
+                    if result.get("reply"):
+                        from app.transports.telegram import TelegramTransport
+                        transport = TelegramTransport()
+                        transport.send(to=chat_id, body=result["reply"])
+                    return {"ok": True, "action": result.get("action", "unknown"), "chat_id": chat_id}
+        finally:
+            session.close()
+
     # Unrecognized message — echo help text
     return {"ok": True, "action": "unknown"}
 

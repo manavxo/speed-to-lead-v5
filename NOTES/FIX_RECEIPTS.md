@@ -128,3 +128,30 @@ pytest tests/ -q → 275 passed, 4 failed, 1 skipped
 
 **Commit:**
 - `570abb8` Fix calendar: day.items → day.appts + permanent week-view tests
+
+---
+
+## Phase 1 — Rep availability
+
+**Changes:**
+- Added `UnavailableWindow` Pydantic model to `app/config.py` (date/start/end/note with format validators)
+- Added `unavailable_windows: list[UnavailableWindow]` field to `SalesRep` with default empty list
+- Added `POST /dashboard/team/{rep_name}/unavailable` endpoint (manager-only, validates via Pydantic)
+- Added `POST /dashboard/team/{rep_name}/unavailable/remove` endpoint (manager-only, removes by index)
+- Used `flag_modified(current_dealer, "config")` for SQLite JSON column mutation tracking
+
+**Tests (`tests/test_rep_availability.py`, 10 tests):**
+- Adding a window persists in dealer config
+- Malformed date/time rejected (400)
+- End before start rejected (400)
+- Unknown rep returns 404
+- Auth required (401/303)
+- Rep role redirect (manager-only)
+- Remove window by index works
+- YAML load validates windows correctly
+- YAML load rejects bad date
+
+`pytest tests/ -q` → 289 passed (+14), 4 failed (pre-existing)
+
+**Commit:**
+- `6b9b7b1` Phase 1: rep availability — data model, dashboard endpoints, 10 tests
