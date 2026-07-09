@@ -2183,7 +2183,10 @@ async def add_team_member(
     phone: str = Form(...),
     _auth: dict = Depends(require_auth),
 ):
-    """Add a new team member to the dealer's sales team."""
+    """Add a new team member to the dealer's sales team. Managers only."""
+    if _auth.get("role") != "manager":
+        return HTMLResponse("Access denied — managers only", status_code=403)
+
     session = _get_session()
     try:
         cookie_value = request.cookies.get("session")
@@ -2207,8 +2210,9 @@ async def add_team_member(
             "notify_backend": "telegram",
             "telegram_chat_id": None,
         })
-        # Reassign a fresh object so SQLAlchemy reliably detects the JSON change.
         current_dealer.config = _json.loads(_json.dumps(config))
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(current_dealer, "config")
         session.commit()
 
         response = HTMLResponse(
@@ -2249,6 +2253,8 @@ async def add_unavailable_window(
         rep_cfg = next((r for r in sales_team if r.get("name", "").lower() == rep_name.lower()), None)
         if not rep_cfg:
             return HTMLResponse(f"Rep {rep_name} not found", status_code=404)
+        if _auth.get("role") != "manager":
+            return HTMLResponse("Access denied — managers only", status_code=403)
 
         # Validate the window via Pydantic
         try:
@@ -2297,6 +2303,8 @@ async def remove_unavailable_window(
         rep_cfg = next((r for r in sales_team if r.get("name", "").lower() == rep_name.lower()), None)
         if not rep_cfg:
             return HTMLResponse(f"Rep {rep_name} not found", status_code=404)
+        if _auth.get("role") != "manager":
+            return HTMLResponse("Access denied — managers only", status_code=403)
 
         windows = rep_cfg.get("unavailable_windows", [])
         if index < 0 or index >= len(windows):
@@ -2342,6 +2350,8 @@ async def lead_mark_showed(
         lead = session.get(Lead, appt.lead_id)
         if not lead or lead.dealer_id != current_dealer.id:
             return HTMLResponse("Lead not found", status_code=404)
+        if not _check_lead_access(lead, _auth):
+            return HTMLResponse("Access denied", status_code=403)
 
         from tools.book_appointment import mark_showed
         mark_showed(session, appt, lead)
@@ -2377,6 +2387,8 @@ async def lead_mark_no_show(
         lead = session.get(Lead, appt.lead_id)
         if not lead or lead.dealer_id != current_dealer.id:
             return HTMLResponse("Lead not found", status_code=404)
+        if not _check_lead_access(lead, _auth):
+            return HTMLResponse("Access denied", status_code=403)
 
         from tools.book_appointment import mark_no_show
         mark_no_show(session, appt)

@@ -144,15 +144,32 @@ def test_availability_requires_auth(client):
 
 
 def test_availability_rep_cannot_add(client):
-    """Rep role cannot add availability (manager-only)."""
+    """Rep role cannot add availability (manager-only) — including for their own name."""
     cookie = _make_rep_session("Helly")
     response = client.post(
         "/dashboard/team/Helly/unavailable",
         data={"date": "2026-07-15", "start": "14:00", "end": "16:00"},
         cookies={"session": cookie},
     )
-    # Rep can access the page but the team page redirects non-managers
-    assert response.status_code in (303, 200)
+    assert response.status_code == 403
+
+
+def test_availability_rep_cannot_remove(client):
+    """Rep role cannot remove another rep's (or their own) availability window."""
+    cookie = _make_manager_session()
+    client.post(
+        "/dashboard/team/Helly/unavailable",
+        data={"date": "2026-07-15", "start": "14:00", "end": "16:00"},
+        cookies={"session": cookie},
+    )
+
+    rep_cookie = _make_rep_session("Helly")
+    response = client.post(
+        "/dashboard/team/Helly/unavailable/remove",
+        data={"index": 0},
+        cookies={"session": rep_cookie},
+    )
+    assert response.status_code == 403
 
 
 def test_availability_remove_window(client):

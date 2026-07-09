@@ -1160,14 +1160,22 @@ async def webhook_telegram_verify(request: Request) -> Response:
 
 
 def _handle_telegram_start(text: str, chat_id: str) -> None:
-    """Parse /start <dealer>__<rep> and save chat_id to the rep's config."""
+    """Parse /start <dealer>__<rep>__<pin> and save chat_id to the rep's config.
+
+    The PIN is required (and checked against the rep's own login PIN) so that
+    knowing/guessing a dealer slug + rep name alone — both visible in shared
+    dashboard URLs and the sales-team dropdown — isn't enough to hijack a
+    rep's lead-notification channel.
+    """
     parts = text.split(maxsplit=1)
     if len(parts) < 2:
         return
     token = parts[1]
-    if "__" not in token:
+    token_parts = token.split("__", 2)
+    if len(token_parts) < 3:
+        logger.warning("Telegram start: missing PIN in deep link")
         return
-    dealer_slug, rep_name = token.split("__", 1)
+    dealer_slug, rep_name, pin = token_parts
 
     session = _get_session()
     try:
@@ -1181,6 +1189,9 @@ def _handle_telegram_start(text: str, chat_id: str) -> None:
         updated = False
         for r in sales_team:
             if r.get("name") == rep_name:
+                if not pin or str(r.get("pin", "")) != str(pin):
+                    logger.warning("Telegram start: PIN mismatch for rep=%s dealer=%s", rep_name, dealer_slug)
+                    return
                 r["telegram_chat_id"] = chat_id
                 updated = True
                 logger.info("Telegram: saved chat_id=%s for rep=%s dealer=%s", chat_id, rep_name, dealer_slug)
@@ -1188,7 +1199,9 @@ def _handle_telegram_start(text: str, chat_id: str) -> None:
 
         if updated:
             import json as _json
+            from sqlalchemy.orm.attributes import flag_modified
             dealer.config = _json.loads(_json.dumps(config))
+            flag_modified(dealer, "config")
             session.commit()
 
             # Send confirmation via Telegram

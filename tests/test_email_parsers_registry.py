@@ -168,8 +168,14 @@ def test_dealer_webform_rejects_unlabeled():
     assert result is None
 
 
-def test_dealer_webform_loose_phone():
-    """Parser falls back to loose phone extraction when no labeled phone field."""
+def test_dealer_webform_no_loose_phone_fallback():
+    """Parser must NOT extract a phone number that isn't behind a Phone/Mobile/Cell label.
+
+    Regression guard: a label-free loose-phone regex previously let an attacker who can
+    deliver mail to the shared lead inbox plant an arbitrary third-party phone number in
+    the body text and have the system auto-text it as a "lead". Only explicitly labelled
+    phone fields should be trusted.
+    """
     email = (
         "Name: Eve Adams\n"
         "Email: eve@example.com\n"
@@ -179,7 +185,7 @@ def test_dealer_webform_loose_phone():
     result = parse_dealer_website_form(email)
     assert result is not None
     assert result.name == "Eve Adams"
-    assert result.phone == "+16045558888"
+    assert result.phone is None
     assert result.email == "eve@example.com"
 
 

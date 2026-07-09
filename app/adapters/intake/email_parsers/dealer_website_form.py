@@ -59,15 +59,6 @@ def parse_dealer_website_form(raw: str, subject: str = "", from_addr: str = "") 
         digits_only = re.sub(r"[^\d+]", "", raw_phone)
         phone = normalize_phone(digits_only)
 
-    # Loose phone extraction if no labelled phone field
-    if not phone:
-        loose = re.search(r"\b(\+?1[-.\s]?)?\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})\b", raw)
-        if loose:
-            groups = loose.groups()
-            raw_phone = f"+1{groups[1]}{groups[2]}{groups[3]}"
-            from app.adapters.intake import normalize_phone
-            phone = normalize_phone(raw_phone)
-
     email_match = re.search(r"(?:Email|E-mail)(?:\s+Address)?:\s*(\S+@\S+)", raw, re.IGNORECASE)
     if email_match:
         email_addr = email_match.group(1).strip()
