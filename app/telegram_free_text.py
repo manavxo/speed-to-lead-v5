@@ -37,12 +37,14 @@ def classify_message(text: str) -> dict:
     client = _get_openai_client()
     model = _get_model_name()
 
+    today_str = datetime.now(timezone.utc).date().isoformat()
+
     prompt = f"""Classify the following message from a car dealership sales rep. Return ONLY a JSON object with:
 - "intent": one of "availability", "new_lead", "no_show_reply", "unknown"
 - "params": extracted details based on intent
 
 For intent "availability":
-  - "date": the date mentioned (e.g. "Friday" → compute relative to today 2026-07-09, or explicit date)
+  - "date": the date mentioned (e.g. "Friday" → compute relative to today {today_str}, or explicit date)
   - "start": start time in HH:MM format
   - "end": end time in HH:MM format
   - "note": reason if mentioned (e.g. "dentist", "sick"), empty string otherwise

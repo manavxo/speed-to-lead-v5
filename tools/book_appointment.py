@@ -206,6 +206,27 @@ def book_appointment(
                             f"Rep {lead.assigned_rep} is unavailable at {scheduled_for.isoformat()}. "
                             "Please offer a different time or assign a different rep."
                         )
+
+                    # Also check the rep doesn't already have a real appointment at
+                    # this exact time (e.g. rebooking a no-show into a slot the same
+                    # rep is already booked elsewhere — a manual unavailable_windows
+                    # entry wouldn't catch this, since it's a real appointment, not a
+                    # declared block).
+                    from sqlalchemy import select as _select_conflict
+                    conflicting_appt = session.execute(
+                        _select_conflict(Appointment)
+                        .join(Lead, Appointment.lead_id == Lead.id)
+                        .where(
+                            Lead.assigned_rep == lead.assigned_rep,
+                            Appointment.scheduled_for == scheduled_for,
+                            Appointment.status.in_(["set", "confirmed"]),
+                        )
+                    ).scalars().first()
+                    if conflicting_appt:
+                        raise ValueError(
+                            f"Rep {lead.assigned_rep} already has an appointment at "
+                            f"{scheduled_for.isoformat()}. Please offer a different time."
+                        )
                 chosen_rep = rep_config
             else:
                 # Find an available rep via smart pairing

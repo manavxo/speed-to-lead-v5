@@ -315,7 +315,10 @@ def find_available_rep_for_slot(
     if not available:
         return None
 
-    idx = dealer.round_robin_pointer % len(available)
-    dealer.round_robin_pointer = (dealer.round_robin_pointer + 1) % max(len(sales_team), 1)
+    # Reuse the existing round-robin picker (already correct/tested) instead of
+    # reimplementing pointer math — index and advance both use len(available)
+    # consistently this way, unlike a hand-rolled version keyed against the full
+    # team size.
+    chosen = next_rep(dealer, available)
     session.commit()
-    return available[idx]
+    return chosen

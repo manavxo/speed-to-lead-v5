@@ -791,12 +791,19 @@ def _run_no_show_nudge_session(session) -> None:
             rep_config = next((r for r in sales_team if r.get('name', '').lower() == (rep_name or '').lower()), None) if rep_name else None
             chat_id = rep_config.get('telegram_chat_id') if rep_config else None
 
-            if chat_id:
-                from app.transports.telegram import TelegramTransport
-                transport = TelegramTransport()
-                customer_name = lead.name or 'A customer'
-                time_str = appt.scheduled_for.strftime('%I:%M %p') if appt.scheduled_for else ''
-                transport.send(to=chat_id, body=f'Did {customer_name} show for their appointment at {time_str}? Reply showed or no show.')
+            if not chat_id:
+                # Rep hasn't connected Telegram yet — don't record a nudge event,
+                # since nothing was actually sent. Leaving this un-recorded means
+                # the sweep keeps retrying every cycle instead of silently giving up
+                # forever; it resolves itself once the rep connects, or the rep
+                # marks the appointment manually from the dashboard in the meantime.
+                continue
+
+            from app.transports.telegram import TelegramTransport
+            transport = TelegramTransport()
+            customer_name = lead.name or 'A customer'
+            time_str = appt.scheduled_for.strftime('%I:%M %p') if appt.scheduled_for else ''
+            transport.send(to=chat_id, body=f'Did {customer_name} show for their appointment at {time_str}? Reply showed or no show.')
 
             session.add(LeadEvent(
                 lead_id=lead.id, dealer_id=dealer.id, type='no_show_nudge',
