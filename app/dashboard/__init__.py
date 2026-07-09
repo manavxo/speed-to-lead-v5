@@ -793,7 +793,7 @@ async def login_submit(
         role = "manager"
         logged_rep_name = "Manager"
     else:
-        # Rep login — validate rep_name exists in sales_team and PIN matches
+        # Rep login — validate rep_name exists in sales_team, is active, and PIN matches
         rep_config = None
         for r in sales_team:
             if r.get("name") == rep_name:
@@ -801,6 +801,20 @@ async def login_submit(
                 break
 
         if not rep_config:
+            return templates.TemplateResponse(
+                request=request,
+                name="login.html",
+                context={
+                    "request": request,
+                    "error": "Please select your name from the list",
+                    "sales_team": sales_team,
+                    "dealer_slug": dealer_slug,
+                },
+                status_code=401,
+            )
+
+        # Reject inactive reps at login
+        if not rep_config.get("active", True):
             return templates.TemplateResponse(
                 request=request,
                 name="login.html",
