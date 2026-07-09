@@ -705,7 +705,7 @@ async def login_page(request: Request, dealer_slug: str = ""):
             "active_page": "login",
             "sales_team": sales_team,
             "dealer_slug": dealer_slug,
-            "show_manager_option": bool(dealer.config.get("manager_pin")) if dealer else False,
+            "show_manager_option": bool((config or {}).get("manager_pin")) if dealer else False,
         },
     )
     response.set_cookie(
