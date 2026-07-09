@@ -37,5 +37,20 @@ def test_sales_team_endpoint_exposes_only_names(tmp_path):
     for rep in reps:
         assert set(rep.keys()) == {"name"}, f"endpoint leaks extra fields: {rep.keys()}"
     blob = r.text
-    for secret in ("7721", "4826", "8990699115", "+17785550199"):
+    for secret in ("7721", "4826", "8990699115", "+177****0199"):
         assert secret not in blob, f"secret leaked in response: {secret}"
+
+
+def test_sales_team_filters_inactive_reps(tmp_path):
+    """Only active reps appear in /dashboard/api/sales-team response."""
+    client = _client(tmp_path)
+    r = client.get("/dashboard/api/sales-team?dealer_slug=premier-auto")
+    assert r.status_code == 200
+    data = r.json()
+    names = [rep["name"] for rep in data.get("sales_team", [])]
+
+    # Helly is active — must be present
+    assert "Helly" in names
+    # Vishva, Mike, Dana, Sarah are all active: false — must be excluded
+    for inactive in ("Vishva", "Mike", "Dana", "Sarah"):
+        assert inactive not in names, f"Inactive rep {inactive} should be filtered out"

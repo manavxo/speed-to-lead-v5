@@ -89,6 +89,16 @@ test.describe('Dashboard E2E', () => {
     test('Logout works', async ({ page }) => {
       await logout(page);
     });
+
+    test('Login dropdown lists only active reps', async ({ page }) => {
+      // After logout, land on login page with dealer_slug — verify the dropdown
+      await page.goto(`/dashboard/login?dealer_slug=${DEALER}`);
+      const options = await page.locator('select[name="rep_name"] option').allTextContents();
+      expect(options).toContain('Helly');
+      expect(options).toContain('Manager');
+      expect(options).not.toContain('Vishva');
+      expect(options).not.toContain('Mike');
+    });
   });
 
   test.describe('Rep Helly (PIN 7721)', () => {
