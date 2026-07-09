@@ -2318,6 +2318,78 @@ async def remove_unavailable_window(
         session.close()
 
 
+# ── No-show endpoints ────────────────────────────────────────────────────────
+
+@router.post("/leads/{lead_id}/mark-showed")
+async def lead_mark_showed(
+    request: Request,
+    lead_id: int,
+    appointment_id: int = Form(...),
+    _auth: dict = Depends(require_auth),
+):
+    """Mark an appointment as showed."""
+    session = _get_session()
+    try:
+        cookie_value = request.cookies.get("session")
+        current_dealer = get_dealer_from_auth(session, cookie_value) if cookie_value else None
+        if not current_dealer:
+            return HTMLResponse("Unauthorized", status_code=401)
+
+        from app.models import Appointment, Lead
+        appt = session.get(Appointment, appointment_id)
+        if not appt:
+            return HTMLResponse("Appointment not found", status_code=404)
+        lead = session.get(Lead, appt.lead_id)
+        if not lead or lead.dealer_id != current_dealer.id:
+            return HTMLResponse("Lead not found", status_code=404)
+
+        from tools.book_appointment import mark_showed
+        mark_showed(session, appt, lead)
+
+        response = HTMLResponse("", status_code=200)
+        response.headers["X-Toast-Message"] = f"Marked as showed: {lead.name or 'Customer'}"
+        response.headers["X-Toast-Type"] = "success"
+        response.headers["HX-Trigger"] = "showToast"
+        return response
+    finally:
+        session.close()
+
+
+@router.post("/leads/{lead_id}/mark-no-show")
+async def lead_mark_no_show(
+    request: Request,
+    lead_id: int,
+    appointment_id: int = Form(...),
+    _auth: dict = Depends(require_auth),
+):
+    """Mark an appointment as no-show."""
+    session = _get_session()
+    try:
+        cookie_value = request.cookies.get("session")
+        current_dealer = get_dealer_from_auth(session, cookie_value) if cookie_value else None
+        if not current_dealer:
+            return HTMLResponse("Unauthorized", status_code=401)
+
+        from app.models import Appointment, Lead
+        appt = session.get(Appointment, appointment_id)
+        if not appt:
+            return HTMLResponse("Appointment not found", status_code=404)
+        lead = session.get(Lead, appt.lead_id)
+        if not lead or lead.dealer_id != current_dealer.id:
+            return HTMLResponse("Lead not found", status_code=404)
+
+        from tools.book_appointment import mark_no_show
+        mark_no_show(session, appt)
+
+        response = HTMLResponse("", status_code=200)
+        response.headers["X-Toast-Message"] = f"Marked as no-show: {lead.name or 'Customer'}"
+        response.headers["X-Toast-Type"] = "warning"
+        response.headers["HX-Trigger"] = "showToast"
+        return response
+    finally:
+        session.close()
+
+
 # ── Inventory upload ──────────────────────────────────────────────────────────
 
 from fastapi import UploadFile, File

@@ -710,6 +710,26 @@ def register_jobs(scheduler) -> None:
         replace_existing=True,
         misfire_grace_time=600,
     )
+    # No-show nudge sweep
+    scheduler.add_job(
+        _run_no_show_nudge,
+        "interval",
+        minutes=15,
+        id="no-show-nudge",
+        replace_existing=True,
+        misfire_grace_time=600,
+    )
+
+    # No-show nudge sweep
+    scheduler.add_job(
+        _run_no_show_nudge,
+        'interval',
+        minutes=15,
+        id='no-show-nudge',
+        replace_existing=True,
+        misfire_grace_time=600,
+    )
+
 
 
 def _run_email_poll_for_all_dealers():
@@ -730,6 +750,71 @@ def _run_email_poll_for_all_dealers():
                     logger.info("Email poll for %s: %d new leads", dealer.slug, count)
             except Exception:
                 logger.exception("Email poll failed for dealer %s", dealer.slug)
+    finally:
+        session.close()
+
+
+
+
+# --- No-show nudge sweep ---
+
+def _run_no_show_nudge_session(session) -> None:
+    """Find appointments > 2h past their time still in set status and nudge the rep."""
+    from app.models import Appointment, Dealer, Lead, LeadEvent
+    from sqlalchemy import select
+    from datetime import timedelta
+
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=2)
+    dealers = session.execute(select(Dealer)).scalars().all()
+
+    for dealer in dealers:
+        dealer_config = dealer.config or {}
+        sales_team = dealer_config.get('sales_team', [])
+        overdue_appts = session.execute(
+            select(Appointment).join(Lead, Appointment.lead_id == Lead.id)
+            .where(Lead.dealer_id == dealer.id, Appointment.status == 'set', Appointment.scheduled_for < cutoff)
+        ).scalars().all()
+
+        for appt in overdue_appts:
+            lead = session.get(Lead, appt.lead_id)
+            if not lead:
+                continue
+            existing_nudge = session.execute(
+                select(LeadEvent).where(LeadEvent.lead_id == lead.id, LeadEvent.type == 'no_show_nudge')
+                .order_by(LeadEvent.created_at.desc())
+            ).scalars().first()
+            if existing_nudge:
+                continue
+
+            rep_name = lead.assigned_rep
+            rep_config = next((r for r in sales_team if r.get('name', '').lower() == (rep_name or '').lower()), None) if rep_name else None
+            chat_id = rep_config.get('telegram_chat_id') if rep_config else None
+
+            if chat_id:
+                from app.transports.telegram import TelegramTransport
+                transport = TelegramTransport()
+                customer_name = lead.name or 'A customer'
+                time_str = appt.scheduled_for.strftime('%I:%M %p') if appt.scheduled_for else ''
+                transport.send(to=chat_id, body=f'Did {customer_name} show for their appointment at {time_str}? Reply showed or no show.')
+
+            session.add(LeadEvent(
+                lead_id=lead.id, dealer_id=dealer.id, type='no_show_nudge',
+                payload={'appointment_id': appt.id, 'scheduled_for': appt.scheduled_for.isoformat() if appt.scheduled_for else '', 'nudged_at': now.isoformat(), 'chat_id_sent': chat_id},
+                synced=False,
+            ))
+            session.commit()
+
+
+def _run_no_show_nudge():
+    """Cron entry point for the no-show nudge sweep."""
+    from app.db import get_session_factory
+    logger.info('Running no-show nudge sweep')
+    session = get_session_factory()()
+    try:
+        _run_no_show_nudge_session(session)
+    except Exception:
+        logger.exception('No-show nudge sweep failed')
     finally:
         session.close()
 
