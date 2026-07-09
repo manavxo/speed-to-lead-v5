@@ -320,6 +320,60 @@ def test_quiet_hours_suppresses_send(e2e_session, dealer):
     assert lead.state in (LeadState.AUTO_REPLIED, LeadState.ENGAGED, LeadState.NEW)
 
 
+def test_reply_during_quiet_hours_respects_dealer_preference(e2e_session, dealer, monkeypatch):
+    """The AI's reply to a customer-initiated text during quiet hours is gated by
+    compliance.reply_during_quiet_hours_if_customer_initiated (default True = reply
+    right away; False = dealer wants strict quiet hours even for replies).
+
+    Mirrors the force_send wiring in app/main.py's _process_and_send_sync.
+    """
+    from app.config import settings
+    monkeypatch.setattr(settings, "quiet_hours_disabled", False)
+
+    fake_twilio = E2EFakeTwilio()
+    now = datetime(2026, 6, 4, 6, 0, tzinfo=timezone.utc)  # 23:00 Vancouver — quiet hours
+
+    from tools.route_lead import ingest_lead
+    lead_data = NormalizedLead(
+        source=Channel.WEBFORM, name="Late Texter", phone="+16045559999",
+        consent=True, raw={},
+    )
+    lead = ingest_lead(e2e_session, dealer, lead_data, fake_twilio=fake_twilio, now=now)
+
+    from tools.send_sms import send_sms
+
+    # Default (true): dealer wants an immediate reply even during quiet hours.
+    config_default = dict(dealer.config or {})
+    config_default["compliance"] = {"reply_during_quiet_hours_if_customer_initiated": True}
+    reply_during_quiet_hours = config_default.get("compliance", {}).get(
+        "reply_during_quiet_hours_if_customer_initiated", True
+    )
+    before = len(fake_twilio.sent)
+    sid = send_sms(
+        e2e_session, "+16045559999", "Thanks for reaching out!", "+17787623122",
+        dealer_config=config_default, lead=lead, fake_twilio=fake_twilio,
+        force_send=reply_during_quiet_hours, now=now,
+    )
+    assert sid is not None
+    assert len(fake_twilio.sent) == before + 1
+
+    # Dealer opts into strict quiet hours — reply must wait even though the
+    # customer texted first.
+    config_strict = dict(dealer.config or {})
+    config_strict["compliance"] = {"reply_during_quiet_hours_if_customer_initiated": False}
+    reply_during_quiet_hours = config_strict.get("compliance", {}).get(
+        "reply_during_quiet_hours_if_customer_initiated", True
+    )
+    before = len(fake_twilio.sent)
+    sid = send_sms(
+        e2e_session, "+16045559999", "Thanks for reaching out!", "+17787623122",
+        dealer_config=config_strict, lead=lead, fake_twilio=fake_twilio,
+        force_send=reply_during_quiet_hours, now=now,
+    )
+    assert sid is None
+    assert len(fake_twilio.sent) == before
+
+
 def test_round_robin_distribution(e2e_session, dealer):
     """Test that appointments trigger round-robin rep distribution."""
     fake_twilio = E2EFakeTwilio()

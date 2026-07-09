@@ -220,6 +220,7 @@ def _build_dealer_config(form_data: dict) -> tuple[dict, str]:
             "consent_text": consent_text,
             "opt_out_keywords": opt_out_keywords,
             "quiet_hours": form_data.get("quiet_hours", "21:00-08:00").strip() or "21:00-08:00",
+            "reply_during_quiet_hours_if_customer_initiated": form_data.get("reply_during_quiet_hours", "true") == "true",
         },
     }
 

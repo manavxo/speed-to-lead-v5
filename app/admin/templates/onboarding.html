@@ -443,10 +443,23 @@
                     </div>
                     <div class="form-group full-width">
                         <label class="form-label" for="opt_out_keywords">Opt-Out Keywords</label>
-                        <input class="input" type="text" id="opt_out_keywords" name="opt_out_keywords" 
+                        <input class="input" type="text" id="opt_out_keywords" name="opt_out_keywords"
                                value="STOP, STOPALL, UNSUBSCRIBE, ARRET"
                                placeholder="STOP, STOPALL, UNSUBSCRIBE, ARRET">
                         <div class="help-text">Comma-separated. ARRET for bilingual compliance.</div>
+                    </div>
+                    <div class="form-group full-width">
+                        <label class="form-label" for="reply_during_quiet_hours">
+                            If a customer texts in during quiet hours, should the AI reply right away?
+                        </label>
+                        <select class="select" id="reply_during_quiet_hours" name="reply_during_quiet_hours">
+                            <option value="true" selected>Yes — reply immediately (they started it)</option>
+                            <option value="false">No — wait until quiet hours end</option>
+                        </select>
+                        <div class="help-text">
+                            Ask the dealer this directly — it's a real preference, not just a technical setting.
+                            Default is to reply right away since the customer initiated contact.
+                        </div>
                     </div>
                 </div>
             </div>

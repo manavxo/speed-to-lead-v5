@@ -77,3 +77,4 @@ compliance:
   consent_text: "By submitting you agree to receive texts from Premier Auto Group. Reply STOP to opt out. Msg&data rates may apply."
   opt_out_keywords: [STOP, STOPALL, UNSUBSCRIBE, ARRET]
   quiet_hours: "21:00-08:00"
+  reply_during_quiet_hours_if_customer_initiated: true

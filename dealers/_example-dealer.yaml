@@ -66,3 +66,9 @@ compliance:                          # Canada / BC
   consent_text: "By submitting you agree to receive texts from Sunrise Auto Sales. Reply STOP to opt out."
   opt_out_keywords: [STOP, STOPALL, UNSUBSCRIBE, ARRET]   # ARRET for bilingual compliance
   quiet_hours: "21:00-08:00"         # no outbound sends in this window (dealer timezone)
+  reply_during_quiet_hours_if_customer_initiated: true    # IMPORTANT onboarding question — ask every dealer:
+                                                            # "If a customer texts you after hours, should the AI reply
+                                                            # right away, or wait until quiet hours end?" Default: reply
+                                                            # right away (true), since the customer started it. Some
+                                                            # dealers may prefer strict quiet hours even for replies — set
+                                                            # to false if so.

@@ -174,6 +174,12 @@ def _process_and_send_sync(
             reply_text = f"{reply_text}\n\n{footer}"
 
     # Send via send_sms chokepoint (enforces compliance, logs message)
+    # force_send bypasses quiet hours because the customer initiated this exchange —
+    # but that's a per-dealer choice (some dealers may prefer to wait until quiet
+    # hours end even for a reply), so it's config-driven, not hardcoded.
+    reply_during_quiet_hours = bg_dealer_config.get("compliance", {}).get(
+        "reply_during_quiet_hours_if_customer_initiated", True
+    )
     from tools.send_sms import send_sms
     send_sms(
         session,
@@ -183,7 +189,7 @@ def _process_and_send_sync(
         dealer_slug=dealer_slug,
         dealer_config=bg_dealer_config,
         lead=bg_lead,
-        force_send=True,
+        force_send=reply_during_quiet_hours,
     )
     logger.info("Background reply sent for lead#%s", lead_id)
 

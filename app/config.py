@@ -251,6 +251,13 @@ class Compliance(BaseModel):
         default_factory=lambda: ["STOP", "STOPALL", "UNSUBSCRIBE", "ARRET"]
     )
     quiet_hours: str = Field("21:00-08:00", description="No outbound sends during this window (dealer tz)")
+    reply_during_quiet_hours_if_customer_initiated: bool = Field(
+        True,
+        description=(
+            "If the customer texts in during quiet hours, reply right away anyway "
+            "(default). If false, the AI's reply waits and sends after quiet hours end."
+        ),
+    )
 
 
 class DealerConfig(BaseModel):
