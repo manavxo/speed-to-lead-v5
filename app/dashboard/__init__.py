@@ -2334,6 +2334,65 @@ async def remove_unavailable_window(
         session.close()
 
 
+# ── Lead deletion ────────────────────────────────────────────────────────────
+
+@router.post("/leads/{lead_id}/delete")
+async def delete_lead(
+    request: Request,
+    lead_id: int,
+    _auth: dict = Depends(require_auth),
+):
+    """Hard-delete a lead and its related data. Manager-only.
+
+    Deletes: Lead, Message, Appointment, LeadEvent rows.
+    Writes a ConsentLog(action='deleted') as the only remaining record.
+    """
+    if _auth.get("role") != "manager":
+        from fastapi.responses import JSONResponse as _JR
+        return _JR({"status": "error", "message": "Unauthorized"}, status_code=403)
+
+    session = _get_session()
+    try:
+        cookie_value = request.cookies.get("session")
+        current_dealer = get_dealer_from_auth(session, cookie_value) if cookie_value else None
+        if not current_dealer:
+            return HTMLResponse("Unauthorized", status_code=401)
+
+        from app.models import Lead, Message, Appointment, LeadEvent, ConsentLog
+        from sqlalchemy import delete as _delete
+
+        lead = session.get(Lead, lead_id)
+        if not lead or lead.dealer_id != current_dealer.id:
+            return HTMLResponse("Lead not found", status_code=404)
+
+        phone = lead.phone or "unknown"
+
+        # Write the compliance audit log BEFORE deleting
+        session.add(ConsentLog(
+            dealer_id=current_dealer.id,
+            lead_id=None,
+            phone=phone,
+            action="deleted",
+            text=f"Deletion requested, lead #{lead_id} hard deleted",
+        ))
+
+        # Delete related data
+        session.execute(_delete(Message).where(Message.lead_id == lead_id))
+        session.execute(_delete(Appointment).where(Appointment.lead_id == lead_id))
+        session.execute(_delete(LeadEvent).where(LeadEvent.lead_id == lead_id))
+        session.delete(lead)
+        session.commit()
+
+        response = HTMLResponse("", status_code=200)
+        response.headers["HX-Redirect"] = "/dashboard/leads"
+        response.headers["X-Toast-Message"] = f"Lead #{lead_id} and all associated data deleted"
+        response.headers["X-Toast-Type"] = "warning"
+        response.headers["HX-Trigger"] = "showToast"
+        return response
+    finally:
+        session.close()
+
+
 # ── No-show endpoints ────────────────────────────────────────────────────────
 
 @router.post("/leads/{lead_id}/mark-showed")
