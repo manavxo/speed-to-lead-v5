@@ -240,8 +240,12 @@ def _auto_provision_dealers() -> None:
                     )
                     session.add(dealer)
                     logger.info("Auto-provision: created dealer %s", cfg.dealer.slug)
-            except Exception:
-                logger.exception("Auto-provision failed for %s", yaml_path.name)
+            except Exception as e:
+                logger.error(
+                    "Auto-provision failed for %s: %s",
+                    yaml_path.name, e,
+                    exc_info=True,
+                )
         session.commit()
     finally:
         session.close()
