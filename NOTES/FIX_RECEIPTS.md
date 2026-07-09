@@ -180,3 +180,75 @@ pytest tests/ -q → 275 passed, 4 failed, 1 skipped
 
 **Commit:**
 - `e06e443` Phase 2: Telegram free-text router — 3 intents, confirmation step, 7 tests
+
+---
+
+## Phase 3 — Smart booking pairing
+
+**Changes:**
+- Added `find_available_rep_for_slot()` to `app/engine/router.py` — filters active reps by:
+  - Not having an unavailability window covering the time
+  - Not already having an appointment at that exact time
+  - Falls back to round-robin among qualifying reps
+- Modified `book_appointment()` in `tools/book_appointment.py`:
+  - Replaced dealer-wide slot conflict with per-rep check
+  - Uses `find_available_rep_for_slot` instead of blind `assign_lead`
+  - Respects already-assigned reps (checks their availability)
+
+**Tests (`tests/test_smart_booking.py`, 4 tests):**
+- One rep blocked, one free → picks the free rep
+- Two customers, same time, two free reps → different reps
+- All reps blocked → no rep available
+- No windows → round-robin fairness preserved
+
+`pytest tests/ -q` → 300 passed (+4), 4 failed (pre-existing)
+`test_router.py` existing round-robin tests still pass unmodified
+
+**Commit:**
+- `543e562` Phase 3: smart booking pairing — per-rep slot check, find_available_rep_for_slot, 4 tests
+
+---
+
+## Phase 4 — No-show handling
+
+**Changes:**
+- Added `POST /dashboard/leads/{lead_id}/mark-showed` endpoint → calls `mark_showed()`
+- Added `POST /dashboard/leads/{lead_id}/mark-no-show` endpoint → calls `mark_no_show()`
+- Added `_run_no_show_nudge_session()` to `app/scheduler.py` — finds appointments >2h past still "set", sends Telegram nudge, records `LeadEvent(type='no_show_nudge')` to prevent double-nudge
+- Wired into scheduler as 15-min interval job
+
+**Tests (`tests/test_no_show.py`, 7 tests):**
+- Dashboard mark-showed updates appointment + lead state
+- Dashboard mark-no-show updates appointment status
+- Scheduler nudge sends for overdue appointment
+- Nudge sends exactly once (double-run test)
+- No nudge for recent appointment (< 2h)
+- Telegram "showed" reply marks appointment showed
+- Telegram "no show" reply marks appointment no_show
+
+`pytest tests/ -q` → 307 passed (+7), 4 failed (pre-existing)
+
+**Commit:**
+- `8610e1d` Phase 4: no-show handling — dashboard buttons, scheduler nudge, Telegram replies, 7 tests
+
+---
+
+## Phase 5 — Cross-system consistency
+
+**Tests (`tests/test_cross_system.py`, 3 tests):**
+- Lead created via Telegram appears on /dashboard/leads
+- Availability window set via Telegram respected by `find_available_rep_for_slot`
+- No-show marked via Telegram reflected on /dashboard/appointments
+
+`pytest tests/ -q` → 310 passed (+3), 4 failed (pre-existing)
+
+**Commit:**
+- `b9cfe57` Phase 5: cross-system consistency verification tests (3)
+
+---
+
+## Final counts
+
+**Baseline → Final:** 275 → 310 passed (+35 new tests), 4 failed (pre-existing, unchanged)
+**New files tracked:** app/telegram_free_text.py, tests/test_rep_availability.py, tests/test_telegram_free_text.py, tests/test_smart_booking.py, tests/test_no_show.py, tests/test_cross_system.py
+**Total commits this session:** 8
