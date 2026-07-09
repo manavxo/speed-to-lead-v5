@@ -93,3 +93,38 @@ All 4 are pre-existing and documented as such.
 **Baseline → Final:** 253 → 274 passed (+21 new tests), 4 failed (pre-existing, unchanged)
 **New files tracked:** `scripts/engine_test_harness.py` (committed from untracked)
 **Total commits this session:** 11
+
+
+# Speed to Lead v5 — Rep Scheduling + Telegram (2026-07-09)
+
+## Phase 0 — Baseline
+
+**git status:** clean after calendar fix commit
+
+### pytest baseline
+```
+pytest tests/ -q → 275 passed, 4 failed, 1 skipped
+```
+
+**Known date-sensitive failures (unchanged):**
+1. `test_full_pipeline_e2e` — booked June 2026 date in past
+2. `test_escalation_after_timeout` — same cause
+3. `test_round_robin_distribution` — same cause
+4. `test_book_appointment_calls_notify_rep_for_appointment_set` — same cause
+
+---
+
+## Calendar fix + week-view tests
+
+**Fix:** Changed `day.items` → `day.appts` in `app/dashboard/templates/appointments.html` (line 490). Backend already used `"appts"` as the dict key; Jinja was resolving `day.items` to Python's built-in `dict.items()` method, crashing with `TypeError`.
+
+**Tests added:** 4 new tests in `tests/test_dashboard_pages.py`:
+- `test_appointments_view_list_returns_200`
+- `test_appointments_view_week_returns_200` — seeds an appointment, asserts name in rendered grid
+- `test_appointments_view_week_navigation` — week_offset=-1 and 1 both return 200
+- `test_appointments_view_week_rep_can_access` — rep-scoped week view
+
+`pytest tests/test_dashboard_pages.py -q` → 23 passed (including 4 new)
+
+**Commit:**
+- `570abb8` Fix calendar: day.items → day.appts + permanent week-view tests
