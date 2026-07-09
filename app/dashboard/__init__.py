@@ -1665,6 +1665,8 @@ async def save_channel_settings(
         config["routing"]["digest_enabled"] = digest_enabled
         config["routing"]["digest_time"] = digest_time or "08:00"
         current_dealer.config = config
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(current_dealer, "config")
         session.commit()
 
         return JSONResponse({"status": "success", "message": "Channel settings saved"})
@@ -1718,6 +1720,8 @@ async def save_business_settings(
         config["hours"] = hours
 
         current_dealer.config = config
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(current_dealer, "config")
         session.commit()
 
         return JSONResponse({"status": "success", "message": "Business info saved"})
@@ -1758,6 +1762,8 @@ async def save_ai_settings(
         config["ai"]["guardrails"] = {g: True for g in guardrails}
 
         current_dealer.config = config
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(current_dealer, "config")
         session.commit()
 
         return JSONResponse({"status": "success", "message": "AI personality saved"})
@@ -1795,6 +1801,8 @@ async def save_compliance_settings(
             config["compliance"]["opt_out_keywords"] = [kw.strip() for kw in form["opt_out_keywords"].split(",")]
 
         current_dealer.config = config
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(current_dealer, "config")
         session.commit()
 
         return JSONResponse({"status": "success", "message": "Compliance settings saved"})

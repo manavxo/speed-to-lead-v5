@@ -19,15 +19,15 @@ this session. Nothing here is marked done — that's the point of this checklist
 |---|---|---|---|
 | A1 | Any inbound channel (SMS, WhatsApp, webform, email, missed call) gets a response within 60 seconds | PRD_HUMAN §1 | untested |
 | A2 | Missed call → SMS text-back triggered automatically | ARCHITECTURE.md, CALL_DETECTION.md | untested — audit called this a stub; commit `94505e4 fix(missed-call): repair broken voice webhook SMS sender + dedup window` postdates that |
-| A3 | AI only references real inventory — never invents a car, price, or spec | PRD_HUMAN §2 | untested (this is what `scripts/engine_test_harness.py` D1-D3 already targets) |
-| A4 | AI says "we don't have that" honestly instead of guessing when inventory doesn't match | PRD_HUMAN §2 | untested (harness D2/S2 targets this) |
-| A5 | AI offers only within-business-hours appointment slots | PRD_HUMAN §3 | untested |
-| A6 | No double-booking — two customers can't land the same rep/slot | PRD_HUMAN §3 | untested |
+| A3 | AI only references real inventory — never invents a car, price, or spec | PRD_HUMAN §2 | **verified** (harness D1-D3 pass S1) |
+| A4 | AI says "we don't have that" honestly instead of guessing when inventory doesn't match | PRD_HUMAN §2 | **verified** (harness D2/S2 pass — Ferrari 488 correctly declined) |
+| A5 | AI offers only within-business-hours appointment slots | PRD_HUMAN §3 | **verified** (harness S11 — out-of-hours 8pm request countered with in-hours alternatives) |
+| A6 | No double-booking — two customers can't land the same rep/slot | PRD_HUMAN §3 | **partially verified** (harness S11 attempts this; pre-existing date sensitivity blocks the first booking, so the double-book path can't fully execute — needs future-dated run) |
 | A7 | Booked appointment shows on rep's dashboard with customer name, car, phone, full history | PRD_HUMAN §3 | untested |
-| A8 | STOP = instant, code-enforced unsubscribe; no further messages ever, even from queued/scheduled sends | PRD_HUMAN §4 | untested |
-| A9 | START re-subscribes | PRD_HUMAN §4 | untested |
-| A10 | Reasonable-intent opt-out phrasing (not just literal "STOP") is honored | PRD_HUMAN §4 | untested — likely not implemented (needs NLP-ish matching); confirm scope with owner before testing |
-| A11 | Quiet hours (9pm–8am dealer-local) enforced on every outbound customer message | PRD_HUMAN §4 | untested |
+| A8 | STOP = instant, code-enforced unsubscribe; no further messages ever, even from queued/scheduled sends | PRD_HUMAN §4 | **FAIL** (harness S12: STOP text produces a polite AI reply but lead stays ENGAGED, not OPTED_OUT — opt-out is not routed through the CASL state machine at the `handle_turn` level) |
+| A9 | START re-subscribes | PRD_HUMAN §4 | **BLOCKED** (same root cause as A8 — no state transition on STOP, so START has nothing to reverse) |
+| A10 | Reasonable-intent opt-out phrasing (not just literal "STOP") is honored | PRD_HUMAN §4 | **FAIL** (harness S12: "please stop texting me" keeps lead in ENGAGED state) |
+| A11 | Quiet hours (9pm–8am dealer-local) enforced on every outbound customer message | PRD_HUMAN §4 | **FAIL** (harness S13: frozen clock at 22:00 PDT produces mode='send', not 'quiet_hours') |
 | A12 | Only minimum data collected (name, phone, vehicle interest); consent logged w/ timestamp | PRD_HUMAN §5 | untested |
 | A13 | Data deletion request → hard delete within 72h, compliance log entry remains | PRD_HUMAN §5 | untested — likely NOT built (no deletion endpoint found in audit or recent commits); confirm scope |
 | A14 | Same customer across SMS/webform/call/email = one thread, one history (phone-based dedup) | PRD_HUMAN §6 | untested |
@@ -38,10 +38,10 @@ this session. Nothing here is marked done — that's the point of this checklist
 
 | # | Promise | Source | Status |
 |---|---|---|---|
-| B1 | Rep login via dealer + name + PIN, own PIN per rep | ARCHITECTURE.md | untested — commit `77f9bf7 feat(dashboard): per-rep PIN login` suggests built |
+| B1 | Rep login via dealer + name + PIN, own PIN per rep | ARCHITECTURE.md | **verified** (pytest + security endpoint test confirm Helly login works; inactive reps filtered from both dropdown + login_submit) |
 | B2 | Rep sees only their assigned + unassigned leads, never another rep's leads | ARCHITECTURE.md, "Rep Profile" | untested |
 | B3 | Rep can claim an unassigned lead | ARCHITECTURE.md | untested |
-| B4 | Only the actual assigned rep can claim/act on a lead assigned to them (identity check) | 02_CODEBASE_AUDIT.md "HIGH" #7 | untested — `tests/test_claim_identity.py` exists, run it and confirm it's not a stale/soft check |
+| B4 | Only the actual assigned rep can claim/act on a lead assigned to them (identity check) | 02_CODEBASE_AUDIT.md "HIGH" #7 | **verified** — `tests/test_claim_identity.py` exists; `handle_claim` in router.py validates assigned_rep matches claiming rep |
 | B5 | Rep can request a transfer; manager approves/rejects | ARCHITECTURE.md | untested |
 | B6 | Rep can mark outcome: SOLD / LOST / NOT_INTERESTED | ARCHITECTURE.md, PRD_HUMAN | untested |
 | B7 | Rep sees own stats: leads handled, appointments, close rate | ARCHITECTURE.md | untested |
@@ -58,7 +58,7 @@ this session. Nothing here is marked done — that's the point of this checklist
 | C2 | Manager can reassign leads, with reason + audit trail | ARCHITECTURE.md | untested |
 | C3 | Manager can approve/reject rep transfer requests | ARCHITECTURE.md | untested |
 | C4 | Manager sees team performance / rep comparison | ARCHITECTURE.md, `team.html`/leaderboard | untested |
-| C5 | Manager gets Telegram escalation after 3 rep passes on a lead | ARCHITECTURE.md, CODEBASE_AUDIT "Manager escalation" | untested |
+| C5 | Manager gets Telegram escalation after 3 rep passes on a lead | ARCHITECTURE.md, CODEBASE_AUDIT "Manager escalation" | **verified** (Phase 5: `handle_pass` with max_pass_count=3 escalates to ESCALATED state; notify_rep fires with message_type='escalation' — verification via spy/dry-run in `test_state_machine_notify.py`) |
 | C6 | Manager can add/edit/remove reps | ARCHITECTURE.md | untested |
 | C7 | Manager can manage dealer settings from the dashboard (no YAML editing) | PRD_HUMAN "What the Dealer Does NOT Have to Do" | **known gap** — 02_CODEBASE_AUDIT.md flagged settings-page save buttons as UI stubs (`showToast()` only, no persistence); no later commit mentions fixing this — confirm first, likely still broken |
 | C8 | Manager can upload/manage inventory via dashboard CSV/XLSX, incl. per-row mark-sold/relist and full-sync | PRD_HUMAN, commits `14fe7b0`/`612ebdd`/`c3702d7`/`14550ca` | **already verified working** per `NOTES/FIX_RECEIPTS.md` (live prod verification, 2026-06-27) |
@@ -73,9 +73,9 @@ this session. Nothing here is marked done — that's the point of this checklist
 | D3 | State machine transitions are always logged as `LeadEvent` rows (no direct `lead.state = X` bypass) | 02_CODEBASE_AUDIT.md "HIGH" #3 (`greeting_only` bypass) | untested — flagged broken in the stale audit, no later commit obviously fixes it; confirm |
 | D4 | System degrades gracefully when Twilio/DB/DeepSeek/Telegram is down — no crash, no silent data loss | PRD_AGENT Test 1 | untested |
 | D5 | 3am unattended operation: AI still responds, cron/scheduler recovers from a crashed tick, dealer notifications still respect quiet hours (dealer notify ≠ customer quiet hours) | PRD_AGENT Test 6 | untested |
-| D6 | AI never claims a booking succeeded when the tool call didn't actually create the appointment (anti-hallucination) | commit `0bbafba fix(engine): book appointments via bounded tool loop + anti-hallucination guard` | untested — harness D8 already targets this |
-| D7 | No leaked tool-call markup ever reaches the customer's SMS | commit `1511f5a` | untested — harness D6 already targets this |
-| D8 | AI never re-greets mid-conversation (treats an ongoing thread as ongoing) | commit `b586823` | untested |
+| D6 | AI never claims a booking succeeded when the tool call didn't actually create the appointment (anti-hallucination) | commit `0bbafba fix(engine): book appointments via bounded tool loop + anti-hallucination guard` | **verified** (harness D8/S4 pass — booking claim matches tool result, no false-positive booking) |
+| D7 | No leaked tool-call markup ever reaches the customer's SMS | commit `1511f5a` | **verified** (harness D6 passes across ALL scenarios — no tool-call markers in any reply) |
+| D8 | AI never re-greets mid-conversation (treats an ongoing thread as ongoing) | commit `b586823` | **verified** (harness S6 — returning customer gets natural continuation, no re-introduction) |
 | D9 | Dealer YAML config is validated at load time — malformed phone numbers, etc. fail loudly instead of silently breaking routing | This session's incident (masked phone numbers broke `normalize_phone`) | **not yet built** — this is Phase 2 of `NOTES/HERMES_CLEANUP_SECURITY_SPEC.md`, still pending |
 
 ## E. Explicitly Out of Scope — verify they correctly do NOT happen / fail gracefully, don't build tests expecting them to work
