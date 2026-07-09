@@ -1431,8 +1431,15 @@ async def team_page(request: Request, days: int = 30, _auth: dict = Depends(requ
 # ---------------------------------------------------------------------------
 
 @router.get("/appointments")
-async def appointments_page(request: Request, status: str = None, _auth: None = Depends(require_auth)):
-    """Appointments overview — list all appointments with filter by status."""
+async def appointments_page(
+    request: Request,
+    status: str = None,
+    view: str = "list",
+    week_offset: int = 0,
+    _auth: None = Depends(require_auth),
+):
+    """Appointments overview — list all appointments with filter by status,
+    or a week-grid calendar view (view=week)."""
     session = _get_session()
     try:
         cookie_value = request.cookies.get("session")
@@ -1445,7 +1452,8 @@ async def appointments_page(request: Request, status: str = None, _auth: None = 
         now = datetime.now(timezone.utc)
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         today_end = today_start + timedelta(days=1)
-        week_start = today_start - timedelta(days=today_start.weekday())
+        this_week_start = today_start - timedelta(days=today_start.weekday())
+        week_start = this_week_start + timedelta(weeks=week_offset)
         week_end = week_start + timedelta(days=7)
 
         # Build query
@@ -1477,13 +1485,39 @@ async def appointments_page(request: Request, status: str = None, _auth: None = 
         )
         week_count = sum(
             1 for a in all_appts
-            if a.scheduled_for.replace(tzinfo=timezone.utc) >= week_start
-            and a.scheduled_for.replace(tzinfo=timezone.utc) < week_end
+            if a.scheduled_for.replace(tzinfo=timezone.utc) >= this_week_start
+            and a.scheduled_for.replace(tzinfo=timezone.utc) < this_week_start + timedelta(days=7)
         )
         showed_count = sum(1 for a in all_appts if a.status == "showed")
         completed = sum(1 for a in all_appts if a.status in ("showed", "no_show"))
         no_show_count = sum(1 for a in all_appts if a.status == "no_show")
         no_show_pct = round(no_show_count / completed * 100, 1) if completed > 0 else 0
+
+        # Week-grid data: 7 days x appointments that fall in each day, for view=week
+        week_days = []
+        for i in range(7):
+            day_start = week_start + timedelta(days=i)
+            day_end = day_start + timedelta(days=1)
+            day_appts = [
+                a for a in all_appts
+                if a.scheduled_for.replace(tzinfo=timezone.utc) >= day_start
+                and a.scheduled_for.replace(tzinfo=timezone.utc) < day_end
+            ]
+            day_appts.sort(key=lambda a: a.scheduled_for)
+            day_appt_items = []
+            for a in day_appts:
+                lead = session.get(Lead, a.lead_id)
+                local_dt = a.scheduled_for.replace(tzinfo=timezone.utc)
+                # Position within a 7am-8pm (13hr) grid, clamped so early/late
+                # appointments still show at the top/bottom rather than vanishing.
+                hour_decimal = max(7.0, min(20.0, local_dt.hour + local_dt.minute / 60))
+                top_pct = (hour_decimal - 7) / 13 * 100
+                day_appt_items.append({
+                    "appointment": a, "lead": lead, "top_pct": round(top_pct, 1),
+                })
+            # NOTE: key is "appts", not "items" — Jinja resolves `day.items` to
+            # dict.items() (the builtin method) if the key is named "items".
+            week_days.append({"date": day_start, "appts": day_appt_items})
 
         return templates.TemplateResponse(request=request, name="appointments.html", context={
             "request": request,
@@ -1494,6 +1528,11 @@ async def appointments_page(request: Request, status: str = None, _auth: None = 
             "showed_count": showed_count,
             "no_show_pct": no_show_pct,
             "filter_status": status,
+            "view": view,
+            "week_offset": week_offset,
+            "week_start": week_start,
+            "week_days": week_days,
+            "now_local": _local_time(now, '%Y-%m-%d'),
             "dealer": current_dealer,
             "dealer_name": current_dealer.name,
             **_base_context(_auth),
@@ -2177,6 +2216,102 @@ async def add_team_member(
             f'They still need to tap their Telegram link to get lead pings.</div>',
             status_code=200,
         )
+        response.headers["HX-Trigger"] = "showToast"
+        return response
+    finally:
+        session.close()
+
+
+@router.post("/team/{rep_name}/unavailable")
+async def add_unavailable_window(
+    request: Request,
+    rep_name: str,
+    date: str = Form(...),
+    start: str = Form(...),
+    end: str = Form(...),
+    note: str = Form(""),
+    _auth: dict = Depends(require_auth),
+):
+    """Add an unavailability window for a rep."""
+    from app.config import UnavailableWindow as _UnavailableWindow
+    from sqlalchemy.orm.attributes import flag_modified
+    import json as _json
+
+    session = _get_session()
+    try:
+        cookie_value = request.cookies.get("session")
+        current_dealer = get_dealer_from_auth(session, cookie_value) if cookie_value else None
+        if not current_dealer:
+            return HTMLResponse("Unauthorized", status_code=401)
+
+        config = current_dealer.config or {}
+        sales_team = config.get("sales_team", [])
+        rep_cfg = next((r for r in sales_team if r.get("name", "").lower() == rep_name.lower()), None)
+        if not rep_cfg:
+            return HTMLResponse(f"Rep {rep_name} not found", status_code=404)
+
+        # Validate the window via Pydantic
+        try:
+            window = _UnavailableWindow(date=date, start=start, end=end, note=note)
+        except Exception as e:
+            return HTMLResponse(f"Invalid window: {e}", status_code=400)
+
+        # Add to rep's unavailable_windows
+        if "unavailable_windows" not in rep_cfg:
+            rep_cfg["unavailable_windows"] = []
+        rep_cfg["unavailable_windows"].append(window.model_dump())
+
+        current_dealer.config = _json.loads(_json.dumps(config))
+        flag_modified(current_dealer, "config")
+        session.commit()
+
+        response = HTMLResponse("", status_code=200)
+        response.headers["X-Toast-Message"] = f"Unavailable added for {rep_name}: {date} {start}-{end}"
+        response.headers["X-Toast-Type"] = "success"
+        response.headers["HX-Trigger"] = "showToast"
+        return response
+    finally:
+        session.close()
+
+
+@router.post("/team/{rep_name}/unavailable/remove")
+async def remove_unavailable_window(
+    request: Request,
+    rep_name: str,
+    index: int = Form(...),
+    _auth: dict = Depends(require_auth),
+):
+    """Remove an unavailability window by index for a rep."""
+    from sqlalchemy.orm.attributes import flag_modified
+    import json as _json
+
+    session = _get_session()
+    try:
+        cookie_value = request.cookies.get("session")
+        current_dealer = get_dealer_from_auth(session, cookie_value) if cookie_value else None
+        if not current_dealer:
+            return HTMLResponse("Unauthorized", status_code=401)
+
+        config = current_dealer.config or {}
+        sales_team = config.get("sales_team", [])
+        rep_cfg = next((r for r in sales_team if r.get("name", "").lower() == rep_name.lower()), None)
+        if not rep_cfg:
+            return HTMLResponse(f"Rep {rep_name} not found", status_code=404)
+
+        windows = rep_cfg.get("unavailable_windows", [])
+        if index < 0 or index >= len(windows):
+            return HTMLResponse("Invalid window index", status_code=400)
+
+        removed = windows.pop(index)
+        rep_cfg["unavailable_windows"] = windows
+
+        current_dealer.config = _json.loads(_json.dumps(config))
+        flag_modified(current_dealer, "config")
+        session.commit()
+
+        response = HTMLResponse("", status_code=200)
+        response.headers["X-Toast-Message"] = f"Removed unavailable window for {rep_name}"
+        response.headers["X-Toast-Type"] = "success"
         response.headers["HX-Trigger"] = "showToast"
         return response
     finally:

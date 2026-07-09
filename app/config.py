@@ -169,6 +169,40 @@ class Channels(BaseModel):
         return _validate_e164(v)
 
 
+class UnavailableWindow(BaseModel):
+    """A time window when a rep is not available for appointments."""
+    date: str = Field(..., description="Date in YYYY-MM-DD format")
+    start: str = Field(..., description="Start time in HH:MM format (24h)")
+    end: str = Field(..., description="End time in HH:MM format (24h)")
+    note: str = Field("", description="Optional reason for the unavailability")
+
+    @field_validator("date")
+    @classmethod
+    def _check_date_format(cls, v: str) -> str:
+        import re as _re
+        if not _re.match(r"^\d{4}-\d{2}-\d{2}$", v):
+            raise ValueError(f"Date {v!r} does not match YYYY-MM-DD format")
+        return v
+
+    @field_validator("start", "end")
+    @classmethod
+    def _check_time_format(cls, v: str) -> str:
+        import re as _re
+        if not _re.match(r"^\d{2}:\d{2}$", v):
+            raise ValueError(f"Time {v!r} does not match HH:MM format")
+        return v
+
+    @field_validator("end")
+    @classmethod
+    def _check_end_after_start(cls, v: str, info) -> str:
+        if "start" in info.data:
+            start_hr, start_min = map(int, info.data["start"].split(":"))
+            end_hr, end_min = map(int, v.split(":"))
+            if (end_hr, end_min) <= (start_hr, start_min):
+                raise ValueError(f"End time {v!r} must be after start time {info.data['start']!r}")
+        return v
+
+
 class SalesRep(BaseModel):
     name: str
     pin: str = Field("", description="4-digit PIN for dashboard login — each rep gets their own")
@@ -183,6 +217,10 @@ class SalesRep(BaseModel):
     )
     telegram_chat_id: Optional[str] = Field(
         None, description="Telegram chat_id for telegram notify_backend"
+    )
+    unavailable_windows: list[UnavailableWindow] = Field(
+        default_factory=list,
+        description="Time windows when this rep is not available for appointments",
     )
 
     @field_validator("phone")
