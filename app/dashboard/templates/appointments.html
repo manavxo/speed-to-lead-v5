@@ -251,6 +251,176 @@
             flex-shrink: 0;
         }
     }
+
+    /* View toggle (List / Week) */
+    .view-toggle {
+        display: flex;
+        gap: 4px;
+        margin-left: auto;
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 3px;
+    }
+
+    .view-toggle a {
+        padding: 5px 14px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        border-radius: 16px;
+        transition: var(--transition);
+    }
+
+    .view-toggle a.active {
+        color: var(--text-primary);
+        background: var(--bg-surface);
+    }
+
+    /* Week calendar */
+    .week-nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+    }
+
+    .week-nav-label {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    .week-nav-btn {
+        padding: 6px 12px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        transition: var(--transition);
+    }
+
+    .week-nav-btn:hover {
+        color: var(--text-primary);
+        border-color: var(--border-hover);
+    }
+
+    .week-grid-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        overflow: hidden;
+    }
+
+    .week-grid-header {
+        display: grid;
+        grid-template-columns: 56px repeat(7, 1fr);
+        border-bottom: 1px solid var(--border);
+    }
+
+    .week-grid-header-cell {
+        padding: 10px 8px;
+        text-align: center;
+        border-left: 1px solid var(--border);
+    }
+
+    .week-grid-header-cell:first-child {
+        border-left: none;
+    }
+
+    .week-day-name {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .week-day-num {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-top: 2px;
+    }
+
+    .week-day-num.today {
+        color: var(--accent);
+    }
+
+    .week-grid-body {
+        display: grid;
+        grid-template-columns: 56px repeat(7, 1fr);
+        position: relative;
+    }
+
+    .week-hour-labels {
+        display: grid;
+        grid-template-rows: repeat(13, 48px);
+    }
+
+    .week-hour-label {
+        font-size: 11px;
+        color: var(--text-muted);
+        text-align: right;
+        padding-right: 8px;
+        transform: translateY(-6px);
+    }
+
+    .week-day-col {
+        position: relative;
+        border-left: 1px solid var(--border);
+        background-image: repeating-linear-gradient(
+            to bottom, transparent, transparent 47px, var(--border) 47px, var(--border) 48px
+        );
+        height: 624px; /* 13 hours * 48px */
+    }
+
+    .week-appt-block {
+        position: absolute;
+        left: 4px;
+        right: 4px;
+        padding: 3px 6px;
+        border-radius: 4px;
+        font-size: 11px;
+        line-height: 1.3;
+        cursor: pointer;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        background: var(--accent-subtle);
+        border-left: 3px solid var(--accent);
+        color: var(--text-primary);
+        transition: var(--transition);
+        z-index: 1;
+    }
+
+    .week-appt-block:hover {
+        filter: brightness(1.3);
+        z-index: 2;
+    }
+
+    .week-appt-block.no_show {
+        border-left-color: var(--error);
+        background: rgba(239, 68, 68, 0.1);
+    }
+
+    .week-appt-block.showed {
+        border-left-color: var(--cyan);
+        background: rgba(6, 182, 212, 0.1);
+    }
+
+    .week-appt-block.cancelled {
+        border-left-color: var(--text-muted);
+        background: rgba(107, 114, 128, 0.1);
+        opacity: 0.6;
+    }
+
+    @media (max-width: 900px) {
+        .week-grid-card { overflow-x: auto; }
+        .week-grid-header, .week-grid-body { min-width: 760px; }
+    }
 </style>
 {% endblock %}
 
@@ -278,14 +448,59 @@
 
     <!-- Filters -->
     <div class="filter-bar">
-        <a href="/dashboard/appointments" class="filter-btn {% if not filter_status %}active{% endif %}">All</a>
-        <a href="/dashboard/appointments?status=set" class="filter-btn {% if filter_status == 'set' %}active{% endif %}">Set</a>
-        <a href="/dashboard/appointments?status=confirmed" class="filter-btn {% if filter_status == 'confirmed' %}active{% endif %}">Confirmed</a>
-        <a href="/dashboard/appointments?status=showed" class="filter-btn {% if filter_status == 'showed' %}active{% endif %}">Showed</a>
-        <a href="/dashboard/appointments?status=no_show" class="filter-btn {% if filter_status == 'no_show' %}active{% endif %}">No-Show</a>
-        <a href="/dashboard/appointments?status=cancelled" class="filter-btn {% if filter_status == 'cancelled' %}active{% endif %}">Cancelled</a>
+        <a href="/dashboard/appointments?view=list" class="filter-btn {% if not filter_status %}active{% endif %}">All</a>
+        <a href="/dashboard/appointments?view=list&status=set" class="filter-btn {% if filter_status == 'set' %}active{% endif %}">Set</a>
+        <a href="/dashboard/appointments?view=list&status=confirmed" class="filter-btn {% if filter_status == 'confirmed' %}active{% endif %}">Confirmed</a>
+        <a href="/dashboard/appointments?view=list&status=showed" class="filter-btn {% if filter_status == 'showed' %}active{% endif %}">Showed</a>
+        <a href="/dashboard/appointments?view=list&status=no_show" class="filter-btn {% if filter_status == 'no_show' %}active{% endif %}">No-Show</a>
+        <a href="/dashboard/appointments?view=list&status=cancelled" class="filter-btn {% if filter_status == 'cancelled' %}active{% endif %}">Cancelled</a>
+
+        <div class="view-toggle">
+            <a href="/dashboard/appointments?view=list" class="{% if view != 'week' %}active{% endif %}">List</a>
+            <a href="/dashboard/appointments?view=week" class="{% if view == 'week' %}active{% endif %}">Week</a>
+        </div>
     </div>
 
+    {% if view == 'week' %}
+    <!-- Week calendar -->
+    <div class="week-nav">
+        <a href="/dashboard/appointments?view=week&week_offset={{ week_offset - 1 }}" class="week-nav-btn">&larr; Prev</a>
+        <div class="week-nav-label">{{ week_start|local_time('%b %d') }} &ndash; {{ week_days[-1].date|local_time('%b %d, %Y') }}</div>
+        <a href="/dashboard/appointments?view=week&week_offset={{ week_offset + 1 }}" class="week-nav-btn">Next &rarr;</a>
+    </div>
+
+    <div class="week-grid-card">
+        <div class="week-grid-header">
+            <div class="week-grid-header-cell"></div>
+            {% for day in week_days %}
+            <div class="week-grid-header-cell">
+                <div class="week-day-name">{{ day.date|local_time('%a') }}</div>
+                <div class="week-day-num {% if day.date|local_time('%Y-%m-%d') == now_local %}today{% endif %}">{{ day.date|local_time('%d') }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="week-grid-body">
+            <div class="week-hour-labels">
+                {% for h in range(7, 20) %}
+                <div class="week-hour-label">{{ '%d:00'|format(h if h <= 12 else h - 12) }}{{ ' AM' if h < 12 else ' PM' }}</div>
+                {% endfor %}
+            </div>
+            {% for day in week_days %}
+            <div class="week-day-col">
+                {% for item in day.appts %}
+                <div class="week-appt-block {{ item.appointment.status }}"
+                     style="top: {{ item.top_pct }}%;"
+                     title="{{ item.lead.name or 'Unknown' }} — {{ item.appointment.scheduled_for|local_time('%I:%M %p') }} — {{ item.lead.assigned_rep or 'Unassigned' }}"
+                     onclick="window.location='/dashboard/leads/{{ item.lead.id }}'">
+                    <strong>{{ item.appointment.scheduled_for|local_time('%I:%M %p') }}</strong> {{ item.lead.name or 'Unknown' }}
+                    <div style="opacity:.75;">{{ item.lead.assigned_rep or 'Unassigned' }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
     <!-- Table -->
     <div class="appt-table-card">
         <div class="appt-table-header">
@@ -344,5 +559,6 @@
         </div>
         {% endif %}
     </div>
+    {% endif %}
 </div>
 {% endblock %}

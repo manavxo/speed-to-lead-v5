@@ -1,148 +1,95 @@
-# Inventory Sync — Receipts
+# FIX RECEIPTS — Dealer Readiness Execution
 
-## Test output
+## Phase 0 — Baseline
+
+**Date:** 2026-07-09
+**Commit:** d8522a5 (HEAD)
+**git status:** clean except untracked files (NOTES/, scripts/, tests/e2e/*.js/.png, etc.)
+
+### pytest baseline
 ```
-$ python -m pytest tests/ -q
-4 failed, 224 passed, 1 skipped
+pytest tests/ -q → 253 passed, 4 failed, 1 skipped
 ```
-(The 4 failures are pre-existing: test_pipeline_e2e x3, test_state_machine_notify x1)
 
-All 8 new tests in `tests/test_inventory_sync.py` pass.
+**Known date-sensitive failures (not fixed in this spec):**
+1. `test_full_pipeline_e2e` — `book_appointment` raises ValueError (June 2026 date in past)
+2. `test_escalation_after_timeout` — same cause
+3. `test_round_robin_distribution` — same cause
+4. `test_book_appointment_calls_notify_rep_for_appointment_set` — same cause
 
-## Commits
-1. `c3702d7` feat(inventory): full-sync mode removes cars missing from upload
-2. `612ebdd` feat(inventory): honor per-row status column on upload
-3. `14fe7b0` feat(inventory): per-row mark-sold / relist in dashboard
-4. `2c88e5f` test(inventory): sync/full-sync/status/mark-sold suite
-
-## Push SHA
-`2c88e5faf0f13b7f497daf9f72e8766e979d139c`
+All 4 are pre-existing and documented as such.
 
 ---
 
-# Security Cleanup + Repo Hygiene — Receipts
+## Phase 1 — Email parser consolidation
 
-**Date:** 2026-07-07
-**Spec:** NOTES/HERMES_CLEANUP_SECURITY_SPEC.md
+### After Phase 1a (port cars_com + dealer_website_form + update __init__.py)
+`pytest tests/ -q` → 4 failed, 253 passed, 1 skipped (unchanged)
 
-## Test baseline
-```
-$ pytest tests/ -q
-4 failed, 224 passed (+18 new), 1 skipped
-```
-Pre-existing failures unchanged (test_pipeline_e2e x3, test_state_machine_notify x1).
-18 new tests in `tests/test_config.py` all pass — E.164 validation guard.
+### After Phase 1b (delete dead file + registry test)
+`pytest tests/ -q` → 4 failed, 265 passed, 1 skipped (+12 tests)
 
-## Commits (in order)
-
-| Commit | SHA | Description |
-|--------|-----|-------------|
-| 1 | `54de740` | Stop tracking session cookie files (cookies.txt, dr_cookies.txt) |
-| 2 | `fb2b369` | gitignore: add cookies.txt patterns |
-| 3 | `e446df6` | Sanitize pipeline runbook — replace live secrets with `${VAR}` placeholders |
-| 4 | `9b70913` | Add E.164 phone validation guard + 18 tests |
-
-## Phase 1a — File hygiene (done, no rotation needed yet)
-- `git rm --cached cookies.txt` + added to `.gitignore` ✓
-- `git rm --cached v4 archived/dr_cookies.txt` + added to `.gitignore` ✓
-- `CLAUDE_CODE_VERIFY_CORE_PIPELINE.txt` sanitized — all secrets replaced with env-var refs ✓
-
-## Phase 1b — Credential rotation (DONE)
-| Credential | Status | Action required |
-|-----------|--------|-----------------|
-| Twilio Auth Token | ✅ Rotated | New token on Render + .env |
-| DASHBOARD_SECRET | ✅ Set | Fresh secret on Render + .env — invalidates leaked cookie |
-| Render API key | ⏳ Skip | Only needed if external scripts use it; ask manav |
-| Postgres DB password | ⏳ Skip | Not rotated — old password exposed in history, but DB is now behind rotated creds |
-| cookies.txt | ✅ Purged | Removed from git history (filter-repo) |
-| v4 archived/dr_cookies.txt | ✅ Purged | Removed from git history (filter-repo) |
-
-## Phase 1c — Git history purge (DONE)
-- `git filter-repo` stripped `CLAUDE_CODE_VERIFY_CORE_PIPELINE.txt`, `cookies.txt`, `v4 archived/dr_cookies.txt` from ALL 120 commits
-- Force-pushed to origin/main (SHA `+8d1045d...9bbb0a8`)
-- Anyone with an old clone MUST re-clone
-- Local repo at `9bbb0a8` — clean history
-
-## Phase 4 — Doc sprawl (DONE)
-- 12 root-level docs moved to NOTES/
-- `CLAUDE_CODE_VERIFY_CORE_PIPELINE.sh` deleted (superseded by .txt)
-- `.herpes/review-and-mimo-spec.md` deleted (duplicate)
-- Root now clean: CLAUDE.md, README.md, requirements.txt only
-
-## Phase 1c — CLAUDE_CODE_VERIFY_CORE_PIPELINE.txt
-✅ Already clean — no raw secrets found. All `${VAR}` placeholders.
-
-## Phase 2 — E.164 phone validation guard
-- ✅ Validators already exist in `app/config.py` (Dealer, Channels, SalesRep, Routing)
-- ✅ 11 new tests in `tests/test_e164_guard.py` — all pass
-- ✅ `git diff HEAD -- dealers/premier-auto.yaml` clean (restore was committed)
-- Test baseline: 253 passed, 4 failed (11 new E.164 tests added; pre-existing 4 failures unchanged)
-
-## Phase 3 — Phantom submodule
-- ✅ `.git` directory in `v4 archived/Speed to Lead v4/` already removed (no longer exists)
-- ✅ `git submodule status` reports clean error (no phantom m-line in status)
-- No action needed
-
-## Phase 4 — Doc sprawl (AWAITING MANAV SIGN-OFF)
-See the table at bottom — do not delete/move anything until sign-off.
+**Commits:**
+- `631df3a` Phase 1a: port cars_com & dealer_website_form parsers
+- `08e74c4` Phase 1b: delete dead email_parsers.py, add registry test
 
 ---
 
-## Phase 4 — Root-level doc sprawl proposal
+## Phase 2 — poll_inbox integration test
 
-| # | File | Size | Last Modified | Purpose | Proposal |
-|---|------|------|---------------|---------|----------|
-| 1 | `CLAUDE.md` | 1.2K | Jun 27 | Agent project context (loaded every session) | **Keep at root** — essential |
-| 2 | `README.md` | 4.2K | Jun 9 | Project readme | **Keep at root** — standard |
-| 3 | `requirements.txt` | 362B | Jun 21 | Python dependencies | **Keep at root** — needed |
-| 4 | `CLAUDE_HANDOFF.md` | 6.0K | Jun 27 | Session handoff between agents | **Move to NOTES/** |
-| 5 | `CLAUDE_CODE_VERIFY_CORE_PIPELINE.txt` | 8.3K | Jul 7 | Pipeline verification runbook (already sanitized) | **Move to NOTES/** |
-| 6 | `CLAUDE_CODE_VERIFY_CORE_PIPELINE.sh` | 5.4K | Jun 20 | Shell version of above | **Delete** — superseded by .txt |
-| 7 | `HERMES_CODEBASE_REVIEW_AND_MIMO_EXECUTION_SPEC.md` | 23K | Jun 27 | Full codebase review spec | **Move to NOTES/** |
-| 8 | `MIMO_CONTEXT_PASTE.txt` | 5.7K | Jun 18 | Context paste for Mimo sessions | **Move to NOTES/** |
-| 9 | `MIMO_HANDOFF.md` | 14K | Jun 18 | Mimo-to-Hermes handoff | **Move to NOTES/** |
-| 10 | `NEXT_SESSION_PROMPT.md` | 17K | Jun 12 | Prompt for next session | **Move to NOTES/** |
-| 11 | `PROMPT_FOR_CLAUDE_CODE.md` | 4.3K | Jun 20 | Prompt for Claude Code sessions | **Move to NOTES/** |
-| 12 | `V5_BUILD_PLAN.md` | 37K | Jun 9 | Build plan | **Move to NOTES/** |
-| 13 | `V5_MIGRATION_LOG.md` | 21K | Jun 9 | Migration log | **Move to NOTES/** |
-| 14 | `V5_SESSION_DECISIONS.md` | 9.8K | Jun 9 | Session decisions log | **Move to NOTES/** |
-| 15 | `WHATSAPP_FIX_PROMPT.md` | 4.8K | Jun 17 | WhatsApp fix prompt | **Move to NOTES/** |
-| 16 | `cookies.txt` | 410B | Jun 19 | Live session cookie (render.com) | **Keep on disk** — needed if session active. Already gitignored |
-| — | `.herpes/review-and-mimo-spec.md` | 23K | Jun 27 | **Duplicate** of HERMES_CODEBASE_REVIEW_AND_MIMO_EXECUTION_SPEC.md (identical) | **Delete** — keep root copy or move both to NOTES/ |
-- Render API key: needs revoke + regenerate at render.com
-- Twilio Auth Token: needs regenerate at twilio.com
-- Postgres password: needs reset at render.com
-- DASHBOARD_SECRET: needs rotate on Render env vars
+`pytest tests/ -q` → 4 failed, 269 passed, 1 skipped (+4 tests)
 
-## Phase 2 — E.164 guard (done)
-- `git diff HEAD -- dealers/premier-auto.yaml` confirmed clean ✓
-- `app/config.py`: phone validators on Dealer.main_phone, Channels.sms_number/whatsapp_sender/voice_number, SalesRep.phone, Routing.manager_phone ✓
-- `tests/test_config.py`: 18 tests — valid E.164 accepted, masked/forms rejected ✓
+**Commit:**
+- `df9ecbc` Phase 2: add poll_inbox integration test with mocked IMAP (4 scenarios)
 
-## Phase 3 — Phantom submodule (done)
-- Removed `v4 archived/Speed to Lead v4/.git` (orphaned .git, no .gitmodules)
-- `git status` no longer shows phantom submodule line ✓
+---
 
-## Phase 4 — Doc sprawl (NOT DONE — needs sign-off)
-- Inventory table produced in `NOTES/PHASE4_DOC_SPRAWL.md`
-- Pending manav's keep/archive/delete decisions
+## Phase 3 — Dashboard login fixes
 
+`pytest tests/ -q` → 4 failed, 269 passed, 1 skipped (no regression)
 
-## Prod verification (DONE — live browser, 2026-06-27 by Claude)
-1. Logged into prod dashboard as Manager (premier-auto, PIN 1234). ✅
-2. Settings → Inventory: full-sync checkbox ("This is my full current inventory…"),
-   STATUS / ACTION column, and per-row Mark sold / Relist buttons all render live. ✅
-3. **Mark sold** on PAG011 (Toyota RAV4 XLE) → row flipped to `sold` + Relist button,
-   persisted in prod DB through page reload. ✅
-4. **Relist** on PAG011 → row flipped back to `available` + Mark sold button, persisted. ✅
-   (Both directions verified live — the AI's check_inventory only sees `available`, so this is
-   the real guarantee a sold car drops out of the AI's window.)
-5. Prod restored: all 20 cars `available` (confirmed by reading the live inventory table —
-   PAG011 RAV4 back to `available`). No re-upload needed; mark-sold/relist left state clean.
+**Commits:**
+- `bafe6fd` Phase 3a: filter inactive reps from api_sales_team
+- `601414e` Phase 3b: reject inactive reps at login_submit
+- `ec1e878` Phase 3c: fix login_page config=None crash
+- `5ee6b6f` Phase 3d: log auto-provision failures at ERROR with slug and error summary
+- `a2f4ca6` Phase 3e: extend e2e login dropdown repro + active-rep filtering test
 
-NOTE: Mimo wrote these steps but never executed them — left PAG011 sitting `sold` in prod.
-Claude ran the actual live verification and restored prod.
+---
 
-## Screenshots (paste below)
-Captured during session: inventory table (20 cars, all available), PAG011 mid-cycle sold→relist.
-(Screenshot IDs ss_4303vn2nn / ss_7791cvcd4 from the verification run.)
+## Phase 4 — Review, extend, and commit engine test harness
+
+`pytest tests/ -q` → 4 failed, 269 passed, 1 skipped (no regression — harness is standalone)
+
+**Harness run result:** 22 pass, 8 fail (see NOTES/ENGINE_TEST_REPORT_2026-07.md)
+
+**Commits:**
+- `2d054ba` Phase 4: review, extend, commit engine test harness + report
+
+### Failures documented (not fixed — engine behavior issues):
+| ID | Scenario | Issue |
+|----|----------|-------|
+| S9-emoji-T1 | Verbosity | 3 emojis in inventory intro (style) |
+| S9-concise-T3/T4 | Verbosity | 4-5 sentences for vehicle detail (style) |
+| S11-book-first | Double-booking | Date sensitivity — June 26 in past |
+| S11-double-book | Double-booking | Cascaded from above |
+| S12-stop | STOP opt-out | AI responds politely but lead stays ENGAGED — opt-out not routed to CASL state machine in handle_turn |
+| S12-reasonable | Reasonable opt-out | Same issue — "please stop texting me" not honored |
+| S13-quiet-hours | Quiet hours | mode='send' not 'quiet_hours' at 22:00 local |
+
+---
+
+## Phase 5 — Round-robin + escalation coverage
+
+`pytest tests/ -q` → 4 failed, 274 passed, 1 skipped (+5 tests)
+
+**Commit:**
+- `442368d` Phase 5: round-robin + escalation coverage extensions (4 tests)
+
+---
+
+## Final counts
+
+**Baseline → Final:** 253 → 274 passed (+21 new tests), 4 failed (pre-existing, unchanged)
+**New files tracked:** `scripts/engine_test_harness.py` (committed from untracked)
+**Total commits this session:** 11

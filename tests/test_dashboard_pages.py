@@ -236,3 +236,73 @@ def test_logout_clears_session(client):
     set_cookie = response.headers.get("set-cookie", "").lower()
     # The cookie is cleared either by emptying the value or expiring it (Max-Age=0).
     assert 'session=;' in set_cookie or 'session=""' in set_cookie or 'max-age=0' in set_cookie
+
+
+# ---- Week calendar view tests ------------------------------------------------
+
+def _seed_appointment(db, lead_id: int, days_from_now: int = 0, hour: int = 14):
+    """Seed one Appointment for a given lead on a future date."""
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import select
+    from app.models import Appointment, Dealer
+
+    session = db.get_session_factory()()
+    try:
+        dealer = session.execute(
+            select(Dealer).where(Dealer.slug == "premier-auto")
+        ).scalars().first()
+        assert dealer is not None
+        scheduled = datetime.now(timezone.utc).replace(
+            hour=hour, minute=0, second=0, microsecond=0
+        ) + timedelta(days=days_from_now)
+        if scheduled < datetime.now(timezone.utc):
+            scheduled += timedelta(days=1)
+        session.add(Appointment(
+            lead_id=lead_id,
+            dealer_id=dealer.id,
+            scheduled_for=scheduled,
+            status="set",
+        ))
+        session.commit()
+        return scheduled
+    finally:
+        session.close()
+
+
+def test_appointments_view_list_returns_200(client):
+    """view=list returns 200 on /dashboard/appointments."""
+    cookie = _make_manager_session()
+    response = client.get("/dashboard/appointments?view=list", cookies={"session": cookie})
+    assert response.status_code == 200
+
+
+def test_appointments_view_week_returns_200(client):
+    """view=week returns 200 and renders the grid with appointment blocks."""
+    import app.db as db
+    _seed_appointment(db, lead_id=1, days_from_now=1, hour=14)
+
+    cookie = _make_manager_session()
+    response = client.get("/dashboard/appointments?view=week", cookies={"session": cookie})
+    assert response.status_code == 200, f"Week view returned {response.status_code}: {response.text[:300]}"
+    assert "Alice Test" in response.text, "Lead name should appear in week grid"
+
+
+def test_appointments_view_week_navigation(client):
+    """week_offset=-1 and 1 both return 200."""
+    cookie = _make_manager_session()
+
+    response_prev = client.get("/dashboard/appointments?view=week&week_offset=-1", cookies={"session": cookie})
+    assert response_prev.status_code == 200, f"Prev week returned {response_prev.status_code}"
+
+    response_next = client.get("/dashboard/appointments?view=week&week_offset=1", cookies={"session": cookie})
+    assert response_next.status_code == 200, f"Next week returned {response_next.status_code}"
+
+
+def test_appointments_view_week_rep_can_access(client):
+    """Rep can access week view (scoped to their leads)."""
+    import app.db as db
+    _seed_appointment(db, lead_id=1, days_from_now=1, hour=14)
+
+    cookie = _make_rep_session("Helly")
+    response = client.get("/dashboard/appointments?view=week", cookies={"session": cookie})
+    assert response.status_code == 200
