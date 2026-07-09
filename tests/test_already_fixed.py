@@ -149,18 +149,29 @@ def test_settings_compliance_persist(client):
 
 # ── Missed-call test ─────────────────────────────────────────────────────────
 
+@patch("twilio.rest.Client")
 @patch("app.main._validate_twilio_signature", return_value=True)
-def test_missed_call_creates_lead_and_sends_sms(mock_validate, client):
-    """Twilio missed-call webhook → lead created, SMS queued (mocked)."""
+def test_missed_call_creates_lead_and_sends_sms(mock_validate, mock_twilio_client, client, monkeypatch):
+    """Twilio missed-call webhook → lead created, SMS queued (mocked).
+
+    Both settings mutations are scoped via monkeypatch (auto-reverted after this
+    test) and the real Twilio client is patched at its source — a prior version of
+    this test set `app.config.settings.outbound_enabled = True` as a permanent
+    direct assignment with no real client mock, which leaked into every test that
+    ran afterward in the same session and caused real (failing, HTTP 401) Twilio API
+    calls from unrelated tests later in the suite.
+    """
     import app.db as db
     from app.models import Lead, Dealer
     from sqlalchemy import select as _select
     import json as _json
 
-    # Ensure outbound is enabled for the test
+    mock_twilio_client.return_value.messages.create.return_value.sid = "SMTEST_MOCKED"
+
+    # Ensure outbound is enabled for the test — scoped, reverts after this test
     import app.config
-    app.config.settings.outbound_enabled = True
-    app.config.settings.quiet_hours_disabled = True
+    monkeypatch.setattr(app.config.settings, "outbound_enabled", True)
+    monkeypatch.setattr(app.config.settings, "quiet_hours_disabled", True)
 
     # Provision a test dealer with a clean phone number
     from sqlalchemy.orm.attributes import flag_modified
