@@ -155,3 +155,28 @@ pytest tests/ -q → 275 passed, 4 failed, 1 skipped
 
 **Commit:**
 - `6b9b7b1` Phase 1: rep availability — data model, dashboard endpoints, 10 tests
+
+---
+
+## Phase 2 — Telegram free-text router
+
+**Changes:**
+- New module `app/telegram_free_text.py` with `handle_free_text()` entry point
+- Three intents: availability (with confirmation step), new_lead (uses `ingest_lead`), no_show_reply
+- LLM classification via `_get_openai_client()` (reuses conversation engine's plumbing)
+- `_CONFIRMATION_CACHE` module-level dict for pending availability confirmations
+- Wired into `webhook_telegram` in `app/main.py` — free-text from known reps routed to handler
+
+**Tests (`tests/test_telegram_free_text.py`, 7 tests, all mocked):**
+- Availability → confirmation reply, nothing written yet
+- Confirmation → window committed to dealer.config
+- Deny → window not written
+- New lead → Lead row created with correct fields, assigned to submitting rep
+- Garbage message → help reply, no side effects
+- Unrecognized chat_id → ignored/logged
+- No-show reply without active nudge → guidance message
+
+`pytest tests/ -q` → 296 passed (+7), 4 failed (pre-existing)
+
+**Commit:**
+- `e06e443` Phase 2: Telegram free-text router — 3 intents, confirmation step, 7 tests

@@ -166,21 +166,58 @@ def book_appointment(
                 "Only offer slots during open hours listed in the dealer config."
             )
 
-    # Guard: reject if the slot is already occupied (double-book prevention)
+    # Smart booking: find an available rep for this slot BEFORE creating the appointment
+    chosen_rep = None
     if dealer_config:
-        from sqlalchemy import select as sa_select
-        existing_appt = session.execute(
-            sa_select(Appointment).where(
-                Appointment.dealer_id == lead.dealer_id,
-                Appointment.scheduled_for == scheduled_for,
-                Appointment.status.in_(["set", "confirmed"]),
-            )
-        ).scalars().first()
-        if existing_appt:
-            raise ValueError(
-                "This time slot is already booked. Please offer a different time from "
-                "the available slots returned by check_availability."
-            )
+        sales_team = dealer_config.get("sales_team", [])
+        if sales_team:
+            from app.engine.router import find_available_rep_for_slot
+            from app.models import Dealer as _Dealer
+            from sqlalchemy import select as _select
+            dealer_obj = session.execute(
+                _select(_Dealer).where(_Dealer.id == lead.dealer_id)
+            ).scalar()
+
+            if lead.assigned_rep:
+                # Lead already has a rep — check that rep is available at this slot
+                rep_config = next(
+                    (r for r in sales_team if r.get("name", "").lower() == lead.assigned_rep.lower()),
+                    None,
+                )
+                if rep_config:
+                    # Check if this rep is blocked by an unavailable window
+                    from datetime import time as _t, date as _d
+                    windows = rep_config.get("unavailable_windows", [])
+                    req_date = scheduled_for.date()
+                    req_time = scheduled_for.time()
+                    blocked = False
+                    for w in windows:
+                        try:
+                            wd = _d.fromisoformat(w["date"])
+                            ws = _t.fromisoformat(w["start"])
+                            we = _t.fromisoformat(w["end"])
+                            if wd == req_date and ws <= req_time < we:
+                                blocked = True
+                                break
+                        except (KeyError, ValueError):
+                            continue
+                    if blocked:
+                        raise ValueError(
+                            f"Rep {lead.assigned_rep} is unavailable at {scheduled_for.isoformat()}. "
+                            "Please offer a different time or assign a different rep."
+                        )
+                chosen_rep = rep_config
+            else:
+                # Find an available rep via smart pairing
+                if dealer_obj:
+                    chosen_rep = find_available_rep_for_slot(
+                        session, dealer_obj, sales_team, scheduled_for,
+                    )
+                    if not chosen_rep:
+                        raise ValueError(
+                            "No rep is available at this time. "
+                            "Please offer a different time from the available slots."
+                        )
 
     appt = Appointment(
         lead_id=lead.id,
@@ -217,20 +254,14 @@ def book_appointment(
     session.add(event)
     session.commit()
 
-    # Assign the lead to a rep via round-robin NOW (not at lead creation).
+    # Assign the lead to the available rep selected during smart booking.
     # The AI has qualified the lead and booked an appointment — this is when
     # the sales rep gets involved. Use notify=False — the appointment
     # notification below handles the rep alert (not a claim ping).
-    if dealer_config:
-        sales_team = dealer_config.get("sales_team", [])
-        if sales_team and not lead.assigned_rep:
-            from app.engine.router import assign_lead
-            from app.models import Dealer
-            from sqlalchemy import select
-            dealer = session.execute(select(Dealer).where(Dealer.id == lead.dealer_id)).scalar()
-            if dealer:
-                assign_lead(session, lead, dealer, sales_team, notify=False, dealer_config=dealer_config)
-                logger.info("Lead#%s assigned to %s on appointment booking", lead.id, lead.assigned_rep)
+    if dealer_config and chosen_rep and not lead.assigned_rep:
+        lead.assigned_rep = chosen_rep["name"]
+        session.commit()
+        logger.info("Lead#%s assigned to %s (smart booking)", lead.id, chosen_rep["name"])
 
     # Notify the assigned rep (or dealership) about the new appointment
     _notify_rep_of_appointment(

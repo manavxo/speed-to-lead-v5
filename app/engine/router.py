@@ -251,3 +251,71 @@ def _escalate_to_manager(
             logger.exception("Failed to notify manager for lead#%s escalation", lead.id)
     else:
         logger.warning("No manager_phone configured for dealer %s — lead#%s escalated silently", dealer.slug, lead.id)
+
+
+def find_available_rep_for_slot(
+    session: Session,
+    dealer: Dealer,
+    sales_team: list[dict],
+    requested_time: datetime,
+) -> dict | None:
+    """Return an active rep who is available at the requested time.
+
+    Filters out reps who:
+    - Are not active
+    - Have an unavailability window covering the requested time
+    - Already have an appointment at that exact time
+
+    Among qualifying reps, uses round-robin (next_rep) for fairness.
+    Returns None if no rep is available.
+    """
+    from app.models import Appointment, Lead
+    from datetime import time as _time, date as _date
+
+    active_reps = [r for r in sales_team if r.get("active", True)]
+    if not active_reps:
+        return None
+
+    requested_date = requested_time.date()
+    requested_time_only = requested_time.time()
+
+    available: list[dict] = []
+    for rep in active_reps:
+        windows = rep.get("unavailable_windows", [])
+        blocked = False
+        for w in windows:
+            try:
+                w_date = _date.fromisoformat(w["date"])
+                w_start = _time.fromisoformat(w["start"])
+                w_end = _time.fromisoformat(w["end"])
+            except (KeyError, ValueError):
+                continue
+            if w_date != requested_date:
+                continue
+            if w_start <= requested_time_only < w_end:
+                blocked = True
+                break
+        if blocked:
+            continue
+
+        existing_appt = session.execute(
+            select(Appointment)
+            .join(Lead, Appointment.lead_id == Lead.id)
+            .where(
+                Lead.assigned_rep == rep["name"],
+                Appointment.scheduled_for == requested_time,
+                Appointment.status.in_(["set", "confirmed"]),
+            )
+        ).scalars().first()
+        if existing_appt:
+            continue
+
+        available.append(rep)
+
+    if not available:
+        return None
+
+    idx = dealer.round_robin_pointer % len(available)
+    dealer.round_robin_pointer = (dealer.round_robin_pointer + 1) % max(len(sales_team), 1)
+    session.commit()
+    return available[idx]
