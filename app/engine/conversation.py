@@ -383,6 +383,7 @@ def build_system_prompt(
     vehicle_context: str | None = None,
     *,
     is_continuing: bool = False,
+    returning_customer_text: str | None = None,
 ) -> str:
     """Assemble the system prompt from the dealer config + workflow SOPs + vehicle context.
 
@@ -700,6 +701,9 @@ def build_system_prompt(
     workflow = load_workflow("qualify_and_book.md")
     prompt_parts.append(f"\nREFERENCE WORKFLOW:\n{workflow}")
 
+    if returning_customer_text:
+        prompt_parts.append(f"[RETURNING CUSTOMER] {returning_customer_text}\nGreet them warmly as someone who has been in touch before. Do NOT introduce yourself as if for the first time.")
+
     return "\n\n".join(prompt_parts)
 
 
@@ -924,7 +928,31 @@ def handle_turn(
         ).scalar() or 0
         is_continuing = prior_outbound > 0
 
-    system_prompt = build_system_prompt(dealer_config, vehicle_context, is_continuing=is_continuing)
+        # Returning customer context
+    returning_text = None
+    if session is not None and lead is not None:
+        from sqlalchemy import select
+        from app.models import LeadEvent
+        rc = session.execute(
+            select(LeadEvent).where(
+                LeadEvent.lead_id == lead.id,
+                LeadEvent.type == "returning_customer",
+            ).order_by(LeadEvent.created_at.desc())
+        ).scalars().first()
+        if rc:
+            p = rc.payload or {}
+            parts = []
+            if p.get("prior_vehicle"):
+                parts.append(f"previously interested in {p['prior_vehicle']}")
+            if p.get("prior_state"):
+                parts.append(f"last outcome: {p['prior_state']}")
+            if p.get("prior_created"):
+                parts.append(f"last contact: {p['prior_created']}")
+            if p.get("prior_name"):
+                parts.append(f"known as {p['prior_name']}")
+            returning_text = ". ".join(parts) if parts else "Has prior history with the dealership."
+
+    system_prompt = build_system_prompt(dealer_config, vehicle_context, is_continuing=is_continuing, returning_customer_text=returning_text)
 
     tools_used: list[str] = []
 

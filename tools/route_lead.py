@@ -261,6 +261,29 @@ def ingest_lead(
         logger.info("Lead#%s created for dealer=%s source=%s phone=%s",
                     lead.id, dealer.slug, lead_data.source, lead_data.phone)
 
+    # 2b. Returning customer detection: prior terminal-state lead for same phone
+    prior_leads = []
+    if lead_data.phone and not existing:
+        prior_leads = find_prior_leads_by_phone(session, dealer, lead_data.phone)
+        if prior_leads:
+            prior = prior_leads[0]
+            session.add(LeadEvent(
+                lead_id=lead.id,
+                dealer_id=dealer.id,
+                type="returning_customer",
+                payload={
+                    "prior_lead_id": prior.id,
+                    "prior_state": prior.state.value,
+                    "prior_vehicle": prior.vehicle_ref or "",
+                    "prior_name": prior.name or "",
+                    "prior_created": prior.created_at.isoformat() if prior.created_at else "",
+                },
+                synced=False,
+            ))
+            session.commit()
+            logger.info("Returning customer: lead#%s (new) linked to prior lead#%s (%s)",
+                        lead.id, prior.id, prior.state.value)
+
     # 3. Log consent if provided (webform express consent)
     if lead_data.consent and lead_data.phone:
         consent_log = ConsentLog(
@@ -551,7 +574,40 @@ def ingest_lead_email_no_phone(
         _record_email_message(session, lead, email_body)
 
     # 6. Transition to ASSIGNED (AI is done — rep handles from here)
-    transition(session, lead, LeadState.ASSIGNED, reason="email_no_phone",
-               meta={"email_sent": email_body is not None, "email": lead_data.email})
-
+    transition(session, lead, LeadState.ASSIGNED, reason="email_no_phone")
+    session.commit()
     return lead
+
+
+# ── Returning customer recognition ───────────────────────────────────────────
+
+def find_prior_leads_by_phone(
+    session: Session,
+    dealer,
+    phone: str,
+    *,
+    exclude_lead_id: int | None = None,
+) -> list[Lead]:
+    """Find prior leads for the same dealer+phone that are in a terminal state.
+
+    Used by ingest_lead to detect returning customers (weeks/months later).
+    Excludes the current lead if specified.
+    Returns most-recent-first.
+    """
+    from datetime import timedelta
+    terminal_states = (LeadState.SOLD, LeadState.LOST, LeadState.OPTED_OUT)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    query = (
+        select(Lead)
+        .where(
+            Lead.dealer_id == dealer.id,
+            Lead.phone == phone,
+            Lead.state.in_(terminal_states),
+            Lead.created_at < cutoff,
+        )
+        .order_by(Lead.created_at.desc())
+        .limit(5)
+    )
+    if exclude_lead_id:
+        query = query.where(Lead.id != exclude_lead_id)
+    return _exec(session, query).all()
