@@ -288,8 +288,11 @@ def _run_stuck_lead_sweep_session(session) -> None:
             )
         ).scalars().all()
         for lead in stuck_new:
+            created_at = lead.created_at
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
             logger.warning("STUCK lead#%s in NEW for %d min (dealer=%s)",
-                           lead.id, (now - lead.created_at).total_seconds() / 60, dealer.slug)
+                           lead.id, (now - created_at).total_seconds() / 60, dealer.slug)
 
         # Leads stuck in ASSIGNED for >2x timeout
         stuck_assigned = session.execute(
@@ -300,8 +303,11 @@ def _run_stuck_lead_sweep_session(session) -> None:
             )
         ).scalars().all()
         for lead in stuck_assigned:
+            updated_at = lead.updated_at
+            if updated_at.tzinfo is None:
+                updated_at = updated_at.replace(tzinfo=timezone.utc)
             logger.warning("STUCK lead#%s in ASSIGNED for %d min (dealer=%s)",
-                           lead.id, (now - lead.updated_at).total_seconds() / 60, dealer.slug)
+                           lead.id, (now - updated_at).total_seconds() / 60, dealer.slug)
 
 
 def _run_stuck_lead_sweep():

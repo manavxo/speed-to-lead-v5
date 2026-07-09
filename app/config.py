@@ -5,7 +5,7 @@ file per dealership (`dealers/<slug>.yaml`) declares every behavior, including w
 to use on each of the three axes (intake / inventory / organization). Validating it with
 Pydantic is what lets us onboard a new client without touching core code.
 
-See `dealers/_schema.md` for human docs and `dealers/example-dealer.yaml` for a filled example.
+See `dealers/_schema.md` for human docs and `dealers/_example-dealer.yaml` for a filled example.
 """
 
 from __future__ import annotations
