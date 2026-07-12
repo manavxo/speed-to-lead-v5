@@ -305,8 +305,8 @@ def session_count(db, model):
 # ── Unrecognized chat_id ────────────────────────────────────────────────────
 
 @patch("app.transports.telegram.TelegramTransport.send")
-def test_unrecognized_chat_id_ignored(mock_send, client):
-    """Message from unknown chat_id → not processed, ignored/logged."""
+def test_unrecognized_chat_id_sends_help(mock_send, client):
+    """Message from unknown chat_id → not processed, sends re-register prompt."""
     import app.db as db
     from app.models import Lead
     from sqlalchemy import select
@@ -318,17 +318,21 @@ def test_unrecognized_chat_id_ignored(mock_send, client):
         "message": {
             "text": "new lead, John Doe, wants a Civic",
             "from": {"username": "stranger"},
-            "chat": {"id": "999999999"},
+            "chat": {"id": 999999999},
         }
     }
     response = client.post("/webhook/telegram", json=payload)
     assert response.status_code == 200
     data = response.json()
-    # Should fall through to "unknown" since no rep matched
-    assert data.get("action") == "unknown"
+    assert data.get("action") == "unrecognized_chat"
 
     # No new lead created
     assert session_count(db, Lead) == initial_count
+
+    # Should have sent a "re-register" reply
+    mock_send.assert_called_once()
+    call_args = mock_send.call_args
+    assert "/start" in call_args[1]["body"]
 
 
 # ── No-show reply ───────────────────────────────────────────────────────────

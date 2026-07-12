@@ -1086,14 +1086,27 @@ async def webhook_messenger_verify(request: Request) -> Response:
 async def webhook_telegram(request: Request) -> dict:
     """Handle inbound Telegram updates: /start deep links + inline button callbacks.
 
-    - /start <dealer_slug>__<rep_name>  → captures chat_id, saves to dealer config.
+    - /start <dealer_slug>__<rep_name>__<pin>  → captures chat_id, saves to dealer config.
     - Callback queries (claim:<lead_id> / pass:<lead_id>) → handles claim/pass.
+    - Free-text from a known rep → routed to intent classifier.
+
+    CRITICAL: Always return 200 to Telegram. A non-200 causes Telegram to retry
+    the same update indefinitely, blocking ALL subsequent messages to the bot.
     """
     try:
         payload = await request.json()
     except Exception:
-        return {"error": "invalid json"}
+        return {"ok": True}
 
+    try:
+        return _process_telegram_update(payload)
+    except Exception:
+        logger.exception("Telegram webhook handler crashed — returning 200 to prevent retry loop")
+        return {"ok": True, "error": "internal"}
+
+
+def _process_telegram_update(payload: dict) -> dict:
+    """Process a single Telegram update. Extracted so exceptions are caught above."""
     message = payload.get("message") or {}
     callback = payload.get("callback_query") or {}
     callback_data = callback.get("data", "")
@@ -1106,12 +1119,14 @@ async def webhook_telegram(request: Request) -> dict:
     logger.info("Telegram webhook: chat_id=%s text=%r callback=%r", chat_id, text[:100], callback_data)
 
     # ── /start deep link: capture chat_id ─────────────────────────────────
-    if text.startswith("/start ") or any(
-        e.get("type") == "bot_command" and "start" in text
-        for e in entities
-    ):
-        _handle_telegram_start(text, chat_id)
-        return {"ok": True, "action": "start_captured", "chat_id": chat_id}
+    is_start_command = text.startswith("/start")
+    if is_start_command:
+        if " " in text:
+            _handle_telegram_start(text, chat_id)
+            return {"ok": True, "action": "start_captured", "chat_id": chat_id}
+        else:
+            _handle_telegram_bare_start(chat_id)
+            return {"ok": True, "action": "start_no_payload", "chat_id": chat_id}
 
     # ── Inline button callback ────────────────────────────────────────────
     if callback_data:
@@ -1119,7 +1134,6 @@ async def webhook_telegram(request: Request) -> dict:
 
     # ── Free-text from known rep ─────────────────────────────────────────
     if text and not text.startswith("/"):
-        # Look up the rep by chat_id
         session = _get_session()
         try:
             from sqlalchemy import select as _select
@@ -1146,17 +1160,46 @@ async def webhook_telegram(request: Request) -> dict:
                         transport = TelegramTransport()
                         transport.send(to=chat_id, body=result["reply"])
                     return {"ok": True, "action": result.get("action", "unknown"), "chat_id": chat_id}
+
+            # No rep found for this chat_id — tell them to re-register
+            if chat_id:
+                from app.transports.telegram import TelegramTransport
+                TelegramTransport().send(
+                    to=chat_id,
+                    body=(
+                        "I don't recognize your account. "
+                        "Use the /start link your manager sent to connect."
+                    ),
+                )
+            return {"ok": True, "action": "unrecognized_chat", "chat_id": chat_id}
         finally:
             session.close()
 
-    # Unrecognized message — echo help text
-    return {"ok": True, "action": "unknown"}
+    return {"ok": True, "action": "ignored"}
 
 
 @app.get("/webhook/telegram")
 async def webhook_telegram_verify(request: Request) -> Response:
     """Telegram webhook verification (for setWebhook via GET)."""
     return PlainTextResponse("ok")
+
+
+def _handle_telegram_bare_start(chat_id: str) -> None:
+    """Handle /start without a deep-link payload — send instructions."""
+    from app.transports.telegram import TelegramTransport
+    transport = TelegramTransport()
+    transport.send(
+        to=chat_id,
+        body=(
+            "👋 Welcome to Hermes — your Speed to Lead assistant.\n\n"
+            "To connect your account, use the link your manager sent you.\n"
+            "It looks like: /start dealer__yourname__pin\n\n"
+            "If you're already connected, just send me a message:\n"
+            "• Set unavailability: 'not free 2-4pm Friday'\n"
+            "• Add a lead: 'new lead, John, 604-555-1234, wants a Civic'\n"
+            "• Confirm show/no-show: reply to a nudge"
+        ),
+    )
 
 
 def _handle_telegram_start(text: str, chat_id: str) -> None:
@@ -1167,6 +1210,8 @@ def _handle_telegram_start(text: str, chat_id: str) -> None:
     dashboard URLs and the sales-team dropdown — isn't enough to hijack a
     rep's lead-notification channel.
     """
+    from app.transports.telegram import TelegramTransport
+
     parts = text.split(maxsplit=1)
     if len(parts) < 2:
         return
@@ -1174,6 +1219,10 @@ def _handle_telegram_start(text: str, chat_id: str) -> None:
     token_parts = token.split("__", 2)
     if len(token_parts) < 3:
         logger.warning("Telegram start: missing PIN in deep link")
+        TelegramTransport().send(
+            to=chat_id,
+            body="❌ Invalid link — expected format: /start dealer__name__pin",
+        )
         return
     dealer_slug, rep_name, pin = token_parts
 
@@ -1182,15 +1231,23 @@ def _handle_telegram_start(text: str, chat_id: str) -> None:
         dealer = _exec(session, select(Dealer).where(Dealer.slug == dealer_slug)).first()
         if not dealer:
             logger.warning("Telegram start: dealer %s not found", dealer_slug)
+            TelegramTransport().send(
+                to=chat_id,
+                body="❌ Dealer not found. Check the link with your manager.",
+            )
             return
 
         config = dealer.config or {}
         sales_team = config.get("sales_team", [])
         updated = False
         for r in sales_team:
-            if r.get("name") == rep_name:
+            if r.get("name", "").lower() == rep_name.lower():
                 if not pin or str(r.get("pin", "")) != str(pin):
                     logger.warning("Telegram start: PIN mismatch for rep=%s dealer=%s", rep_name, dealer_slug)
+                    TelegramTransport().send(
+                        to=chat_id,
+                        body="❌ PIN mismatch. Double-check the link your manager gave you.",
+                    )
                     return
                 r["telegram_chat_id"] = chat_id
                 updated = True
@@ -1204,13 +1261,15 @@ def _handle_telegram_start(text: str, chat_id: str) -> None:
             flag_modified(dealer, "config")
             session.commit()
 
-            # Send confirmation via Telegram
-            from app.transports.telegram import TelegramTransport
-            transport = TelegramTransport()
-            transport.send(
+            TelegramTransport().send(
                 to=chat_id,
                 body=f"✅ Welcome {rep_name}! You're now connected to {dealer.name}. "
                      f"You'll receive lead notifications here.",
+            )
+        else:
+            TelegramTransport().send(
+                to=chat_id,
+                body=f"❌ Rep '{rep_name}' not found in {dealer_slug}. Check the link.",
             )
     finally:
         session.close()
